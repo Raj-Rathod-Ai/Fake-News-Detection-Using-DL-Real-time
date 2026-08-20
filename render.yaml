@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: truthlens-ai
+    name: fake-news-detection-using-ml-real-time
     env: python
     region: oregon
     plan: free

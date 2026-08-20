@@ -3,9 +3,9 @@
   publish = "templates"
 
 [[redirects]]
-  # Proxy all API requests to the Render backend service (replace with your Render URL if frontend is deployed separately on Netlify)
+  # Proxy all API requests to the Render backend service
   from = "/api/*"
-  to = "https://truthlens-ai.onrender.com/api/:splat"
+  to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
   status = 200
   force = true
 

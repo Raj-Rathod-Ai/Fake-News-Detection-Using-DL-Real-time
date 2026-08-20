@@ -74,7 +74,7 @@ Fake-News-Detection-Using-ML-Real-time/
 2. Go to [Render Dashboard](https://dashboard.render.com/) and click **New +** → **Web Service**.
 3. Select your GitHub repository.
 4. Configure the service settings:
-   - **Name**: `truthlens-ai`
+   - **Name**: `fake-news-detection-using-ml-real-time`
    - **Environment**: `Python 3`
    - **Region**: Any (e.g., `Oregon (US West)` or `Frankfurt (EU)`)
    - **Branch**: `main`
@@ -88,7 +88,7 @@ Fake-News-Detection-Using-ML-Real-time/
    - `MISTRAL_API_KEY` = *your_mistral_api_key*
    - `MONGO_URI` = *your_mongodb_connection_string* (Optional)
    - `CRICBUZZ_KEY` = *your_rapidapi_key* (Optional)
-6. Click **Deploy Web Service**. Your app will be live at `https://truthlens-ai.onrender.com`.
+6. Click **Deploy Web Service**. Your app will be live at `https://fake-news-detection-using-ml-real-time.onrender.com`.
 
 ---
 
@@ -101,11 +101,11 @@ If you prefer hosting the frontend on Netlify with the backend hosted on Render:
 3. Configure Build Settings:
    - **Publish directory**: `templates`
    - **Build command**: *(leave blank)*
-4. Update `netlify.toml` redirects to point `/api/*` to your live Render backend URL:
+4. The [`netlify.toml`](file:///c:/Final%20Project/netlify.toml) automatically proxies `/api/*` requests to your live Render backend:
    ```toml
    [[redirects]]
      from = "/api/*"
-     to = "https://your-render-app.onrender.com/api/:splat"
+     to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
      status = 200
      force = true
    ```
