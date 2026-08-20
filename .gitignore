@@ -1,0 +1,67 @@
+# TruthLens - Production Git Ignore Configuration
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Large training datasets (downloadable via dataset_downloader.py)
+datasets/*.csv
+datasets/*.zip
+
+# Database & SQLite files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads directory contents
+uploads/*
+!uploads/.gitkeep
+
+# Temporary & Log files
+*.tmp
+*.temp
+*.log
+temp/
+tmp/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Local tools & IDE
+gh/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

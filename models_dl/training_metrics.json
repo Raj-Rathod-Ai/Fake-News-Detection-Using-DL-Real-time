@@ -1,0 +1,7 @@
+{
+  "val_accuracy": 0.9447,
+  "roc_auc": 0.9799,
+  "epochs": 4,
+  "vocab_size": 25000,
+  "architecture": "Conv1D + BiLSTM + Multi-Head Self-Attention + GELU/Swish Dense NN"
+}

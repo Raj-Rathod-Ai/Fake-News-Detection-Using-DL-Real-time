@@ -1,0 +1,23 @@
+# Netlify Deployment Configuration for TruthLens
+[build]
+  publish = "templates"
+
+[[redirects]]
+  # Proxy all API requests to the Render backend service (replace with your Render URL if frontend is deployed separately on Netlify)
+  from = "/api/*"
+  to = "https://truthlens-ai.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  # Single-page app fallback
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

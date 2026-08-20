@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens — AI Verified Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['DM Sans', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        paper: { 50:'#fdfcf8', 100:'#f1f3f4', 200:'#dadce0', 800:'#1a1a1a', 900:'#0f0f0f' },
+                        ink:   { 900:'#1a1a2e', 700:'#5f6368', 500:'#9aa0a6', 100:'#e8eaed' },
+                        tl: {
+                            blue:'#1a73e8', red:'#ea4335', green:'#34a853',
+                            yellow:'#fbbc04', purple:'#7c3aed', orange:'#f97316',
+                            cyan:'#06b6d4'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; }
+        .dark body { background:#0f0f0f; color:#e8eaed; }
+        * { transition: background-color 0.25s ease, border-color 0.25s ease; }
+
+        ::-webkit-scrollbar { width:4px; height:4px; }
+        ::-webkit-scrollbar-thumb { background:#dadce0; border-radius:10px; }
+        .dark ::-webkit-scrollbar-thumb { background:#333; }
+        .no-scrollbar::-webkit-scrollbar { display:none; }
+
+        /* Loader */
+        .loader-bar { height:3px; background:#e8eaed; border-radius:10px; overflow:hidden; position:relative; }
+        .loader-bar::before {
+            content:''; position:absolute; height:100%; width:40%; left:-50%;
+            background:linear-gradient(90deg,#7c3aed,#1a73e8);
+            animation:loaderAnim 1.5s linear infinite;
+        }
+        @keyframes loaderAnim { 0%{left:-50%} 100%{left:110%} }
+
+        /* Ticker */
+        .ticker-move { display:flex; animation:tickerScroll 40s linear infinite; width:max-content; }
+        .ticker-move:hover { animation-play-state:paused; }
+        @keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+        /* Nav */
+        .nav-item { position:relative; cursor:pointer; white-space:nowrap; transition:all 0.2s;
+                    font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
+        .nav-item:hover { color:#1a73e8; }
+        .nav-item.active { color:#7c3aed; }
+        .nav-item.active::after {
+            content:''; position:absolute; bottom:-10px; left:0; width:100%; height:3px;
+            background:linear-gradient(90deg,#7c3aed,#1a73e8); border-radius:10px;
+        }
+
+        /* Glass */
+        .glass { backdrop-filter:blur(16px); background:rgba(253,252,248,0.92); }
+        .dark .glass { background:rgba(15,15,15,0.92); }
+
+        /* Cards */
+        .news-card { border-radius:20px; overflow:hidden; border:1px solid rgba(0,0,0,0.06);
+                     transition:all 0.3s cubic-bezier(0.23,1,0.32,1); }
+        .news-card:hover { transform:translateY(-4px); box-shadow:0 20px 40px -10px rgba(0,0,0,0.15); }
+        .dark .news-card { border-color:rgba(255,255,255,0.06); }
+
+        /* Animations */
+        .fade-up { animation:fadeUp 0.5s cubic-bezier(0.23,1,0.32,1) forwards; opacity:0; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+        /* Score rings */
+        .score-ring { transform:rotate(-90deg); transform-origin:50% 50%; }
+        
+        /* Pulse dot */
+        .pulse-dot::before {
+            content:''; position:absolute; inset:0; border-radius:50%;
+            background:inherit; animation:pulseDot 2s ease-out infinite;
+        }
+        @keyframes pulseDot { 0%{opacity:0.7;transform:scale(1)} 100%{opacity:0;transform:scale(2.5)} }
+
+        /* Chatbot */
+        #chatbot-panel { transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+        
+        /* Market table */
+        .market-row:hover { background:rgba(26,115,232,0.04); }
+        .dark .market-row:hover { background:rgba(26,115,232,0.08); }
+
+        /* Upload zone */
+        .upload-zone { border:2px dashed #dadce0; border-radius:16px; transition:all 0.2s; }
+        .upload-zone:hover,.upload-zone.drag-over { border-color:#7c3aed; background:rgba(124,58,237,0.04); }
+        .dark .upload-zone { border-color:#333; }
+
+        /* Toast */
+        .toast { transform:translateY(20px) scale(0.95); opacity:0;
+                  transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        .toast.show { transform:translateY(0) scale(1); opacity:1; }
+
+        /* Verdict badge */
+        .verdict-real { background:linear-gradient(135deg,#34a853,#059669); }
+        .verdict-fake { background:linear-gradient(135deg,#ea4335,#dc2626); }
+        .verdict-deepfake { background:linear-gradient(135deg,#f97316,#ea4335); }
+        .verdict-authentic { background:linear-gradient(135deg,#34a853,#059669); }
+        .verdict-manipulated { background:linear-gradient(135deg,#f97316,#dc2626); }
+
+        /* Scan animation */
+        @keyframes scanLine { 0%{top:0%} 100%{top:100%} }
+        .scan-line { position:absolute; left:0; right:0; height:2px; 
+                     background:linear-gradient(90deg,transparent,#7c3aed,transparent);
+                     animation:scanLine 1.5s ease-in-out infinite alternate; }
+
+        /* Sidebar panels */
+        .sidebar-card { border-radius:16px; border:1px solid rgba(0,0,0,0.07); }
+        .dark .sidebar-card { border-color:rgba(255,255,255,0.07); }
+
+        /* AI glow */
+        .ai-glow { box-shadow:0 0 30px rgba(124,58,237,0.15); }
+        
+        /* OTP input */
+        .otp-input { width:48px; height:56px; text-align:center; font-size:24px; font-weight:700;
+                     border:2px solid #dadce0; border-radius:12px; outline:none; }
+        .otp-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.1); }
+        .dark .otp-input { background:#1a1a2e; border-color:#333; color:white; }
+        /* Currency styling */
+        .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
+        .price-amt { font-size:1.02em; font-weight:800; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body class="antialiased min-h-screen flex flex-col font-sans">
+
+<!-- CINEMATIC PRELOADER (TruthLens brand style) -->
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center" style="background:#000000;">
+    <div style="text-align:center;">
+        <div id="preloader-brand" style="
+            font-family:'Playfair Display',serif;font-size:clamp(2.5rem,10vw,5rem);
+            font-weight:900;font-style:italic;letter-spacing:-0.05em;color:white;display:inline-block;
+        "></div>
+        <div style="width:320px;height:1px;background:rgba(255,255,255,0.06);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
+            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
+        </div>
+        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#555;text-transform:uppercase;">Initializing AI Engine...</p>
+    </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" class="fixed bottom-6 right-6 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- STOCK TICKER BAR -->
+<div class="bg-ink-900 dark:bg-black border-b border-white/5 h-8 flex items-center overflow-hidden relative z-[60]">
+    <div class="shrink-0 bg-tl-purple px-4 h-full flex items-center z-10">
+        <span class="text-[9px] font-black text-white uppercase tracking-widest">LIVE</span><span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse opacity-70"></span>
+    </div>
+    <div class="ticker-move items-center gap-8" id="stock-ticker"></div>
+</div>
+
+<!-- HEADER -->
+<header class="glass border-b border-paper-200 dark:border-white/10 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center justify-between h-14">
+        <!-- Weather -->
+        <div class="flex items-center gap-3 w-1/3">
+            <button id="weather-box" onclick="requestLoc()" class="flex items-center gap-2 hover:bg-paper-100 dark:hover:bg-white/5 rounded-xl px-3 py-1.5 transition-all opacity-0">
+                <i id="weather-icon" class="ph-fill ph-cloud-sun text-tl-yellow text-2xl"></i>
+                <div class="hidden sm:flex flex-col">
+                    <span class="text-sm font-black dark:text-white leading-none" id="weather-temp">--°C</span>
+                    <span class="text-[9px] text-ink-500 font-bold uppercase tracking-wider truncate max-w-[100px]" id="weather-loc">Locating...</span>
+                </div>
+            </button>
+        </div>
+
+        <!-- Logo -->
+        <button onclick="nav('home')" class="flex flex-col items-center group">
+            <h1 class="text-3xl md:text-4xl font-serif font-black tracking-tighter text-ink-900 dark:text-white group-hover:text-tl-purple transition-colors">TruthLens</h1>
+            <span class="text-[8px] font-mono uppercase tracking-[0.2em] text-ink-500 group-hover:text-tl-purple transition-colors">AI Intelligence</span>
+        </button>
+
+        <!-- Actions -->
+        <div class="w-1/3 flex justify-end items-center gap-2 md:gap-3">
+            <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-paper-100 dark:hover:bg-white/10 transition-all text-ink-700 dark:text-ink-500">
+                <i class="ph-bold ph-moon hidden dark:block text-xl"></i>
+                <i class="ph-bold ph-sun block dark:hidden text-xl text-tl-yellow"></i>
+            </button>
+            <div id="auth-area"></div>
+        </div>
+    </div>
+
+    <!-- NAV TABS -->
+    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2">
+        <div class="max-w-[1680px] mx-auto px-4 md:px-6">
+            <nav class="flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 justify-center" id="nav-tabs"></nav>
+        </div>
+    </div>
+</header>
+
+<!-- SEARCH & SCANNER BAR -->
+<div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-5 px-4">
+    <div class="max-w-2xl mx-auto space-y-2">
+        <div class="relative flex items-center bg-paper-50 dark:bg-ink-900 border-2 border-paper-200 dark:border-white/10 rounded-2xl overflow-hidden focus-within:border-tl-purple transition-all shadow-sm" id="search-box">
+            <div class="pl-4 flex items-center shrink-0">
+                <i class="ph-bold ph-magnifying-glass text-xl text-ink-500" id="search-ico"></i>
+            </div>
+            <input id="main-search" type="text" placeholder="Search news or paste claim to verify..."
+                   class="flex-1 px-3 py-3.5 bg-transparent outline-none text-ink-900 dark:text-white text-base placeholder-ink-500"
+                   onkeypress="if(event.key==='Enter')handleSearch()">
+            <div class="flex items-center gap-2 pr-2 shrink-0">
+                <button onclick="toggleScanMode()" id="mode-btn"
+                    class="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border border-paper-200 dark:border-white/10 text-ink-700 dark:text-ink-100 hover:border-tl-purple hover:text-tl-purple transition-all">
+                    <span id="mode-lbl">Search</span>
+                </button>
+                <button onclick="handleSearch()"
+                    class="bg-tl-purple hover:bg-purple-800 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 shadow-lg">
+                    <i class="ph-bold ph-arrow-right text-lg" id="search-btn-icon"></i>
+                </button>
+            </div>
+        </div>
+        <div id="ai-label" class="hidden text-center text-[10px] text-tl-purple font-black uppercase tracking-widest flex items-center justify-center gap-2">
+            <i class="ph-fill ph-sparkle animate-pulse"></i> AI Verification Mode Active
+        </div>
+    </div>
+</div>
+
+<!-- CRICKET HUB -->
+<div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar" id="cricket-hub">
+        <span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>
+    </div>
+</div>
+
+<!-- MAIN GRID -->
+<main class="max-w-[1680px] mx-auto px-4 md:px-6 py-8 grid grid-cols-12 gap-6 min-h-screen">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="hidden xl:block col-span-2 space-y-4" id="sidebar-left"></aside>
+
+    <!-- CENTER FEED -->
+    <section class="col-span-12 xl:col-span-7">
+        <div id="app" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+    </section>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="hidden lg:block col-span-12 lg:col-span-3 xl:col-span-3 space-y-4" id="sidebar-right"></aside>
+</main>
+
+<!-- FOOTER -->
+<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-10 mt-auto">
+    <div class="max-w-[1680px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500">
+        <div>
+            <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2">TruthLens</h3>
+            <p class="opacity-70 text-sm leading-relaxed">AI-powered fake news detection & verified intelligence platform.</p>
+        </div>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Sections</h4>
+            <div class="space-y-2">
+                <button onclick="nav('home')" class="block hover:text-tl-blue font-medium">Headlines</button>
+                <button onclick="nav('india')" class="block hover:text-tl-blue font-medium">India</button>
+                <button onclick="nav('technology')" class="block hover:text-tl-blue font-medium">Technology</button>
+                <button onclick="nav('business')" class="block hover:text-tl-blue font-medium">Business</button>
+            </div>
+        </div>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Tools</h4>
+            <div class="space-y-2">
+                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Scanner</button>
+                <button onclick="openScanPanel('image')" class="block hover:text-tl-purple font-medium">Image Detector</button>
+                <button onclick="openScanPanel('video')" class="block hover:text-tl-purple font-medium">Deepfake Detector</button>
+                <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
+            </div>
+        </div>
+        <div class="text-right">
+            <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
+                class="bg-tl-purple/10 text-tl-purple hover:bg-tl-purple hover:text-white px-5 py-2 rounded-xl font-bold text-xs transition-all mb-3">
+                Send Feedback
+            </button>
+            <p class="text-[10px] opacity-50">© 2024 TruthLens. AI-powered.</p>
+        </div>
+    </div>
+</footer>
+
+<!-- FLOATING CHATBOT -->
+<div class="fixed bottom-6 left-6 z-[100]" id="chatbot-container">
+    <button onclick="toggleChat()" id="chat-fab"
+        class="w-14 h-14 bg-gradient-to-br from-tl-purple to-tl-blue rounded-2xl shadow-2xl flex items-center justify-center text-white hover:scale-110 transition-all active:scale-95">
+        <i class="ph-fill ph-chat-circle-dots text-2xl" id="chat-fab-icon"></i>
+    </button>
+    <div id="chatbot-panel" class="absolute bottom-16 left-0 w-80 md:w-96 bg-white dark:bg-paper-800 rounded-3xl shadow-2xl border border-paper-200 dark:border-white/10 overflow-hidden hidden">
+        <!-- Chat Header -->
+        <div class="bg-gradient-to-r from-tl-purple to-tl-blue p-4 flex items-center gap-3">
+            <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                <i class="ph-fill ph-sparkle text-white text-lg"></i>
+            </div>
+            <div>
+                <h4 class="font-black text-white text-sm">TruthLens AI</h4>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 bg-tl-green rounded-full animate-pulse"></span>
+                    <span class="text-[10px] text-white/70 font-bold">News Verification Expert</span>
+                </div>
+            </div>
+            <button onclick="toggleChat()" class="ml-auto text-white/70 hover:text-white">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+        </div>
+        <!-- Chat Messages -->
+        <div class="h-72 overflow-y-auto p-4 space-y-3 bg-paper-50 dark:bg-ink-900" id="chat-messages">
+            <div class="flex gap-2">
+                <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                    <i class="ph-fill ph-sparkle text-white text-xs"></i>
+                </div>
+                <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10">
+                    Namaste! I'm TruthLens AI 🇮🇳 Ask me to fact-check any claim, verify news sources, or discuss today's top stories!
+                </div>
+            </div>
+        </div>
+        <!-- Chat Input -->
+        <div class="p-3 border-t border-paper-200 dark:border-white/10 bg-white dark:bg-paper-800 flex gap-2">
+            <input id="chat-input" type="text" placeholder="Ask me to verify a claim..."
+                   class="flex-1 bg-paper-50 dark:bg-ink-900 border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-tl-purple text-ink-900 dark:text-white"
+                   onkeypress="if(event.key==='Enter')sendChat()">
+            <button onclick="sendChat()" class="bg-tl-purple text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-purple-800 transition-all active:scale-90">
+                <i class="ph-bold ph-paper-plane-tilt text-base"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="auth-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-sm shadow-2xl relative border border-paper-200 dark:border-white/10 overflow-hidden">
+        <div class="bg-gradient-to-br from-tl-purple to-tl-blue p-8 text-center">
+            <i class="ph-fill ph-shield-check text-white text-5xl mb-2"></i>
+            <h2 class="text-2xl font-serif font-black text-white">TruthLens</h2>
+            <p class="text-white/70 text-xs mt-1">AI Intelligence Platform</p>
+        </div>
+        <button onclick="closeAuth()" class="absolute top-4 right-4 text-white/60 hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        <div id="auth-flow" class="p-8"></div>
+    </div>
+</div>
+
+<!-- AI SCANNER MODAL -->
+<div id="scanner-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-paper-200 dark:border-white/10">
+        <div class="p-6 border-b border-paper-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-tl-purple rounded-xl flex items-center justify-center">
+                    <i class="ph-fill ph-shield-check text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-ink-900 dark:text-white text-lg">AI Detection Suite</h3>
+                    <p class="text-xs text-ink-500">Ensemble v3 · SVM+RF+LR + Signal Engine · News Verification</p>
+                </div>
+            </div>
+            <button onclick="closeScanner()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white">
+                <i class="ph-bold ph-x text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Scanner Tabs -->
+        <div class="flex border-b border-paper-200 dark:border-white/10 overflow-x-auto no-scrollbar">
+            <button onclick="switchScanTab('text')" class="scan-tab active px-5 py-3 text-xs font-black uppercase tracking-widest text-tl-purple border-b-2 border-tl-purple whitespace-nowrap" data-tab="text">
+                <i class="ph-bold ph-text-aa mr-1.5"></i>Text Scan
+            </button>
+            <button onclick="switchScanTab('image')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="image">
+                <i class="ph-bold ph-image mr-1.5"></i>Image Check
+            </button>
+            <button onclick="switchScanTab('video')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="video">
+                <i class="ph-bold ph-video mr-1.5"></i>Deepfake
+            </button>
+            <button onclick="switchScanTab('voice')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="voice">
+                <i class="ph-bold ph-waveform mr-1.5"></i>Voice Scan
+            </button>
+            <button onclick="switchScanTab('history')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="history">
+                <i class="ph-bold ph-clock-counter-clockwise mr-1.5"></i>History
+            </button>
+        </div>
+
+        <div class="p-6">
+            <!-- TEXT SCAN -->
+            <div id="scan-tab-text" class="scan-content">
+                <textarea id="scan-text-input" rows="5" placeholder="Paste a news headline, article text, or claim you want to verify..." 
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white resize-none transition-all"></textarea>
+                <div class="flex items-center justify-between mt-3">
+                    <span class="text-xs text-ink-500" id="char-count">0 / 5000 characters</span>
+                    <button onclick="runTextScan()" class="bg-gradient-to-r from-tl-purple to-tl-blue text-white px-6 py-2.5 rounded-xl font-black text-sm hover:opacity-90 transition-all active:scale-95 flex items-center gap-2">
+                        <i class="ph-fill ph-sparkle"></i> Scan Now
+                    </button>
+                </div>
+                <div id="text-scan-result" class="mt-5 hidden"></div>
+            </div>
+
+            <!-- IMAGE SCAN -->
+            <div id="scan-tab-image" class="scan-content hidden">
+                <div class="mb-3">
+                    <input type="text" id="image-caption-input" placeholder="Optional context: Add news headline or claim associated with this image..." 
+                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                </div>
+                <div class="upload-zone p-10 text-center cursor-pointer" id="image-drop-zone"
+                     onclick="document.getElementById('image-upload').click()"
+                     ondragover="event.preventDefault();this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="handleImageDrop(event)">
+                    <i class="ph-bold ph-cloud-arrow-up text-5xl text-tl-purple mb-3"></i>
+                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Image to Analyze</h4>
+                    <p class="text-xs text-ink-500">PNG, JPG, JPEG, GIF, WEBP · Max 20MB</p>
+                    <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageFile(this.files[0])">
+                </div>
+                <div id="image-scan-result" class="mt-5 hidden"></div>
+            </div>
+
+            <!-- VIDEO SCAN -->
+            <div id="scan-tab-video" class="scan-content hidden">
+                <div class="mb-3">
+                    <input type="text" id="video-caption-input" placeholder="Optional context: Add claim, speaker name, or event description..." 
+                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-orange bg-paper-50 dark:bg-ink-900 dark:text-white">
+                </div>
+                <div class="upload-zone p-10 text-center cursor-pointer" id="video-drop-zone"
+                     onclick="document.getElementById('video-upload').click()"
+                     ondragover="event.preventDefault();this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="handleVideoDrop(event)">
+                    <i class="ph-bold ph-video text-5xl text-tl-orange mb-3"></i>
+                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Video for Deepfake Analysis</h4>
+                    <p class="text-xs text-ink-500">MP4, MOV, AVI, MKV, WEBM · Max 50MB</p>
+                    <input type="file" id="video-upload" accept="video/*" class="hidden" onchange="handleVideoFile(this.files[0])">
+                </div>
+                <div class="bg-tl-orange/5 border border-tl-orange/20 rounded-2xl p-4 mt-4 flex gap-3">
+                    <i class="ph-fill ph-warning text-tl-orange text-xl shrink-0 mt-0.5"></i>
+                    <div class="text-xs text-ink-700 dark:text-ink-100">
+                        <strong>Privacy Notice:</strong> Uploaded videos are processed securely and discarded immediately following forensic analysis.
+                    </div>
+                </div>
+                <div id="video-scan-result" class="mt-5 hidden"></div>
+            </div>
+
+            <!-- VOICE SCAN -->
+            <div id="scan-tab-voice" class="scan-content hidden">
+                <div class="mb-3">
+                    <input type="text" id="voice-caption-input" placeholder="Optional context: Add speaker identity or claimed speech context..." 
+                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-blue bg-paper-50 dark:bg-ink-900 dark:text-white">
+                </div>
+                <div class="upload-zone p-10 text-center cursor-pointer" id="voice-drop-zone"
+                     onclick="document.getElementById('voice-upload').click()"
+                     ondragover="event.preventDefault();this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="handleVoiceDrop(event)">
+                    <i class="ph-bold ph-waveform text-5xl text-tl-blue mb-3"></i>
+                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Audio for Voice Synthesis Analysis</h4>
+                    <p class="text-xs text-ink-500">MP3, WAV, M4A, OGG, AAC · Max 20MB</p>
+                    <input type="file" id="voice-upload" accept="audio/*" class="hidden" onchange="handleVoiceFile(this.files[0])">
+                </div>
+                <div id="voice-scan-result" class="mt-5 hidden"></div>
+            </div>
+
+            <!-- HISTORY -->
+            <div id="scan-tab-history" class="scan-content hidden">
+                <div id="scan-history-content" class="space-y-3">
+                    <div class="text-center py-8 text-ink-500 text-sm">Loading scan history...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MARKET MODAL -->
+<div id="market-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl border border-paper-200 dark:border-white/10 flex flex-col">
+        <div class="p-5 border-b border-paper-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-tl-green rounded-xl flex items-center justify-center">
+                    <i class="ph-fill ph-chart-line-up text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-ink-900 dark:text-white">Indian Markets & Commodities</h3>
+                    <div class="flex items-center gap-2 flex-wrap"><p class="text-xs text-ink-500">Real-time · Yahoo Finance · SSE push</p><div id="market-status-badge-modal"></div></div>
+                </div>
+            </div>
+            <button onclick="closeMarket()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        </div>
+        <div class="overflow-y-auto p-5" id="market-table-container">
+            <div class="text-center py-10 text-ink-500">Loading market data...</div>
+        </div>
+    </div>
+</div>
+
+<!-- FEEDBACK MODAL -->
+<div id="feedback-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-md shadow-2xl border border-paper-200 dark:border-white/10 p-8">
+        <button onclick="document.getElementById('feedback-modal').classList.add('hidden');document.getElementById('feedback-modal').classList.remove('flex')"
+            class="absolute top-4 right-4 text-ink-500 hover:text-ink-900 dark:hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        <h3 class="text-xl font-black mb-1 dark:text-white">Platform Feedback</h3>
+        <p class="text-xs text-ink-500 mb-5">Help us improve TruthLens</p>
+        <div class="flex gap-2 mb-4">
+            <span class="text-ink-500 text-xs font-bold self-center">Rating:</span>
+            <div class="flex gap-1" id="star-rating">
+                <button onclick="setRating(1)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(2)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(3)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(4)" class="star text-2xl text-paper-200">★</button>
+                <button onclick="setRating(5)" class="star text-2xl text-paper-200">★</button>
+            </div>
+        </div>
+        <textarea id="feedback-text" rows="4" class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white resize-none" placeholder="Share your experience..."></textarea>
+        <div class="flex justify-end mt-4 gap-3">
+            <button onclick="submitFeedback()" class="bg-tl-purple text-white px-6 py-2.5 rounded-xl font-black text-sm hover:bg-purple-800 transition-all">Submit</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+// =====================================================================
+// CINEMATIC PRELOADER (TruthLens brand style with GSAP-inspired animation)
+// =====================================================================
+(function() {
+    var brand = document.getElementById('preloader-brand');
+    var bar = document.getElementById('pl-bar');
+    var status = document.getElementById('pl-status');
+    if (!brand) return;
+
+    var text = 'TRUTHLENS';
+    var colors = ['#a855f7','#3b82f6','#10b981','#ef4444','#06b6d4'];
+    brand.innerHTML = '';
+    var chars = Array.from(text).map(function(c) {
+        var span = document.createElement('span');
+        span.textContent = c;
+        span.style.cssText = 'display:inline-block;opacity:0;filter:blur(20px);transform:translateY(15px) scale(0.95);will-change:filter,opacity,transform;';
+        brand.appendChild(span);
+        return span;
+    });
+
+    // Stagger reveal chars
+    chars.forEach(function(span, i) {
+        setTimeout(function() {
+            span.style.transition = 'opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease';
+            span.style.opacity = '1';
+            span.style.filter = 'blur(0)';
+            span.style.transform = 'translateY(0) scale(1)';
+        }, i * 90 + 200);
+    });
+
+    // Hover colors
+    chars.forEach(function(span) {
+        span.addEventListener('mouseenter', function() {
+            var col = colors[Math.floor(Math.random()*colors.length)];
+            span.style.color = col;
+            span.style.transform = 'translateY(-10px)';
+            span.style.textShadow = '0 0 25px ' + col + 'AA';
+        });
+        span.addEventListener('mouseleave', function() {
+            span.style.color = '';
+            span.style.transform = 'translateY(0)';
+            span.style.textShadow = '';
+        });
+    });
+
+    // Progress bar animation
+    var pct = 0;
+    var statusSteps = ['Initializing AI Engine...','Loading Signal Engine...','Fetching Market Data...','Calibrating Models...','Connecting News Feed...','Ready.'];
+    var stepIdx = 0;
+    var intv = setInterval(function() {
+        pct += Math.random() * 3 + 1;
+        if (pct >= 100) { pct = 100; clearInterval(intv); }
+        if (bar) bar.style.width = pct + '%';
+        var si = Math.min(Math.floor(pct / (100/statusSteps.length)), statusSteps.length-1);
+        if (si !== stepIdx && status) { stepIdx = si; status.textContent = statusSteps[si]; }
+    }, 55);
+
+    // Dismiss preloader
+    setTimeout(function() {
+        var pl = document.getElementById('preloader');
+        if (!pl) return;
+        pl.style.transition = 'opacity 0.9s ease';
+        pl.style.opacity = '0';
+        setTimeout(function() { if (pl.parentNode) pl.remove(); }, 950);
+    }, 2000);
+})();
+
+
+// =====================================================================
+// STATE
+// =====================================================================
+const state = {
+    page: 'home',
+    user: { id: 'guest_user', name: 'Guest User', email: 'guest@truthlens.ai', scan_count: 0 },
+    scanMode: false,
+    city: 'India',
+    articles: [],
+    bookmarks: JSON.parse(localStorage.getItem('tl_bookmarks') || '[]'),
+    markets: [],
+    chatHistory: [],
+    feedbackRating: 3,
+    activeTab: null
+};
+
+const TABS = [
+    { id:'home', label:'Headlines', icon:'ph-house' },
+    { id:'india', label:'India', icon:'ph-flag' },
+    { id:'world', label:'World', icon:'ph-globe' },
+    { id:'business', label:'Business', icon:'ph-chart-bar' },
+    { id:'technology', label:'Tech', icon:'ph-cpu' },
+    { id:'science', label:'Science', icon:'ph-atom' },
+    { id:'sports', label:'Sports', icon:'ph-soccer-ball' },
+    { id:'entertainment', label:'Entertainment', icon:'ph-popcorn' },
+    { id:'bookmarks', label:'Saved', icon:'ph-bookmark-simple' },
+];
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
+    await checkAuth();
+    renderNavTabs();
+    renderAuthArea();
+    nav('home');
+    requestLoc();
+    fetchMarkets();
+    fetchCricket();
+    connectMarketSSE();
+    setInterval(fetchCricket, 60000);
+    // Polling fallback every 10s if SSE fails
+    setInterval(() => { if (!_sseConnected) fetchMarkets(); }, 10000);
+    // Preloader handled by cinematic animation block above
+
+    // Char counter
+    document.getElementById('scan-text-input').addEventListener('input', function () {
+        document.getElementById('char-count').textContent = `${this.value.length} / 5000 characters`;
+    });
+});
+
+// =====================================================================
+// AUTH
+// =====================================================================
+async function checkAuth() {
+    try {
+        const r = await fetch('/api/auth/me');
+        const d = await r.json();
+        state.user = d.user;
+    } catch (e) { state.user = null; }
+}
+
+function renderAuthArea() {
+    const area = document.getElementById('auth-area');
+    if (!area) return;
+    area.innerHTML = `
+        <div class="flex items-center gap-2">
+            <button onclick="openScanPanel('text')" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
+                <i class="ph-fill ph-shield-check text-sm"></i> Launch AI Scanner
+            </button>
+            <button onclick="openScanPanel('history')" class="p-2 text-ink-500 hover:text-tl-purple hover:bg-paper-100 dark:hover:bg-white/10 rounded-xl transition-all" title="Scan History">
+                <i class="ph-bold ph-clock-counter-clockwise text-lg"></i>
+            </button>
+        </div>`;
+}
+
+
+function openAuth(view) {
+    document.getElementById('auth-modal').classList.remove('hidden');
+    document.getElementById('auth-modal').classList.add('flex');
+    renderAuthFlow(view);
+}
+function closeAuth() {
+    document.getElementById('auth-modal').classList.add('hidden');
+    document.getElementById('auth-modal').classList.remove('flex');
+}
+
+function renderAuthFlow(view) {
+    const flow = document.getElementById('auth-flow');
+    if (view === 'login') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Welcome Back</h3>
+            <p class="text-xs text-ink-500 mb-5">Sign in to access AI detection tools</p>
+            <div class="space-y-3">
+                <input id="auth-email" type="email" placeholder="Email address"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-password" type="password" placeholder="Password"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            </div>
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doLogin()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Sign In
+            </button>
+            <div class="flex items-center gap-3 my-4"><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div><span class="text-xs text-ink-500">or</span><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div></div>
+            <div class="text-center space-y-2">
+                <button onclick="renderAuthFlow('signup')" class="text-xs font-bold text-tl-blue hover:underline">Create account</button>
+                <span class="text-ink-500 text-xs mx-2">·</span>
+                <button onclick="renderAuthFlow('forgot')" class="text-xs font-bold text-ink-500 hover:text-tl-blue hover:underline">Forgot password?</button>
+            </div>`;
+    } else if (view === 'signup') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Create Account</h3>
+            <p class="text-xs text-ink-500 mb-5">Join TruthLens — Free AI fact-checking</p>
+            <div class="space-y-3">
+                <input id="auth-name" type="text" placeholder="Full name"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-email" type="email" placeholder="Email address"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-password" type="password" placeholder="Password (min 6 chars)"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            </div>
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doSignup()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Create Account
+            </button>
+            <div class="text-center mt-4">
+                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Already have an account? Sign in</button>
+            </div>`;
+    } else if (view === 'forgot') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Reset Password</h3>
+            <p class="text-xs text-ink-500 mb-5">Enter your email to receive reset instructions</p>
+            <input id="auth-email" type="email" placeholder="Email address"
+                class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doForgot()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Send Reset Link
+            </button>
+            <div class="text-center mt-4">
+                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-ink-500 hover:text-tl-blue">Back to login</button>
+            </div>`;
+    }
+}
+
+async function doLogin() {
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
+        const d = await r.json();
+        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
+        state.user = d.user;
+        closeAuth(); renderAuthArea(); showToast(`Welcome back, ${d.user.name || 'there'}!`, 'success');
+    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
+}
+
+async function doSignup() {
+    const name = document.getElementById('auth-name').value;
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password}) });
+        const d = await r.json();
+        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
+        state.user = d.user;
+        closeAuth(); renderAuthArea(); showToast(`Account created! Welcome, ${d.user.name || 'there'}!`, 'success');
+    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
+}
+
+async function doForgot() {
+    const email = document.getElementById('auth-email').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/forgot-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('auth-flow').innerHTML = `
+                <div class="text-center py-6">
+                    <div class="w-16 h-16 bg-tl-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="ph-fill ph-check-circle text-tl-green text-4xl"></i>
+                    </div>
+                    <h3 class="font-black text-ink-900 dark:text-white text-lg mb-2">Reset Link Sent!</h3>
+                    <p class="text-xs text-ink-500 mb-4">Check your email for password reset instructions.</p>
+                    <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Back to login</button>
+                </div>`;
+        }
+    } catch(e) { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
+}
+
+async function doLogout() {
+    await fetch('/api/auth/logout', { method:'POST' });
+    state.user = null; renderAuthArea(); showToast('Signed out successfully');
+}
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+function renderNavTabs() {
+    const nav = document.getElementById('nav-tabs');
+    nav.innerHTML = TABS.map(t => `
+        <button onclick="nav('${t.id}')" class="nav-item flex items-center gap-1.5 text-ink-700 dark:text-ink-500 py-1 transition-all" id="nav-${t.id}">
+            <i class="ph-bold ${t.icon} text-sm"></i> ${t.label}
+        </button>`).join('');
+}
+
+function nav(page) {
+    state.page = page;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const activeNav = document.getElementById(`nav-${page}`);
+    if (activeNav) activeNav.classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+    if (page === 'bookmarks') renderBookmarks();
+    else fetchNews(page);
+}
+
+// =====================================================================
+// NEWS
+// =====================================================================
+async function fetchNews(cat) {
+    const app = document.getElementById('app');
+    app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+
+    let url = cat === 'local'
+        ? `/api/news?category=local&city=${encodeURIComponent(state.city)}`
+        : !['india','world','business','technology','science','sports','entertainment','health'].includes(cat) && cat !== 'home'
+            ? `/api/news?query=${encodeURIComponent(cat)}`
+            : `/api/news?category=${encodeURIComponent(cat)}`;
+
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        state.articles = d.articles || [];
+        app.innerHTML = `
+            <div class="col-span-full flex items-end justify-between mb-2">
+                <div class="border-l-4 border-tl-purple pl-4">
+                    <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${d.query || cat}</h2>
+                    <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
+                </div>
+                <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            ${state.articles.map((a,i) => renderCard(a,i)).join('')}
+            ${state.articles.length === 0 ? '<div class="col-span-full py-32 text-center text-ink-500 font-serif italic text-lg">No reports found in current archives.</div>' : ''}`;
+    } catch(e) {
+        app.innerHTML = `<div class="col-span-full py-32 text-center text-tl-red font-bold">Failed to sync with news bureau.</div>`;
+    }
+    renderSidebars();
+}
+
+function renderCard(a, i) {
+    const scoreColor = a.accuracy >= 90 ? 'tl-green' : a.accuracy >= 75 ? 'tl-yellow' : 'tl-red';
+    const saved = state.bookmarks.find(b => b.url === a.url);
+    const delay = Math.min(i * 0.06, 0.4);
+    const encoded = encodeURIComponent(JSON.stringify({title:a.title,url:a.url,urlToImage:a.urlToImage,source:a.source?.name}));
+    return `
+        <div class="news-card bg-white dark:bg-paper-800 fade-up" style="animation-delay:${delay}s">
+            <div class="relative aspect-[16/9] overflow-hidden bg-paper-100 dark:bg-paper-900">
+                <img src="${a.urlToImage}" alt="${a.title}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                     onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600'">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+                <div class="absolute top-3 left-3 flex gap-2">
+                    <span class="bg-white/95 dark:bg-paper-900/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg text-ink-700 dark:text-ink-100">
+                        ${a.source?.name || 'News Bureau'}
+                    </span>
+                </div>
+                <div class="absolute top-3 right-3">
+                    <div class="flex items-center gap-1 bg-white/95 dark:bg-paper-900/95 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                        <div class="w-1.5 h-1.5 rounded-full bg-${scoreColor}"></div>
+                        <span class="text-[9px] font-black text-${scoreColor}">${a.accuracy}%</span>
+                    </div>
+                </div>
+                <div class="absolute bottom-3 left-3">
+                    <span class="text-[9px] font-mono text-white/70">${formatDate(a.publishedAt)}</span>
+                </div>
+            </div>
+            <div class="p-4">
+                <h3 class="font-black text-ink-900 dark:text-white text-sm leading-snug mb-2 line-clamp-3 hover:text-tl-purple cursor-pointer transition-colors"
+                    onclick="window.open('${a.url}','_blank')">${a.title}</h3>
+                <p class="text-xs text-ink-500 leading-relaxed line-clamp-2 mb-4">${a.description || ''}</p>
+                <div class="flex items-center gap-2 justify-between">
+                    <button onclick="window.open('${a.url}','_blank')"
+                        class="flex-1 bg-ink-900 dark:bg-white text-white dark:text-ink-900 py-2 rounded-xl text-xs font-black hover:bg-tl-purple hover:dark:bg-tl-purple hover:dark:text-white transition-all text-center">
+                        Read Full Story
+                    </button>
+                    <button onclick="quickVerify('${encodeURIComponent(a.title)}')"
+                        class="w-9 h-9 bg-tl-purple/10 hover:bg-tl-purple text-tl-purple hover:text-white rounded-xl flex items-center justify-center transition-all" title="AI Verify">
+                        <i class="ph-fill ph-shield-check text-sm"></i>
+                    </button>
+                    <button onclick="toggleSave('${encoded}',this)"
+                        class="w-9 h-9 bg-paper-100 dark:bg-white/10 hover:bg-tl-yellow/20 rounded-xl flex items-center justify-center transition-all" title="Save">
+                        <i class="ph-${saved ? 'fill' : 'bold'} ph-bookmark-simple text-sm ${saved ? 'text-tl-yellow' : 'text-ink-500'}"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderBookmarks() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <div class="col-span-full border-l-4 border-tl-yellow pl-4 mb-2">
+            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white">Reading List</h2>
+            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.bookmarks.length} saved articles</p>
+        </div>
+        ${state.bookmarks.length === 0
+            ? '<div class="col-span-full py-32 text-center"><i class="ph-bold ph-bookmark-simple text-5xl text-paper-200 dark:text-white/10 mb-4 block"></i><p class="text-ink-500 font-serif italic">Your reading list is empty.</p></div>'
+            : state.bookmarks.map((a,i) => renderCard(a,i)).join('')}`;
+}
+
+function toggleSave(encoded, btn) {
+    const a = JSON.parse(decodeURIComponent(encoded));
+    const idx = state.bookmarks.findIndex(b => b.url === a.url);
+    const icon = btn.querySelector('i');
+    if (idx > -1) {
+        state.bookmarks.splice(idx, 1);
+        icon.className = 'ph-bold ph-bookmark-simple text-sm text-ink-500';
+        showToast('Removed from reading list');
+    } else {
+        state.bookmarks.push(a);
+        icon.className = 'ph-fill ph-bookmark-simple text-sm text-tl-yellow';
+        showToast('Saved to reading list!', 'success');
+    }
+    localStorage.setItem('tl_bookmarks', JSON.stringify(state.bookmarks));
+}
+
+// =====================================================================
+// SIDEBARS
+// =====================================================================
+function renderSidebars() {
+    renderLeftSidebar();
+    renderRightSidebar();
+}
+
+function renderLeftSidebar() {
+    const el = document.getElementById('sidebar-left');
+    if (!el) return;
+    el.innerHTML = `
+        <!-- Market Mini -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500">Markets</h4>
+                <button onclick="openMarket()" class="text-[9px] font-black text-tl-blue hover:underline">View All</button>
+            </div>
+            <div class="space-y-2">
+                ${state.markets.filter(m=>m.cat==='index').slice(0,4).map(m=>`
+                    <div class="flex items-center justify-between py-1 border-b border-paper-100 dark:border-white/5 last:border-0">
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                        <div class="text-right">
+                            <div class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</div>
+                            <div class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.up ? '▲' : '▼'} ${m.change}</div>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+        <!-- Gold & Silver -->
+        <div class="sidebar-card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/10 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400 mb-3">Precious Metals</h4>
+            <div class="space-y-3">
+                ${state.markets.filter(m=>m.cat==='metal').slice(0,3).map(m=>`
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">${m.symbol.includes('GOLD') ? '🥇' : m.symbol.includes('SILVER') ? '🥈' : '⚫'}</span>
+                            <div>
+                                <p class="text-xs font-black text-ink-900 dark:text-white">${m.symbol}</p>
+                                <p class="text-[9px] text-ink-500">${m.unit || ''}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                            <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+        <!-- Fuel Prices -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3">⛽ Fuel Prices (${state.city ? state.city.toUpperCase() : 'YOUR CITY'})</h4>
+            ${state.markets.filter(m=>m.cat==='fuel').map(m=>`
+                <div class="flex items-center justify-between py-2 border-b border-paper-100 dark:border-white/5 last:border-0">
+                    <div>
+                        <p class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</p>
+                        <p class="text-[9px] text-ink-500">${m.unit || ''}</p>
+                    </div>
+                    <p class="text-sm font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                </div>`).join('')}
+        </div>`;
+}
+
+function renderRightSidebar() {
+    const el = document.getElementById('sidebar-right');
+    if (!el) return;
+    el.innerHTML = `
+        <!-- AI Scanner CTA -->
+        <div class="sidebar-card bg-gradient-to-br from-tl-purple to-tl-blue p-5 text-white ai-glow">
+            <i class="ph-fill ph-shield-check text-4xl mb-3 block"></i>
+            <h4 class="font-black text-lg mb-1">AI Fact Checker</h4>
+            <p class="text-xs text-white/70 mb-4 leading-relaxed">Detect fake news, manipulated images & deepfake videos using our ML-powered system.</p>
+            <button onclick="openScanPanel('text')" class="w-full bg-white text-tl-purple py-2.5 rounded-xl font-black text-sm hover:bg-white/90 transition-all">
+                Launch AI Scanner
+            </button>
+        </div>
+
+
+        <!-- Stocks -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500">Top Stocks</h4>
+                <button onclick="openMarket()" class="text-[9px] font-black text-tl-blue hover:underline">Markets</button>
+            </div>
+            <div class="space-y-2">
+                ${state.markets.filter(m=>m.cat==='stock').slice(0,5).map(m=>`
+                    <div class="market-row flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer">
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                        <div class="text-right">
+                            <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                            <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Forex & Crypto -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3">Forex & Crypto</h4>
+            ${state.markets.filter(m=>['forex','crypto'].includes(m.cat)).slice(0,5).map(m=>`
+                <div class="flex items-center justify-between py-2 border-b border-paper-100 dark:border-white/5 last:border-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">${m.cat==='crypto' ? '₿' : '💱'}</span>
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                        <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                    </div>
+                </div>`).join('')}
+        </div>`;
+}
+
+// =====================================================================
+// MARKETS
+// =====================================================================
+// ── Real-time market data: SSE + polling fallback ──────────────────────────
+let _sseConnected = false;
+let _prevPrices = {};
+
+async function fetchMarkets() {
+    try {
+        const r = await fetch('/api/markets');
+        const d = await r.json();
+        processMarketData(d);
+    } catch(e) {}
+}
+
+function processMarketData(d) {
+    const newMarkets = d.markets || [];
+    const status = d.market_status || {};
+    
+    // Detect price changes for animation
+    newMarkets.forEach(m => {
+        const prev = _prevPrices[m.symbol];
+        if (prev !== undefined && prev !== m.price) {
+            m._priceUp = m.price > prev;
+            m._changed = true;
+        }
+        _prevPrices[m.symbol] = m.price;
+    });
+    
+    state.markets = newMarkets;
+    state.marketStatus = status;
+    state.liveCount = d.live_count || 0;
+    
+    renderTickerBar();
+    renderSidebars();
+    renderMarketStatusBadge(status);
+    if (document.getElementById('market-table-container') && 
+        !document.getElementById('market-modal').classList.contains('hidden')) {
+        renderMarketTable();
+    }
+}
+
+function connectMarketSSE() {
+    if (_sseConnected) return;
+    _sseConnected = true;
+    fetchMarkets();
+    // Use lightweight non-blocking polling every 15s to keep Flask worker threads 100% free
+    setInterval(fetchMarkets, 15000);
+}
+
+
+function renderMarketStatusBadge(status) {
+    const badge = document.getElementById('market-status-badge');
+    if (!badge || !status) return;
+    const isOpen = status.status === 'open';
+    const isPre = status.status === 'pre_open_session' || status.status === 'pre_market';
+    badge.innerHTML = `
+        <div class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full border"
+             style="color:${status.color || '#9aa0a6'};border-color:${status.color || '#9aa0a6'}30;background:${status.color || '#9aa0a6'}10">
+            <span class="w-1.5 h-1.5 rounded-full ${isOpen ? 'animate-pulse' : ''}" style="background:${status.color || '#9aa0a6'}"></span>
+            ${status.label || 'Market'}
+        </div>`;
+}
+
+function renderTickerBar() {
+    const ticker = document.getElementById('stock-ticker');
+    if (!ticker) return;
+    const items = state.markets.slice(0, 18).map(m => `
+        <div class="flex items-center gap-3 whitespace-nowrap text-[10px] px-5 hover:bg-white/5 cursor-pointer py-0.5" onclick="openMarket()">
+            <span class="font-black text-white/50 uppercase tracking-wider">${m.symbol}</span>
+            <span class="font-mono font-black text-white">${renderPrice(m)}</span>
+            <span class="font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.arrow || (m.up? '▲':'▼')} ${String(m.change || '').replace('+-','+').replace('++','+').replace('--','-')}</span>
+        </div>
+        <div class="h-3 w-px bg-white/10 shrink-0"></div>`).join('');
+    ticker.innerHTML = items + items;
+}
+
+function openMarket() {
+    document.getElementById('market-modal').classList.remove('hidden');
+    document.getElementById('market-modal').classList.add('flex');
+    renderMarketTable();
+}
+function closeMarket() {
+    document.getElementById('market-modal').classList.add('hidden');
+    document.getElementById('market-modal').classList.remove('flex');
+}
+
+function renderMarketTable() {
+    const container = document.getElementById('market-table-container');
+    const cats = [{id:'index',label:'📊 Indices'},{id:'stock',label:'🏢 Stocks'},{id:'metal',label:'⚗️ Metals'},
+                  {id:'fuel',label:'⛽ Fuel'},{id:'forex',label:'💱 Forex'},{id:'crypto',label:'₿ Crypto'},{id:'global',label:'🌏 Global'}];
+    container.innerHTML = cats.map(cat => {
+        const items = state.markets.filter(m => m.cat === cat.id);
+        if (!items.length) return '';
+        return `
+            <div class="mb-6">
+                <h4 class="text-xs font-black uppercase tracking-widest text-ink-500 mb-2">${cat.label}</h4>
+                <div class="rounded-2xl border border-paper-200 dark:border-white/10 overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-paper-50 dark:bg-ink-900">
+                            <tr>
+                                <th class="text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Symbol</th>
+                                <th class="text-right px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Price</th>
+                                <th class="text-right px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Change</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-paper-100 dark:divide-white/5">
+                            ${items.map(m=>`
+                                <tr class="market-row">
+                                    <td class="px-4 py-3">
+                                        <span class="font-black text-ink-900 dark:text-white text-xs">${m.symbol}</span>
+                                        ${m.unit ? `<span class="text-[9px] text-ink-500 ml-1">${m.unit}</span>` : ''}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-mono font-black text-xs text-ink-900 dark:text-white">${renderPrice(m)}</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="text-xs font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.arrow || (m.up? '▲':'▼')} ${String(m.change || '').replace('+-','+').replace('++','+').replace('--','-')}</span>
+                                    </td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// =====================================================================
+// CRICKET
+// =====================================================================
+function formatTeamScore(ms, teamKey) {
+    if (!ms || !ms[teamKey]) return '';
+    const t = ms[teamKey];
+    const inng = t.inngs2 || t.inngs1;
+    if (!inng) return '';
+    const r = inng.runs !== undefined ? inng.runs : '';
+    const w = inng.wickets !== undefined ? inng.wickets : '';
+    const ov = inng.overs ? ` (${inng.overs})` : '';
+    if (r === '') return '';
+    return `${r}/${w}${ov}`;
+}
+
+async function fetchCricket() {
+    try {
+        const r = await fetch('/api/cricket');
+        const d = await r.json();
+        const hub = document.getElementById('cricket-hub');
+        const matches = d.typeMatches || [];
+        let cards = '';
+        for (const tm of matches) {
+            for (const sm of tm.seriesMatches || []) {
+                for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
+                    const mi = m.matchInfo;
+                    if (!mi) continue;
+                    const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
+                    const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
+
+                    const s1 = formatTeamScore(m.matchScore, 'team1Score');
+                    const s2 = formatTeamScore(m.matchScore, 'team2Score');
+
+                    const stateStr = mi.state || '';
+                    const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
+                    const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
+                    const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
+                    const statusNote = mi.status || stateStr;
+
+                    cards += `
+                        <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+                            <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
+                                        <span class="truncate">${t1}</span>
+                                    </div>
+                                    <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
+                                </div>
+                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
+                                        <span class="truncate">${t2}</span>
+                                    </div>
+                                    <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
+                                </div>
+                            </div>
+                            <div class="ml-2 text-right shrink-0 max-w-[100px]">
+                                <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red animate-pulse' : 'text-ink-500'}">${badgeText}</div>
+                                <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
+                            </div>
+                        </div>`;
+                }
+            }
+        }
+        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 MATCHES</span>` + (cards || '<span class="text-xs text-ink-500 italic">No matches available</span>');
+    } catch(e) {}
+}
+
+
+// =====================================================================
+// SEARCH & SCAN
+// =====================================================================
+function toggleScanMode() {
+    state.scanMode = !state.scanMode;
+    const lbl = document.getElementById('mode-lbl');
+    const ico = document.getElementById('search-ico');
+    const aiLbl = document.getElementById('ai-label');
+    const sbox = document.getElementById('search-box');
+    const input = document.getElementById('main-search');
+    if (state.scanMode) {
+        lbl.textContent = 'Verify';
+        ico.className = 'ph-fill ph-shield-check text-xl text-tl-purple animate-pulse';
+        aiLbl.classList.remove('hidden'); aiLbl.classList.add('flex');
+        sbox.classList.add('border-tl-purple');
+        input.placeholder = 'Paste any claim, headline or text to verify...';
+    } else {
+        lbl.textContent = 'Search';
+        ico.className = 'ph-bold ph-magnifying-glass text-xl text-ink-500';
+        aiLbl.classList.add('hidden'); aiLbl.classList.remove('flex');
+        sbox.classList.remove('border-tl-purple');
+        input.placeholder = 'Search news or paste claim to verify...';
+    }
+}
+
+function handleSearch() {
+    const q = document.getElementById('main-search').value.trim();
+    if (!q) return;
+    if (state.scanMode) {
+        openScanPanel('text');
+        setTimeout(() => { document.getElementById('scan-text-input').value = q; }, 100);
+    } else {
+        fetchNews(q);
+    }
+}
+
+function quickVerify(encodedTitle) {
+    const title = decodeURIComponent(encodedTitle);
+    openScanPanel('text');
+    setTimeout(() => {
+        document.getElementById('scan-text-input').value = title;
+        document.getElementById('char-count').textContent = `${title.length} / 5000 characters`;
+    }, 100);
+}
+
+
+// =====================================================================
+// AI SCANNER PANEL
+// =====================================================================
+function openScanPanel(tab) {
+    document.getElementById('scanner-modal').classList.remove('hidden');
+    document.getElementById('scanner-modal').classList.add('flex');
+    switchScanTab(tab);
+}
+
+function closeScanner() {
+    document.getElementById('scanner-modal').classList.add('hidden');
+    document.getElementById('scanner-modal').classList.remove('flex');
+}
+
+function switchScanTab(tab) {
+    document.querySelectorAll('.scan-tab').forEach(t => {
+        t.classList.remove('text-tl-purple','border-tl-purple');
+        t.classList.add('text-ink-500','border-transparent');
+    });
+    document.querySelectorAll('.scan-content').forEach(c => c.classList.add('hidden'));
+    const activeTab = document.querySelector(`[data-tab="${tab}"]`);
+    if (activeTab) {
+        activeTab.classList.remove('text-ink-500','border-transparent');
+        activeTab.classList.add('text-tl-purple','border-tl-purple');
+    }
+    const content = document.getElementById(`scan-tab-${tab}`);
+    if (content) content.classList.remove('hidden');
+    if (tab === 'history') loadScanHistory();
+}
+
+function renderScanAnimation(container, title, subtitle) {
+    container.classList.remove('hidden');
+    container.innerHTML = `
+        <div class="bg-paper-50 dark:bg-ink-900 rounded-2xl p-6 border border-paper-200 dark:border-white/10 relative overflow-hidden shadow-xl">
+            <div class="scan-line"></div>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-tl-purple/20 text-tl-purple flex items-center justify-center animate-spin">
+                    <i class="ph-bold ph-spinner text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Multi-Source Parallel Verification Active'}</h4>
+                    <p class="text-xs text-ink-500">${subtitle || 'Cross-checking with PyTorch DL, Tavily Live Search & LLM Engine...'}</p>
+                </div>
+            </div>
+            <div class="space-y-2.5 font-mono text-xs">
+                <div id="anim-step-1" class="flex items-center gap-2 text-tl-purple font-bold transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div>
+                    <span>[1/4] Inspecting Neural Sequence Patterns & Feature Layers...</span>
+                </div>
+                <div id="anim-step-2" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
+                    <span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>
+                </div>
+                <div id="anim-step-3" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
+                    <span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>
+                </div>
+                <div id="anim-step-4" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
+                    <span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>
+                </div>
+            </div>
+        </div>`;
+    
+    setTimeout(() => {
+        const s1 = document.getElementById('anim-step-1');
+        const s2 = document.getElementById('anim-step-2');
+        if (s1 && s2) {
+            s1.className = 'flex items-center gap-2 text-tl-green font-bold';
+            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/4] Neural Sequence & Pattern Analysis Verified</span>`;
+            s2.className = 'flex items-center gap-2 text-tl-purple font-bold';
+            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>`;
+        }
+    }, 150);
+
+    setTimeout(() => {
+        const s2 = document.getElementById('anim-step-2');
+        const s3 = document.getElementById('anim-step-3');
+        if (s2 && s3) {
+            s2.className = 'flex items-center gap-2 text-tl-green font-bold';
+            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/4] Forensic Signal Analysis Complete</span>`;
+            s3.className = 'flex items-center gap-2 text-tl-purple font-bold';
+            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>`;
+        }
+    }, 300);
+
+    setTimeout(() => {
+        const s3 = document.getElementById('anim-step-3');
+        const s4 = document.getElementById('anim-step-4');
+        if (s3 && s4) {
+            s3.className = 'flex items-center gap-2 text-tl-green font-bold';
+            s3.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[3/4] Live Web Sources Cross-Verification Complete</span>`;
+            s4.className = 'flex items-center gap-2 text-tl-purple font-bold';
+            s4.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>`;
+        }
+    }, 450);
+}
+
+async function runTextScan() {
+    const text = document.getElementById('scan-text-input').value.trim();
+    if (!text || text.length < 10) { showToast('Please enter at least 10 characters', 'error'); return; }
+    const result = document.getElementById('text-scan-result');
+    renderScanAnimation(result, 'Text Claim Real-Time Verification Active', 'Analyzing text sequence & cross-checking live news databases...');
+    try {
+        const r = await fetch('/api/ai-scan', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+        const d = await r.json();
+        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
+        renderScanResult(result, d);
+    } catch(e) {
+        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Analysis failed. Please try again.</div>`;
+    }
+}
+
+
+function renderScanResult(container, d) {
+    const isFake = d.is_fake;
+    const icon = isFake ? 'ph-warning-circle' : 'ph-check-circle';
+    const circumference = 2 * Math.PI * 40;
+    const offset = circumference - (circumference * d.confidence / 100);
+    const confLabel = d.confidence_label || (d.confidence >= 90 ? 'Very High' : d.confidence >= 75 ? 'High' : d.confidence >= 62 ? 'Moderate' : 'Low');
+    
+    // Verification section
+    const ver = d.verification || {};
+    let verHtml = '';
+    if (ver.sources_found > 0) {
+        const vstatus = ver.verification_status || '';
+        const vcolor = vstatus === 'verified_multiple_sources' ? '#34a853' : vstatus === 'partially_verified' ? '#f59e0b' : '#9aa0a6';
+        verHtml = `
+        <div class="mt-4 p-4 rounded-xl border" style="border-color:${vcolor}30;background:${vcolor}08">
+            <p class="text-[10px] font-black uppercase tracking-widest mb-2" style="color:${vcolor}">
+                🔍 Cross-Verification: ${ver.sources_found} source(s) found
+            </p>
+            ${(ver.matching_articles || []).map(a => `
+                <div class="flex items-start gap-2 mb-2">
+                    <i class="ph-fill ${a.is_reputable ? 'ph-seal-check text-tl-green' : 'ph-article text-ink-500'} text-sm mt-0.5 shrink-0"></i>
+                    <div>
+                        <a href="${a.url}" target="_blank" class="text-[10px] font-bold text-tl-blue hover:underline line-clamp-1">${a.title}</a>
+                        <p class="text-[9px] text-ink-500">${a.source} ${a.is_reputable ? '· ✓ Reputable' : ''}</p>
+                    </div>
+                </div>`).join('')}
+        </div>`;
+    }
+
+    container.innerHTML = `
+        <div class="border-2 ${isFake ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
+            <div class="verdict-${isFake ? 'fake' : 'real'} p-5 flex items-center gap-4">
+                <i class="ph-fill ${icon} text-white text-4xl"></i>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h4 class="text-2xl font-black text-white">${d.verdict}</h4>
+                        <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
+                    </div>
+                    <p class="text-white/70 text-xs mt-0.5">${isFake ? 'Misinformation indicators detected' : 'Content appears credible and factual'}</p>
+                    <p class="text-white/50 text-[9px] font-mono mt-1">Signal Score: ${d.signal_score >= 0 ? '+' : ''}${d.signal_score || 0}</p>
+                </div>
+                <div class="relative flex items-center justify-center shrink-0">
+                    <svg class="score-ring" width="80" height="80" viewBox="0 0 90 90">
+                        <circle cx="45" cy="45" r="40" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
+                        <circle cx="45" cy="45" r="40" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"
+                                stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/>
+                    </svg>
+                    <span class="absolute text-base font-black text-white font-mono">${d.confidence}%</span>
+                </div>
+            </div>
+            <div class="p-5">
+                ${(d.fake_signals && d.fake_signals.length) ? `
+                <div class="mb-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-2">⚠ Misinformation Signals (${d.fake_signals.length})</p>
+                    <div class="space-y-1.5">
+                        ${d.fake_signals.map(s=>`
+                        <div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-2">
+                            <i class="ph-fill ph-x-circle text-tl-red text-sm mt-0.5 shrink-0"></i>
+                            <span class="text-xs text-ink-700 dark:text-ink-100">${s}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+                
+                ${(d.real_signals && d.real_signals.length) ? `
+                <div class="mb-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-2">✓ Credibility Markers (${d.real_signals.length})</p>
+                    <div class="space-y-1.5">
+                        ${d.real_signals.map(s=>`
+                        <div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-2">
+                            <i class="ph-fill ph-check-circle text-tl-green text-sm mt-0.5 shrink-0"></i>
+                            <span class="text-xs text-ink-700 dark:text-ink-100">${s}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+
+                ${verHtml}
+
+                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10 flex items-start gap-2 flex-wrap">
+                    <p class="text-[10px] text-ink-500 flex-1">${d.explanation}</p>
+                    <span class="text-[9px] bg-tl-purple/10 text-tl-purple px-2 py-1 rounded-full font-black shrink-0">
+                        <i class="ph-fill ph-brain"></i> ${d.model || 'Ensemble v3'}
+                    </span>
+                </div>
+            </div>
+        </div>`;
+}
+
+async function handleImageFile(file) {
+    if (!file) return;
+    const result = document.getElementById('image-scan-result');
+    const previewUrl = URL.createObjectURL(file);
+    const caption = (document.getElementById('image-caption-input')?.value || '').trim();
+    renderScanAnimation(result, 'Image Forensic News Verification Active', `Analyzing ${file.name} pixel matrix, compression layers & live news...`);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption) formData.append('caption', caption);
+    try {
+        const r = await fetch('/api/detect-image', { method:'POST', body:formData });
+        const d = await r.json();
+        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
+        const isManip = d.is_manipulated;
+        const confLabel = d.confidence_label || (isManip ? 'Fake / Manipulated Image' : '100% Verified Real');
+        
+        result.innerHTML = `
+            <div class="border-2 ${isManip ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
+                <div class="verdict-${isManip ? 'fake' : 'real'} p-5 flex items-center gap-4">
+                    <img src="${previewUrl}" class="w-20 h-20 rounded-xl object-cover border-2 border-white/40 shadow-md shrink-0 bg-black/20" alt="Uploaded Image Preview" title="Uploaded image: ${file.name}">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 class="text-xl font-black text-white tracking-wide">${isManip ? '🔴 FAKE / MANIPULATED IMAGE' : '🟢 100% REAL NEWS IMAGE'}</h4>
+                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
+                        </div>
+                        <p class="text-white/80 text-xs truncate">Confidence Score: <strong class="text-white">${d.confidence}%</strong> · File: ${file.name} (${d.file_size_kb}KB)</p>
+                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Claim: "${caption}"</p>` : ''}
+                    </div>
+                </div>
+                <div class="p-5">
+                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Forensic Checks Performed (${(d.checks_run || []).length})</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
+                    </div>
+                    ${(d.suspicious_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Manipulation Signals</p>
+                        <div class="space-y-1">
+                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    ${(d.real_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Credibility & Authenticity Markers</p>
+                        <div class="space-y-1">
+                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
+                </div>
+            </div>`;
+    } catch(e) {
+        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Image analysis failed.</div>`;
+    }
+}
+
+function handleImageDrop(e) {
+    e.preventDefault();
+    document.getElementById('image-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleImageFile(file);
+}
+
+async function handleVideoFile(file) {
+    if (!file) return;
+    const result = document.getElementById('video-scan-result');
+    const previewUrl = URL.createObjectURL(file);
+    const caption = (document.getElementById('video-caption-input')?.value || '').trim();
+    renderScanAnimation(result, 'Video Deepfake Verification Active', `Analyzing ${file.name} temporal frame variance & facial landmarks...`);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption) formData.append('caption', caption);
+    try {
+        const r = await fetch('/api/detect-deepfake', { method:'POST', body:formData });
+        const d = await r.json();
+        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
+        const isDF = d.is_deepfake;
+        const confLabel = d.confidence_label || (isDF ? 'High Deepfake Risk' : '100% Authentic Video');
+        
+        result.innerHTML = `
+            <div class="border-2 ${isDF ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
+                <div class="verdict-${isDF ? 'fake' : 'real'} p-5 flex items-center gap-4">
+                    <div class="w-20 h-20 rounded-xl bg-black/50 overflow-hidden flex items-center justify-center border-2 border-white/30 shadow-md shrink-0">
+                        <video src="${previewUrl}" class="w-full h-full object-cover" muted loop autoplay playsinline></video>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 class="text-xl font-black text-white tracking-wide">${isDF ? '🔴 SUSPECTED DEEPFAKE VIDEO' : '🟢 100% AUTHENTIC VIDEO'}</h4>
+                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
+                        </div>
+                        <p class="text-white/80 text-xs truncate">Confidence: <strong class="text-white">${d.confidence}%</strong> · Frames Analyzed: ${d.frames_analyzed} · File: ${file.name} (${d.file_size_mb}MB)</p>
+                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Claim: "${caption}"</p>` : ''}
+                    </div>
+                </div>
+                <div class="p-5">
+                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Forensic Video Checks (${(d.checks_run || []).length})</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
+                    </div>
+                    ${(d.suspicious_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Facial Signals</p>
+                        <div class="space-y-1">
+                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    ${(d.real_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Video Credibility Markers</p>
+                        <div class="space-y-1">
+                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
+                </div>
+            </div>`;
+    } catch(e) {
+        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Video analysis failed.</div>`;
+    }
+}
+
+function handleVideoDrop(e) {
+    e.preventDefault();
+    document.getElementById('video-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleVideoFile(file);
+}
+
+async function handleVoiceFile(file) {
+    if (!file) return;
+    const result = document.getElementById('voice-scan-result');
+    const previewUrl = URL.createObjectURL(file);
+    const caption = (document.getElementById('voice-caption-input')?.value || '').trim();
+    renderScanAnimation(result, 'Audio Voice Synthesis Verification Active', `Scanning ${file.name} pitch variance & vocoder frequency spectrum...`);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption) formData.append('caption', caption);
+    try {
+        const r = await fetch('/api/detect-voice', { method:'POST', body:formData });
+        const d = await r.json();
+        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
+        const isSynth = d.is_synthetic;
+        const confLabel = d.confidence_label || (isSynth ? 'Synthetic AI Voice Risk' : '100% Authentic Voice');
+        
+        result.innerHTML = `
+            <div class="border-2 ${isSynth ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
+                <div class="verdict-${isSynth ? 'fake' : 'real'} p-5 flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-xl bg-black/40 flex items-center justify-center text-white text-2xl shrink-0 border border-white/20 shadow-md">
+                        <i class="ph-fill ${isSynth ? 'ph-waveform-slash' : 'ph-waveform'}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 class="text-xl font-black text-white tracking-wide">${isSynth ? '🔴 SYNTHETIC / AI VOICE' : '🟢 100% AUTHENTIC VOICE'}</h4>
+                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
+                        </div>
+                        <p class="text-white/80 text-xs truncate">Confidence: <strong class="text-white">${d.confidence}%</strong> · File: ${file.name} (${d.file_size_kb}KB)</p>
+                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Speaker / Context: "${caption}"</p>` : ''}
+                    </div>
+                </div>
+                <div class="p-5">
+                    <div class="mb-4">
+                        <audio src="${previewUrl}" controls class="w-full h-8 rounded-lg outline-none"></audio>
+                    </div>
+                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Acoustic Checks (${(d.checks_run || []).length})</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
+                    </div>
+                    ${(d.suspicious_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Vocoder Signals</p>
+                        <div class="space-y-1">
+                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    ${(d.real_signals||[]).length ? `
+                    <div class="mb-3">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Natural Vocal Resonance Markers</p>
+                        <div class="space-y-1">
+                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
+                </div>
+            </div>`;
+    } catch(e) {
+        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Audio analysis failed.</div>`;
+    }
+}
+
+function handleVoiceDrop(e) {
+    e.preventDefault();
+    document.getElementById('voice-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleVoiceFile(file);
+}
+
+async function loadScanHistory() {
+
+    try {
+        const r = await fetch('/api/scan-history');
+        const d = await r.json();
+
+        const history = d.history || [];
+        document.getElementById('scan-history-content').innerHTML = history.length ? history.map(h => `
+            <div class="flex items-center gap-3 p-3 bg-paper-50 dark:bg-ink-900 rounded-xl border border-paper-200 dark:border-white/10">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${h.verdict==='REAL' ? 'bg-tl-green/15' : 'bg-tl-red/15'}">
+                    <i class="ph-fill ${h.verdict==='REAL' ? 'ph-check-circle text-tl-green' : 'ph-warning-circle text-tl-red'} text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${h.text_input || 'Scan item'}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[9px] font-black ${h.verdict==='REAL' ? 'text-tl-green' : 'text-tl-red'}">${h.verdict}</span>
+                        <span class="text-[9px] text-ink-500">${h.confidence}% confidence</span>
+                        <span class="text-[9px] text-ink-500 ml-auto">${new Date(h.created_at).toLocaleDateString('en-IN')}</span>
+                    </div>
+                </div>
+            </div>`).join('') :
+            '<div class="text-center py-8 text-ink-500 text-sm italic">No scan history yet. Start by scanning a news claim above!</div>';
+    } catch(e) {}
+}
+
+// =====================================================================
+// CHAT
+// =====================================================================
+function toggleChat() {
+    const panel = document.getElementById('chatbot-panel');
+    const icon = document.getElementById('chat-fab-icon');
+    panel.classList.toggle('hidden');
+    icon.className = panel.classList.contains('hidden') ? 'ph-fill ph-chat-circle-dots text-2xl' : 'ph-bold ph-x text-2xl';
+}
+
+async function sendChat() {
+    if (!state.user) { toggleChat(); openAuth('login'); return; }
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    addChatMessage('user', message);
+    addChatMessage('thinking', '');
+    state.chatHistory.push({role:'user', content:message});
+    try {
+        const r = await fetch('/api/chat', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({message, history: state.chatHistory})
+        });
+        const d = await r.json();
+        document.getElementById('chat-thinking')?.remove();
+        const reply = d.reply || 'Sorry, I could not process that request.';
+        state.chatHistory.push({role:'assistant', content:reply});
+        addChatMessage('assistant', reply);
+    } catch(e) {
+        document.getElementById('chat-thinking')?.remove();
+        addChatMessage('assistant', 'Network error. Please try again.');
+    }
+}
+
+function addChatMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    const el = document.createElement('div');
+    if (role === 'thinking') {
+        el.id = 'chat-thinking';
+        el.className = 'flex gap-2';
+        el.innerHTML = `
+            <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                <i class="ph-fill ph-sparkle text-white text-xs"></i>
+            </div>
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-paper-200 dark:border-white/10 flex gap-1.5 items-center">
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0s"></div>
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0.15s"></div>
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0.3s"></div>
+            </div>`;
+    } else if (role === 'user') {
+        el.className = 'flex gap-2 justify-end';
+        el.innerHTML = `<div class="bg-gradient-to-br from-tl-purple to-tl-blue text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[80%] shadow-sm">${text}</div>`;
+    } else {
+        el.className = 'flex gap-2';
+        el.innerHTML = `
+            <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                <i class="ph-fill ph-sparkle text-white text-xs"></i>
+            </div>
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${text}</div>`;
+    }
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+}
+
+// =====================================================================
+// WEATHER
+// =====================================================================
+async function fetchWeather(lat, lon) {
+    try {
+        const r = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        const d = await r.json();
+        if (d.current) {
+            document.getElementById('weather-temp').textContent = `${Math.round(d.current.temp_c)}°C`;
+            document.getElementById('weather-loc').textContent = `${d.location.name}, ${d.location.region}`;
+            document.getElementById('weather-box').classList.remove('opacity-0');
+            state.city = d.location.name;
+            renderLeftSidebar();
+            const cond = d.current.condition?.text?.toLowerCase() || '';
+            const icon = document.getElementById('weather-icon');
+            if (cond.includes('rain')) icon.className = 'ph-fill ph-cloud-rain text-tl-blue text-2xl';
+            else if (cond.includes('cloud')) icon.className = 'ph-fill ph-cloud text-ink-500 text-2xl';
+            else if (cond.includes('sun') || cond.includes('clear')) icon.className = 'ph-fill ph-sun text-tl-yellow text-2xl';
+        }
+    } catch(e) {}
+}
+
+
+function requestLoc() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        err => { document.getElementById('weather-loc').textContent = 'India'; document.getElementById('weather-box').classList.remove('opacity-0'); },
+        {enableHighAccuracy:false, timeout:8000}
+    );
+}
+
+// =====================================================================
+// THEME
+// =====================================================================
+function toggleTheme() {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('tl_theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+
+// =====================================================================
+// FEEDBACK
+// =====================================================================
+function setRating(n) {
+    state.feedbackRating = n;
+    document.querySelectorAll('.star').forEach((s,i) => {
+        s.className = `star text-2xl ${i < n ? 'text-tl-yellow' : 'text-paper-200'}`;
+    });
+}
+
+async function submitFeedback() {
+    const message = document.getElementById('feedback-text').value.trim();
+    if (!message) { showToast('Please enter a message', 'error'); return; }
+    try {
+        await fetch('/api/feedback', { method:'POST', headers:{'Content-Type':'application/json'},
+                                       body: JSON.stringify({message, rating: state.feedbackRating}) });
+        document.getElementById('feedback-modal').classList.add('hidden');
+        document.getElementById('feedback-modal').classList.remove('flex');
+        showToast('Feedback submitted! Thank you.', 'success');
+    } catch(e) { showToast('Failed to submit', 'error'); }
+}
+
+// =====================================================================
+// UTILS
+// =====================================================================
+function showToast(msg, type='neutral') {
+    const container = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    const bg = type==='success' ? 'bg-tl-green' : type==='error' ? 'bg-tl-red' : 'bg-ink-900';
+    const icon = type==='success' ? 'ph-check-circle' : type==='error' ? 'ph-warning-circle' : 'ph-info';
+    t.className = `toast pointer-events-auto flex items-center gap-3 ${bg} text-white px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold border border-white/10`;
+    t.innerHTML = `<i class="ph-fill ${icon} text-xl"></i>${msg}`;
+    container.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 350); }, 3000);
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    try {
+        const date = new Date(d);
+        const diff = Date.now() - date;
+        if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+        return date.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+    } catch(e) { return ''; }
+}
+
+// Render price with separate currency symbol and amount for consistent sizing
+function renderPrice(m) {
+    try {
+        const ps = m.price_str || '';
+        if (ps && typeof ps === 'string') {
+            // find first digit index
+            const idx = ps.search(/\d/);
+            if (idx > 0) {
+                const cur = ps.slice(0, idx);
+                const amt = ps.slice(idx);
+                return `<span class="currency">${cur}</span><span class="price-amt">${amt}</span>`;
+            }
+            return ps;
+        }
+        // fallback: use symbol and formatted numeric
+        const decimals = (typeof m.decimals === 'number') ? m.decimals : 2;
+        const amt = (m.price != null) ? Number(m.price).toLocaleString('en-IN',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}) : 'N/A';
+        const curSym = m.sym || '&#8377;';
+        return `<span class="currency">${curSym}</span><span class="price-amt">${amt}</span>`;
+    } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
+}
+</script>
+</body>
+</html>
+
+</body>
+</html>
