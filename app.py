@@ -1526,144 +1526,22 @@ def api_cricket():
             _cricket_cache["ts"] = now_ts
         save_last_api_response("cricket", merged_data)
     else:
-        # Try last known good DB cache
+        # Try last known good DB cache if it contains actual matches
         last_cric = get_last_api_response("cricket")
-        if last_cric and last_cric.get("typeMatches"):
+        if last_cric and isinstance(last_cric, dict) and last_cric.get("typeMatches"):
             with _cricket_lock:
                 _cricket_cache["data"] = last_cric
                 _cricket_cache["ts"] = now_ts
             return jsonify(last_cric)
 
-        # Try ESPN Cricinfo RSS as fallback
-        espn_data = _fetch_espn_cricket_rss()
-        if espn_data:
-            with _cricket_lock:
-                _cricket_cache["data"] = espn_data
-                _cricket_cache["ts"] = now_ts
-            save_last_api_response("cricket", espn_data)
-            return jsonify(espn_data)
-
-        # Static fallback with real upcoming/recent matches
-        static_cricket = _static_cricket_fallback()
+        # No active matches: return empty so frontend hides cricket bar automatically
+        empty_data = {"typeMatches": []}
         with _cricket_lock:
-            _cricket_cache["data"] = static_cricket
+            _cricket_cache["data"] = empty_data
             _cricket_cache["ts"] = now_ts
-        return jsonify(static_cricket)
+        return jsonify(empty_data)
 
     return jsonify(_cricket_cache["data"])
-
-
-def _fetch_espn_cricket_rss() -> dict:
-    """Fetch live cricket match summaries from ESPN Cricinfo RSS."""
-    import xml.etree.ElementTree as ET
-    import urllib.request
-    try:
-        url = "https://www.espncricinfo.com/rss/content/story/feeds/0.xml"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        xml_data = urllib.request.urlopen(req, timeout=6).read()
-        root = ET.fromstring(xml_data)
-        items = root.findall('.//item')
-        matches = []
-        for item in items[:6]:
-            title = (item.find('title').text or "") if item.find('title') is not None else ""
-            link = (item.find('link').text or "#") if item.find('link') is not None else "#"
-            if title:
-                matches.append({
-                    "matchInfo": {
-                        "matchId": abs(hash(title)) % 99999,
-                        "team1": {"teamName": "Team A"},
-                        "team2": {"teamName": "Team B"},
-                        "status": title[:80],
-                        "matchFormat": "T20",
-                        "seriesName": "International Cricket",
-                        "startDate": str(int(time.time() * 1000)),
-                    },
-                    "matchScore": {},
-                    "espnLink": link
-                })
-        if matches:
-            return {"typeMatches": [{"matchType": "Live", "seriesMatches": [{"seriesAdWrapper": {"seriesName": "ESPN Cricinfo Live", "matches": matches}}]}]}
-    except Exception as e:
-        print(f"[ESPN Cricket RSS] Error: {e}")
-    return {}
-
-
-def _static_cricket_fallback() -> dict:
-    """Rich static cricket fallback — shows real upcoming/recent schedules."""
-    ts = str(int(time.time() * 1000))
-    return {
-        "typeMatches": [
-            {
-                "matchType": "International",
-                "seriesMatches": [{
-                    "seriesAdWrapper": {
-                        "seriesName": "ICC World Test Championship",
-                        "matches": [
-                            {
-                                "matchInfo": {
-                                    "matchId": 98001,
-                                    "team1": {"teamName": "India", "teamSName": "IND", "imageId": 6},
-                                    "team2": {"teamName": "Australia", "teamSName": "AUS", "imageId": 2},
-                                    "status": "India tour of Australia 2024-25",
-                                    "matchFormat": "TEST",
-                                    "seriesName": "Border-Gavaskar Trophy",
-                                    "startDate": ts,
-                                    "matchDesc": "1st Test",
-                                    "venueInfo": {"ground": "Perth Stadium", "city": "Perth"}
-                                },
-                                "matchScore": {
-                                    "team1Score": {"inngs1": {"runs": 295, "wickets": 10, "overs": 82.3}},
-                                    "team2Score": {"inngs1": {"runs": 104, "wickets": 3, "overs": 28.0}}
-                                }
-                            },
-                            {
-                                "matchInfo": {
-                                    "matchId": 98002,
-                                    "team1": {"teamName": "New Zealand", "teamSName": "NZ", "imageId": 5},
-                                    "team2": {"teamName": "Pakistan", "teamSName": "PAK", "imageId": 7},
-                                    "status": "New Zealand tour of Pakistan 2024",
-                                    "matchFormat": "TEST",
-                                    "seriesName": "Pakistan vs New Zealand Test Series",
-                                    "startDate": ts,
-                                    "matchDesc": "1st Test",
-                                    "venueInfo": {"ground": "Rawalpindi Cricket Stadium", "city": "Rawalpindi"}
-                                },
-                                "matchScore": {
-                                    "team1Score": {"inngs1": {"runs": 408, "wickets": 10, "overs": 105.5}},
-                                    "team2Score": {"inngs1": {"runs": 247, "wickets": 10, "overs": 75.4}}
-                                }
-                            }
-                        ]
-                    }
-                }]
-            },
-            {
-                "matchType": "Domestic",
-                "seriesMatches": [{
-                    "seriesAdWrapper": {
-                        "seriesName": "Duleep Trophy 2024",
-                        "matches": [{
-                            "matchInfo": {
-                                "matchId": 98003,
-                                "team1": {"teamName": "India A", "teamSName": "IND A"},
-                                "team2": {"teamName": "India B", "teamSName": "IND B"},
-                                "status": "Duleep Trophy 2024 — India A vs India B",
-                                "matchFormat": "TEST",
-                                "seriesName": "Duleep Trophy",
-                                "startDate": ts,
-                                "matchDesc": "Final",
-                                "venueInfo": {"ground": "M. Chinnaswamy Stadium", "city": "Bengaluru"}
-                            },
-                            "matchScore": {
-                                "team1Score": {"inngs1": {"runs": 321, "wickets": 8, "overs": 88.0}},
-                                "team2Score": {"inngs1": {"runs": 280, "wickets": 10, "overs": 84.2}}
-                            }
-                        }]
-                    }
-                }]
-            }
-        ]
-    }
 
 
 

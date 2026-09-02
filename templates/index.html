@@ -244,7 +244,7 @@
 </div>
 
 <!-- CRICKET HUB -->
-<div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3">
+<div id="cricket-container" class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3 hidden">
     <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar" id="cricket-hub">
         <span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>
     </div>
@@ -597,6 +597,8 @@ function clearStaleNewsCache() {
         localStorage.removeItem('tl_cache_weather');
         localStorage.removeItem('tl_cache_weather_ts');
     }
+    // Clean old dummy cricket cache
+    localStorage.removeItem('tl_cache_cricket');
 }
 
 // Wake up Render backend — waits up to 60s (full cold-start window)
@@ -1087,16 +1089,22 @@ function formatTeamScore(ms, teamKey) {
 
 function renderCricketCards(d) {
     const hub = document.getElementById('cricket-hub');
-    if (!hub) return;
-    const matches = d.typeMatches || [];
+    const container = document.getElementById('cricket-container');
+    if (!hub || !container) return;
+    const matches = d?.typeMatches || [];
     let cards = '';
     for (const tm of matches) {
         for (const sm of tm.seriesMatches || []) {
-            for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
+            for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 6)) {
                 const mi = m.matchInfo;
                 if (!mi) continue;
-                const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
-                const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
+                const rawT1 = mi.team1?.teamName || '';
+                const rawT2 = mi.team2?.teamName || '';
+                // Filter out dummy teams or placeholder matches
+                if (!rawT1 || !rawT2 || rawT1 === 'Team A' || rawT2 === 'Team B') continue;
+
+                const t1 = mi.team1?.teamSName || (rawT1.length <= 4 ? rawT1 : rawT1.slice(0, 3).toUpperCase());
+                const t2 = mi.team2?.teamSName || (rawT2.length <= 4 ? rawT2 : rawT2.slice(0, 3).toUpperCase());
 
                 const s1 = formatTeamScore(m.matchScore, 'team1Score');
                 const s2 = formatTeamScore(m.matchScore, 'team2Score');
@@ -1133,24 +1141,24 @@ function renderCricketCards(d) {
             }
         }
     }
-    hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 MATCHES</span>` + (cards || '<span class="text-xs text-ink-500 italic">No matches available</span>');
+
+    if (cards) {
+        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>` + cards;
+        container.classList.remove('hidden');
+    } else {
+        hub.innerHTML = '';
+        container.classList.add('hidden');
+    }
 }
 
 async function fetchCricket() {
-    // 1. Instant load from localStorage
-    const cached = localStorage.getItem('tl_cache_cricket');
-    if (cached) {
-        try { renderCricketCards(JSON.parse(cached)); } catch(e) {}
-    }
-
     try {
         const r = await fetch('/api/cricket');
         const d = await r.json();
-        if (d && d.typeMatches && d.typeMatches.length > 0) {
-            localStorage.setItem('tl_cache_cricket', JSON.stringify(d));
-            renderCricketCards(d);
-        }
-    } catch(e) {}
+        renderCricketCards(d);
+    } catch(e) {
+        renderCricketCards({ typeMatches: [] });
+    }
 }
 
 // =====================================================================
