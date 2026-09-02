@@ -1437,26 +1437,6 @@ def api_markets():
     data = get_cached_markets()
     return jsonify(data)
 
-@app.route("/api/markets/stream")
-def markets_stream():
-    import queue
-    q = queue.Queue(maxsize=5)
-    with _sse_lock: _sse_clients.append(q)
-
-    def generate():
-        data = get_cached_markets()
-        yield f"data: {json.dumps(data)}\n\n"
-        try:
-            while True:
-                msg = q.get(timeout=30)
-                yield msg
-        except Exception:
-            with _sse_lock:
-                try: _sse_clients.remove(q)
-                except Exception: pass
-
-    return Response(stream_with_context(generate()), mimetype="text/event-stream", headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
-
 _cricket_cache = {"data": {"typeMatches": []}, "ts": 0}
 _cricket_lock = threading.Lock()
 
