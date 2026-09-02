@@ -136,6 +136,17 @@
         /* Currency styling */
         .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
         .price-amt { font-size:1.02em; font-weight:800; }
+
+        /* Pure CSS Guaranteed Preloader Auto-Dismiss */
+        #preloader {
+            pointer-events: none;
+            animation: autoPreloaderDismiss 0.45s 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes autoPreloaderDismiss {
+            0% { opacity: 1; visibility: visible; }
+            90% { opacity: 0; visibility: visible; }
+            100% { opacity: 0; visibility: hidden; display: none !important; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
@@ -143,16 +154,16 @@
 <body class="antialiased min-h-screen flex flex-col font-sans">
 
 <!-- CINEMATIC PRELOADER (TruthLens brand style) -->
-<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center" style="background:#000000;">
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black pointer-events-none">
     <div style="text-align:center;">
         <div id="preloader-brand" style="
             font-family:'Playfair Display',serif;font-size:clamp(2.5rem,10vw,5rem);
             font-weight:900;font-style:italic;letter-spacing:-0.05em;color:white;display:inline-block;
-        "></div>
-        <div style="width:320px;height:1px;background:rgba(255,255,255,0.06);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
-            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
+        ">TruthLens</div>
+        <div style="width:320px;height:2px;background:rgba(255,255,255,0.1);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
+            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:100%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
         </div>
-        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#555;text-transform:uppercase;">Initializing AI Engine...</p>
+        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#888;text-transform:uppercase;">AI Verified Intelligence</p>
     </div>
 </div>
 
