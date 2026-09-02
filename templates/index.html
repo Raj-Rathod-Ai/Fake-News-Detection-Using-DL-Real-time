@@ -1529,9 +1529,24 @@ function renderScanResult(container, d) {
             </div>
         </div>`;
 }
+
+// Prefill scanner with sample text (1=Real, 2=Fake)
+function setSample(type) {
+    const inp = document.getElementById('scan-text-input');
+    const cc = document.getElementById('char-count');
+    const samples = {
+        1: "The Reserve Bank of India raised the repo rate by 25 basis points to 6.75% during its Monetary Policy Committee meeting, according to the official RBI press release. Governor Shaktikanta Das said the decision was unanimous among the six-member panel.",
+        2: "SHOCKING!! PM Modi has been ARRESTED by CBI for a massive scam!! MUST SHARE!! Being suppressed by mainstream media!! Forward to 10 groups immediately before they DELETE this!! Sources close to government confirm!! \ud83d\udea8\ud83d\udea8"
+    };
+    const text = samples[type] || '';
+    if (inp) {
+        inp.value = text;
+        if (cc) cc.textContent = text.length + ' / 5000 characters';
+    }
 }
 
 async function loadScanHistory() {
+
 
     try {
         const r = await fetch('/api/scan-history');
