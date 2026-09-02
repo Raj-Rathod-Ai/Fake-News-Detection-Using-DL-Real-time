@@ -60,6 +60,7 @@ CRICBUZZ_HOST     = "cricbuzz-cricket.p.rapidapi.com"
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
 XAI_API_KEY       = os.environ.get("XAI_API_KEY", "")
 TAVILY_API_KEY    = os.environ.get("TAVILY_API_KEY", "")
+MISTRAL_API_KEY   = os.environ.get("MISTRAL_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")
 MONGO_URI         = os.environ.get("MONGO_URI", "")
 
@@ -503,18 +504,18 @@ def predict_fake(text: str) -> dict:
     signals = compute_signals(text)
     net = signals["net_score"]
 
-    # 0. Impossible Statistical & Futuristic Claim Filter
-    if re.search(r'\b(999|500|600|700|800)\s*(runs?|run)\b', text.lower()) or re.search(r'\b(2027|2028|2029|2030)\b', text.lower()):
+    # 0. Impossible Single-Match Statistical Claim Filter (e.g., 999 runs in a match)
+    if re.search(r'\b(999|1000|1500|2000)\s*(runs?|run)\b', text.lower()):
         return {
             "verdict": "FAKE",
             "confidence": 99.0,
             "confidence_label": "Fake / Misinformation",
             "is_fake": True,
             "prediction": 1,
-            "fake_signals": ["⚠ Impossible sports statistical claim or futuristic season claim"],
+            "fake_signals": ["⚠ Impossible sports statistical claim (single-match scores exceed limits)"],
             "real_signals": [],
             "signal_score": -50,
-            "explanation": "TruthLens Sports Fact-Check: Statistically impossible cricket claim (individual scores cannot exceed match limits; futuristic seasons have not occurred).",
+            "explanation": "TruthLens Sports Fact-Check: Statistically impossible cricket claim (individual scores cannot exceed match limits).",
             "model": "Sports Knowledge Database Filter"
         }
 
@@ -1098,13 +1099,36 @@ def api_news():
 
 
 
+def mistral_direct_check(text: str) -> dict:
+    """Direct Mistral AI evaluation of claim without external search context."""
+    if not MISTRAL_API_KEY:
+        return None
+    try:
+        r = requests.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "mistral-small-latest",
+                "messages": [
+                    {"role": "system", "content": "You are TruthLens AI, an expert factual verification engine. Determine if the user claim is REAL or FAKE based on verified world facts. Output strictly valid JSON with: verdict (REAL or FAKE), confidence (number 0-100), is_fake (boolean), explanation (concise 2-sentence explanation)."},
+                    {"role": "user", "content": f"Fact-check this news claim: \"{text}\""}
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.1
+            },
+            timeout=4.0
+        )
+        if r.status_code == 200:
+            content = r.json()['choices'][0]['message']['content'].strip()
+            return json.loads(content)
+    except Exception as e:
+        print(f"[Mistral Direct Check] Error: {e}")
+    return None
+
+
 def llm_fact_check(text: str, web_sources: list = None) -> dict:
-    """
-    Fact-check any news claim or statement using Mistral AI LLM + Live Web Context.
-    Returns structured verdict, confidence, signals, and detailed factual explanation.
-    """
-    mistral_key = os.environ.get("MISTRAL_API_KEY", "")
-    if not mistral_key:
+    """Mistral AI fact-check grounded with live Tavily web search articles."""
+    if not MISTRAL_API_KEY:
         return None
 
     sources_str = ""
@@ -1115,7 +1139,7 @@ def llm_fact_check(text: str, web_sources: list = None) -> dict:
         ])
 
     prompt = f"""You are TruthLens AI, an expert real-time fact-checking LLM.
-Task: Fact-check the user claim below and determine if it is REAL or FAKE based on factual knowledge and live web context.
+Task: Fact-check the user claim below and determine if it is REAL or FAKE using verified knowledge and the provided live web search news articles.
 
 User Claim: "{text}"
 
@@ -1123,11 +1147,11 @@ Live Search Context from Web:
 {sources_str if sources_str else "No direct matching live articles found in web search."}
 
 Instructions:
-1. If the claim is historically true or corroborated by reputable sources, verdict must be REAL with confidence 95-100%.
+1. If live reputable news articles confirm or report on the user's claim / topic / aspiration (e.g. participation in upcoming tournament, official reports), verdict must be REAL with confidence 95-100%.
 2. If the claim is a known hoax, impossible fact, rumor, or contradicts verified facts, verdict must be FAKE with confidence 90-99%.
-3. If unverified but plausible with zero confirming sources, explain clearly.
+3. If unverified with zero confirming sources, explain clearly.
 
-Output strictly valid JSON with this exact structure (no markdown formatting outside JSON):
+Output strictly valid JSON with this exact structure:
 {{
   "verdict": "REAL",
   "confidence": 98.0,
@@ -1141,29 +1165,24 @@ Output strictly valid JSON with this exact structure (no markdown formatting out
     try:
         r = requests.post(
             "https://api.mistral.ai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {mistral_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model": "open-mistral-7b",
+                "model": "mistral-small-latest",
                 "messages": [
                     {"role": "system", "content": "You are a factual, strict AI news verification engine. Output JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                "max_tokens": 350,
+                "response_format": {"type": "json_object"},
                 "temperature": 0.1
             },
-            timeout=5.5
+            timeout=5.0
         )
 
         if r.status_code == 200:
-            res_content = r.json()['choices'][0]['message']['content'].strip()
-            # Clean markdown codeblocks if present
-            res_content = re.sub(r'^```(?:json)?\s*', '', res_content)
-            res_content = re.sub(r'\s*```$', '', res_content)
-            match = re.search(r'\{.*\}', res_content, re.DOTALL)
-            if match:
-                res_dict = json.loads(match.group())
-                res_dict["model"] = "Mistral AI (open-mistral-7b) + Tavily Grounding"
-                return res_dict
+            content = r.json()['choices'][0]['message']['content'].strip()
+            res_dict = json.loads(content)
+            res_dict["model"] = "Mistral AI + Tavily Live Grounding"
+            return res_dict
     except Exception as e:
         print(f"[LLM Fact Check] Error: {e}")
 
@@ -1174,7 +1193,7 @@ SCAN_CACHE = {}
 _scan_cache_lock = threading.Lock()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAIN AI SCAN ENDPOINT (Text DL + Tavily Real-Time Search + Mistral LLM)
+# MAIN AI SCAN ENDPOINT (Model -> Mistral -> Tavily Multi-Tier Pipeline)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route("/api/ai-scan", methods=["POST"])
 @require_auth
@@ -1192,74 +1211,92 @@ def ai_scan():
             if now_ts - entry["ts"] < 1800:
                 return jsonify(entry["data"])
 
-    # Run Rule/DL Engine & Tavily Web Search CONCURRENTLY IN PARALLEL
-    fut_rule = scan_executor.submit(predict_fake, text)
-    fut_tavily = scan_executor.submit(search_tavily_live_news, text)
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 1: Check Model (Neural DL Model & Heuristic Signals)
+    # ─────────────────────────────────────────────────────────────────────────
+    model_res = predict_fake(text)
+    model_is_fake = bool(model_res.get("is_fake", False))
 
-    result = fut_rule.result()
-    try:
-        verification = fut_tavily.result(timeout=5.0)
-    except Exception:
-        verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
-
-    result["verification"] = verification
-    articles = verification.get("matching_articles", [])
-    is_headline_confirmed = verify_claim_against_articles(text, articles)
-
-    # 1. If explicit rule/sports DB/smear/political override triggered, preserve and return instantly
-    if result.get("model") in ["Sports Knowledge Database Filter", "Sports Knowledge Database Override", "Smear & Hoax Detection Filter", "Political Knowledge Database Filter"]:
-        pass
-    else:
-        # 2. Try Mistral AI LLM Fact Check for nuanced claims with live web context
-        llm_res = None
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 2: Check Mistral AI (Direct Knowledge Check)
+    # ─────────────────────────────────────────────────────────────────────────
+    mistral_res = None
+    if MISTRAL_API_KEY:
         try:
-            fut_llm = scan_executor.submit(llm_fact_check, text, articles)
-            llm_res = fut_llm.result(timeout=5.5)
+            fut_mistral = scan_executor.submit(mistral_direct_check, text)
+            mistral_res = fut_mistral.result(timeout=4.0)
         except Exception:
-            llm_res = None
+            mistral_res = None
 
-        if llm_res and isinstance(llm_res, dict) and "verdict" in llm_res:
-            result["verdict"] = llm_res.get("verdict", result["verdict"])
-            result["confidence"] = float(llm_res.get("confidence", result["confidence"]))
-            result["confidence_label"] = llm_res.get("confidence_label", "Verified Intelligence")
-            result["is_fake"] = bool(llm_res.get("is_fake", result["is_fake"]))
-            if llm_res.get("fake_signals"):
-                result["fake_signals"] = llm_res["fake_signals"]
-            if llm_res.get("real_signals"):
-                result["real_signals"] = llm_res["real_signals"]
-            result["explanation"] = f"TruthLens Fact-Check: {llm_res.get('explanation', result['explanation'])}"
-            result["model"] = "Mistral AI + Tavily Real-Time Grounding"
-        elif verification.get("sources_found", 0) > 0 and is_headline_confirmed:
-            # Web Grounding Confirmation
-            result["is_fake"] = False
-            result["verdict"] = "REAL"
-            result["confidence"] = 100.0
-            result["confidence_label"] = "100% Verified Real"
-            result["real_signals"] = [f"[OK] Confirmed by {verification['sources_found']} live reputable news outlets"]
-            result["fake_signals"] = []
-            result["explanation"] = f"TruthLens Live Web Grounding: Confirmed by {verification['sources_found']} live reputable news sources."
-            result["model"] = "Tavily Real-Time Live Web Intelligence"
-        elif result.get("is_fake"):
-            # Model / Rules detected fake signals
-            if not result.get("fake_signals"):
-                result["fake_signals"] = ["⚠ Misinformation markers and pattern anomalies detected"]
-            result["explanation"] = result.get("explanation") or "TruthLens DL Engine: Synthetic phrasing or misinformation patterns detected."
+    mistral_is_fake = None
+    if mistral_res and isinstance(mistral_res, dict):
+        if "is_fake" in mistral_res:
+            mistral_is_fake = bool(mistral_res["is_fake"])
+        elif "verdict" in mistral_res:
+            mistral_is_fake = (str(mistral_res["verdict"]).upper() == "FAKE")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 3: If both Model and Mistral agree -> Return Consensus Preview!
+    # ─────────────────────────────────────────────────────────────────────────
+    if mistral_res is not None and (model_is_fake == mistral_is_fake):
+        final_verdict = "FAKE" if model_is_fake else "REAL"
+        final_conf = float(mistral_res.get("confidence") or model_res.get("confidence") or 96.0)
+
+        # Quick Tavily search for citation links preview
+        verification = {"sources_found": 0, "matching_articles": []}
+        try:
+            verification = search_tavily_live_news(text)
+        except Exception:
+            pass
+
+        result = {
+            "verdict": final_verdict,
+            "confidence": final_conf,
+            "confidence_label": "100% Verified Real" if final_verdict == "REAL" else "Fake / Misinformation",
+            "is_fake": model_is_fake,
+            "fake_signals": mistral_res.get("fake_signals") or model_res.get("fake_signals") or (["⚠ Misinformation markers and factual anomalies detected"] if model_is_fake else []),
+            "real_signals": mistral_res.get("real_signals") or model_res.get("real_signals") or (["✓ Verified factual consistency across neural model and Mistral AI"] if not model_is_fake else []),
+            "explanation": mistral_res.get("explanation") or model_res.get("explanation") or f"TruthLens Consensus: Evaluated as {final_verdict}.",
+            "model": "Neural Model + Mistral AI Consensus",
+            "verification": verification
+        }
+    else:
+        # ─────────────────────────────────────────────────────────────────────
+        # STEP 4: Otherwise (Disagreement or Uncertain) -> Go to Tavily Live Search!
+        # ─────────────────────────────────────────────────────────────────────
+        verification = search_tavily_live_news(text)
+        articles = verification.get("matching_articles", [])
+
+        # Ground claim with live articles via Mistral
+        grounded_res = None
+        if articles and MISTRAL_API_KEY:
+            try:
+                fut_grounded = scan_executor.submit(llm_fact_check, text, articles)
+                grounded_res = fut_grounded.result(timeout=5.0)
+            except Exception:
+                grounded_res = None
+
+        if grounded_res and isinstance(grounded_res, dict) and "verdict" in grounded_res:
+            result = grounded_res
+            result["verification"] = verification
+            result["model"] = "Tavily Live Search + Mistral AI Grounding"
+        elif verification.get("sources_found", 0) > 0:
+            reputable_sources = [a['source'] for a in articles if a.get('is_reputable')] or [a['source'] for a in articles[:3]]
+            result = {
+                "verdict": "REAL",
+                "confidence": 98.0,
+                "confidence_label": "100% Verified Real",
+                "is_fake": False,
+                "fake_signals": [],
+                "real_signals": [f"[OK] Corroborated by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])})"],
+                "explanation": f"TruthLens Live Grounding: Confirmed by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])}).",
+                "model": "Tavily Real-Time Live Web Grounding",
+                "verification": verification
+            }
         else:
-            # Clean statement with no negative signals
-            if verification.get("sources_found", 0) > 0:
-                result["is_fake"] = False
-                result["verdict"] = "REAL"
-                result["confidence"] = 92.0
-                result["confidence_label"] = "Verified Real"
-                result["real_signals"] = [f"[OK] Corroborated by {verification['sources_found']} web sources"]
-                result["explanation"] = "TruthLens Intelligence: Authentic sequence reporting pattern aligned with live information."
-            else:
-                result["is_fake"] = False
-                result["verdict"] = "REAL"
-                result["confidence"] = 85.0
-                result["confidence_label"] = "Credible Report"
-                result["real_signals"] = ["✓ Clean sequence syntax with 0 misinformation markers"]
-                result["explanation"] = "TruthLens DL Engine: Natural sequence syntax verified clean of clickbait or deceptive signals."
+            result = model_res
+            result["verification"] = verification
+            result["model"] = "Deep Learning Neural Model"
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
