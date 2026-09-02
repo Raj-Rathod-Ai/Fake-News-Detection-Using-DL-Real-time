@@ -1382,13 +1382,38 @@ async function runTextScan() {
     if (!text || text.length < 10) { showToast('Please enter at least 10 characters', 'error'); return; }
     const result = document.getElementById('text-scan-result');
     renderScanAnimation(result, 'Text Claim Real-Time Verification Active', 'Analyzing text sequence & cross-checking live news databases...');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 22000); // 22s fits Netlify 26s limit
+
     try {
-        const r = await fetch('/api/ai-scan', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+        const r = await fetch('/api/ai-scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text}),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!r.ok) {
+            let errMsg = 'Analysis failed.';
+            try { const ed = await r.json(); errMsg = ed.error || errMsg; } catch(e) {}
+            result.innerHTML = `<div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-tl-red/30">
+                <p class="text-tl-red font-bold text-sm">${errMsg}</p>
+                <button onclick="runTextScan()" class="mt-2 text-xs text-tl-purple font-black hover:underline">↺ Try Again</button>
+            </div>`;
+            return;
+        }
         const d = await r.json();
-        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
         renderScanResult(result, d);
     } catch(e) {
-        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Analysis failed. Please try again.</div>`;
+        clearTimeout(timeout);
+        const isTimeout = e.name === 'AbortError';
+        result.innerHTML = `<div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-tl-red/30">
+            <i class="ph-fill ${isTimeout ? 'ph-clock' : 'ph-wifi-slash'} text-2xl text-tl-red block mb-2"></i>
+            <p class="text-tl-red font-bold text-sm">${isTimeout ? 'Analysis timed out. AI engine is warming up.' : 'Cannot connect to AI engine.'}</p>
+            <p class="text-xs text-ink-500 mt-1">${isTimeout ? 'Please wait 10 seconds and try again.' : 'Check your connection and retry.'}</p>
+            <button onclick="runTextScan()" class="mt-3 text-xs font-black text-tl-purple hover:underline">↺ Retry</button>
+        </div>`;
     }
 }
 
