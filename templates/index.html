@@ -1625,6 +1625,8 @@ function renderScanResult(container, d) {
                             <span class="text-xs text-ink-700 dark:text-ink-100">${s}</span>
                         </div>`).join('')}
                     </div>
+                </div>` : ''}
+                
                 ${(d.verification && d.verification.matching_articles && d.verification.matching_articles.length) ? `
                 <div class="mt-4 pt-3 border-t border-paper-200 dark:border-white/10">
                     <p class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-2 flex items-center gap-1.5">
@@ -1852,8 +1854,5 @@ function renderPrice(m) {
     } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
 }
 </script>
-</body>
-</html>
-
 </body>
 </html>
