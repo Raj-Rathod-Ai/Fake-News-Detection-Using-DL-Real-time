@@ -1286,12 +1286,34 @@ async function runTextScan() {
     const result = document.getElementById('text-scan-result');
     renderScanAnimation(result, 'Keras Model Inference Running', 'Analyzing claim with trained Keras Deep Learning model...');
     try {
-        const r = await fetch('/api/ai-scan', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
-        const d = await r.json();
-        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
+        const r = await fetch('/api/ai-scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text})
+        });
+        const contentType = r.headers.get('content-type') || '';
+        let d;
+        if (contentType.includes('application/json')) {
+            d = await r.json();
+        } else {
+            const rawText = await r.text();
+            throw new Error(`Server returned status ${r.status}. The backend was waking up, please retry.`);
+        }
+        if (!r.ok) {
+            result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4 bg-tl-red/10 rounded-xl border border-tl-red/20">${d.error || 'Server error occurred'}</div>`;
+            return;
+        }
         renderScanResult(result, d);
     } catch(e) {
-        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Analysis failed. Please try again.</div>`;
+        console.error("Scan error:", e);
+        result.innerHTML = `
+            <div class="p-4 bg-tl-red/10 border border-tl-red/20 rounded-2xl text-center">
+                <p class="text-tl-red font-bold text-sm mb-1"><i class="ph-bold ph-warning mr-1"></i> Analysis Error</p>
+                <p class="text-xs text-ink-700 dark:text-ink-100 mb-3">${e.message || 'Connection timeout while reaching backend server.'}</p>
+                <button onclick="runTextScan()" class="bg-tl-purple text-white px-5 py-2 rounded-xl text-xs font-bold hover:opacity-90 shadow-md">
+                    <i class="ph-bold ph-arrow-clockwise mr-1"></i> Retry Scan Now
+                </button>
+            </div>`;
     }
 }
 
