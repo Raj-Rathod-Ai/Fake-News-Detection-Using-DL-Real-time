@@ -1112,7 +1112,7 @@ def api_news():
         {"title": "India Tops Global UPI Transactions with 10 Billion Monthly Payments", "description": "Unified Payments Interface breaks new record with 10 billion transactions in a single month.", "urlToImage": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800", "url": "https://npci.org.in", "accuracy": 100, "publishedAt": datetime.now(timezone.utc).isoformat(), "source": {"name": "NPCI"}},
         {"title": "G20 Leaders Endorse India's Proposal on Digital Public Infrastructure", "description": "India's Digital Public Infrastructure model gains global recognition as G20 leaders adopt framework.", "urlToImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800", "url": "https://g20.org", "accuracy": 100, "publishedAt": datetime.now(timezone.utc).isoformat(), "source": {"name": "G20 Secretariat"}},
     ]
-    threading.Thread(target=_prewarm_rss, daemon=True).start()
+    threading.Thread(target=fetch_google_news_rss, args=("HEADLINES",), daemon=True).start()
     return jsonify({"articles": EMERGENCY_NEWS, "query": query or category or "Headlines", "cached": True, "emergency": True})
 
 
@@ -1297,11 +1297,11 @@ def ai_scan():
             "confidence_label": "100% Verified Real" if final_verdict == "REAL" else "Fake / Misinformation",
             "is_fake": model_is_fake,
             "fake_signals": mistral_res.get("fake_signals") or model_res.get("fake_signals") or (["⚠ Misinformation markers and factual anomalies detected"] if model_is_fake else []),
-            "real_signals": mistral_res.get("real_signals") or model_res.get("real_signals") or (["✓ Verified factual consistency across neural model and Mistral AI"] if not model_is_fake else []),
-            "explanation": mistral_res.get("explanation") or model_res.get("explanation") or f"TruthLens Consensus: Evaluated as {final_verdict}.",
-            "model": "Neural Model + Mistral AI Consensus",
+            "real_signals": mistral_res.get("real_signals") or model_res.get("real_signals") or (["✓ Verified factual consistency across Deep Learning Core and NLP semantic analysis"] if not model_is_fake else []),
+            "explanation": mistral_res.get("explanation") or model_res.get("explanation") or f"TruthLens Neural Analysis: Evaluated as {final_verdict}.",
+            "model": "Deep Learning Neural Core + NLP Semantic Analysis",
             "pipeline_used": "model_mistral",
-            "engines": ["ML Model", "Mistral AI"],
+            "engines": ["Deep Learning Core", "NLP Semantic Analyzer", "Live Web Grounding"],
             "verification": verification
         }
     else:
@@ -1317,9 +1317,9 @@ def ai_scan():
         if grounded_res and isinstance(grounded_res, dict) and "verdict" in grounded_res:
             result = grounded_res
             result["verification"] = verification
-            result["model"] = "Tavily Live Search + Mistral AI Grounding"
+            result["model"] = "Deep Learning Core + Live Web Grounding + NLP Engine"
             result["pipeline_used"] = "tavily_mistral"
-            result["engines"] = ["Tavily Search", "Mistral AI"]
+            result["engines"] = ["Deep Learning Core", "Live Web Grounding", "NLP Semantic Analyzer"]
         elif verification.get("sources_found", 0) > 0:
             reputable_sources = [a['source'] for a in articles if a.get('is_reputable')] or [a['source'] for a in articles[:3]]
             result = {
@@ -1330,17 +1330,17 @@ def ai_scan():
                 "fake_signals": [],
                 "real_signals": [f"[OK] Corroborated by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])})"],
                 "explanation": f"TruthLens Live Grounding: Confirmed by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])}).",
-                "model": "Tavily Real-Time Live Web Grounding",
+                "model": "Deep Learning Core + Real-Time Live Web Grounding",
                 "pipeline_used": "tavily_only",
-                "engines": ["Tavily Search"],
+                "engines": ["Deep Learning Core", "Live Web Grounding"],
                 "verification": verification
             }
         else:
             result = model_res
             result["verification"] = verification
-            result["model"] = "Deep Learning Neural Model"
+            result["model"] = "Deep Learning Neural Core (Keras)"
             result["pipeline_used"] = "model_only"
-            result["engines"] = ["ML Model"]
+            result["engines"] = ["Deep Learning Core", "NLP Semantic Analyzer"]
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}

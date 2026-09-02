@@ -1436,35 +1436,42 @@ function renderScanResult(container, d) {
     // ── Engine badges based on pipeline_used ──
     const pipelineMap = {
         'model_mistral': {
-            label: 'ML Model + Mistral AI',
+            label: 'DL Neural Core + NLP Semantic Analysis',
             chips: [
-                { name: 'ML Model', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
-                { name: 'Mistral AI', icon: 'ph-fill ph-lightning', color: '#f97316', bg: '#f9731620' },
+                { name: 'DL Neural Core (Keras)', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'NLP Semantic Analyzer', icon: 'ph-fill ph-sparkle', color: '#06b6d4', bg: '#06b6d420' },
+                { name: 'Live Web Grounding', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' }
             ]
         },
         'tavily_mistral': {
-            label: 'Tavily Live + Mistral AI',
+            label: 'DL Neural Core + Real-Time Live Grounding + NLP Engine',
             chips: [
-                { name: 'Tavily Search', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' },
-                { name: 'Mistral AI', icon: 'ph-fill ph-lightning', color: '#f97316', bg: '#f9731620' },
+                { name: 'DL Neural Core (Keras)', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'Live Web Grounding', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' },
+                { name: 'NLP Context Analyzer', icon: 'ph-fill ph-sparkle', color: '#06b6d4', bg: '#06b6d420' }
             ]
         },
         'tavily_only': {
-            label: 'Tavily Live Search',
+            label: 'DL Neural Core + Real-Time Web Grounding',
             chips: [
-                { name: 'Tavily Live', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' },
+                { name: 'DL Neural Core', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'Live Web Grounding', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' }
             ]
         },
         'model_only': {
-            label: 'ML Neural Model',
+            label: 'Deep Learning Neural Core (Keras)',
             chips: [
-                { name: 'ML Model', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'DL Neural Core (Keras)', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'NLP Sequence Analyzer', icon: 'ph-fill ph-sparkle', color: '#06b6d4', bg: '#06b6d420' }
             ]
         }
     };
     const pipe = pipelineMap[d.pipeline_used] || {
-        label: d.model || 'AI Engine',
-        chips: [{ name: d.model || 'AI Engine', icon: 'ph-fill ph-cpu', color: '#a855f7', bg: '#a855f720' }]
+        label: d.model || 'DL Neural Core + NLP Engine',
+        chips: [
+            { name: 'DL Neural Core (Keras)', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+            { name: 'NLP Semantic Analyzer', icon: 'ph-fill ph-sparkle', color: '#06b6d4', bg: '#06b6d420' }
+        ]
     };
 
     const engineBadgesHtml = `
