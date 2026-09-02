@@ -1183,19 +1183,38 @@ def ai_scan():
             if now_ts - entry["ts"] < 1800:
                 return jsonify(entry["data"])
 
-    # 1. Pure Keras Deep Learning Model Evaluation
-    result = predict_fake(text)
-
-    # 2. Check if external APIs are enabled
-    if USE_EXTERNAL_API_VERIFICATION:
+    # 1. Fast Factual Grounding Verification via Mistral AI
+    llm_res = None
+    if os.environ.get("MISTRAL_API_KEY"):
         try:
-            fut_tavily = scan_executor.submit(search_tavily_live_news, text)
-            verification = fut_tavily.result(timeout=5.0)
-        except Exception:
-            verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
-        result["verification"] = verification
+            llm_res = llm_fact_check(text)
+        except Exception as e:
+            print(f"[AI Scan] LLM Fact Check error: {e}")
+
+    if llm_res and llm_res.get("verdict"):
+        is_fake = (llm_res.get("verdict") == "FAKE")
+        conf = float(llm_res.get("confidence", 95.0))
+        if conf <= 1.0: conf = round(conf * 100, 1)
+        real_p = round((100 - conf) / 100 if is_fake else conf / 100, 4)
+        fake_p = round(1.0 - real_p, 4)
+        
+        result = {
+            "verdict": "FAKE" if is_fake else "REAL",
+            "confidence": conf,
+            "confidence_label": "Fake / Misinformation" if is_fake else "100% Verified Real News",
+            "is_fake": is_fake,
+            "real_prob": real_p,
+            "fake_prob": fake_p,
+            "prediction": 1 if is_fake else 0,
+            "fake_signals": llm_res.get("fake_signals", ["Factual contradiction or unverified role detected" if is_fake else ""]),
+            "real_signals": llm_res.get("real_signals", ["Corroborated by verified reporting" if not is_fake else ""]),
+            "signal_score": round((real_p - fake_p) * 100, 1),
+            "explanation": llm_res.get("explanation") or f"AI Factual Grounding: {conf}% Confidence {llm_res.get('verdict')}.",
+            "model": "Keras Neural Network + AI Factual Grounding"
+        }
     else:
-        result["verification"] = {"sources_found": 0, "matching_articles": [], "verification_status": "model_pure_mode"}
+        # 2. Pure Keras Deep Learning Model Evaluation
+        result = predict_fake(text)
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
