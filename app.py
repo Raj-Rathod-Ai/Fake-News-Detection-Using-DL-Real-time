@@ -1031,16 +1031,6 @@ def fetch_google_news_rss(topic_or_query="HEADLINES") -> List[Dict[str, Any]]:
 
     return cleaned
 
-# Pre-warm top categories on startup (background threads)
-def _prewarm_rss():
-    for cat in ["HEADLINES", "INDIA", "WORLD", "SPORTS", "TECHNOLOGY", "BUSINESS"]:
-        try:
-            fetch_google_news_rss(cat)
-        except Exception:
-            pass
-
-threading.Thread(target=_prewarm_rss, daemon=True).start()
-
 
 
 @app.route("/api/news")
@@ -1693,10 +1683,14 @@ try:
 except Exception as e:
     print(f"[Init DB] Note: {e}")
 
-try:
-    threading.Thread(target=refresh_markets, daemon=True).start()
-except Exception as e:
-    print(f"[Market Thread] Note: {e}")
+def _delayed_startup():
+    time.sleep(5)
+    try:
+        refresh_markets()
+    except Exception as e:
+        print(f"[Market Thread] Note: {e}")
+
+threading.Thread(target=_delayed_startup, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
