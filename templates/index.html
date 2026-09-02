@@ -1231,33 +1231,28 @@ function switchScanTab(tab) {
 function renderScanAnimation(container, title, subtitle) {
     container.classList.remove('hidden');
     container.innerHTML = `
-        <div class="bg-paper-50 dark:bg-ink-900 rounded-2xl p-6 border border-paper-200 dark:border-white/10 relative overflow-hidden shadow-xl">
-            <div class="scan-line"></div>
+        <div class="bg-paper-50 dark:bg-ink-900 border border-paper-200 dark:border-white/10 rounded-2xl p-5 scan-shimmer">
             <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-tl-purple/20 text-tl-purple flex items-center justify-center animate-spin">
-                    <i class="ph-bold ph-spinner text-xl"></i>
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-tl-purple to-tl-blue flex items-center justify-center animate-spin">
+                    <i class="ph-bold ph-brain text-white text-base"></i>
                 </div>
                 <div>
-                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Multi-Source Parallel Verification Active'}</h4>
-                    <p class="text-xs text-ink-500">${subtitle || 'Cross-checking with PyTorch DL, Tavily Live Search & LLM Engine...'}</p>
+                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Keras Neural Network Inference Active'}</h4>
+                    <p class="text-xs text-ink-500">${subtitle || 'Processing text tokens through Keras Deep Learning model...'}</p>
                 </div>
             </div>
             <div class="space-y-2.5 font-mono text-xs">
                 <div id="anim-step-1" class="flex items-center gap-2 text-tl-purple font-bold transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div>
-                    <span>[1/4] Inspecting Neural Sequence Patterns & Feature Layers...</span>
+                    <span>[1/3] Tokenizing text & building padded sequence matrix...</span>
                 </div>
                 <div id="anim-step-2" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>
+                    <span>[2/3] Passing through Embedding & Deep Dense layers...</span>
                 </div>
                 <div id="anim-step-3" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>
-                </div>
-                <div id="anim-step-4" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
-                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>
+                    <span>[3/3] Computing direct Neural Credibility Probability...</span>
                 </div>
             </div>
         </div>`;
@@ -1267,9 +1262,9 @@ function renderScanAnimation(container, title, subtitle) {
         const s2 = document.getElementById('anim-step-2');
         if (s1 && s2) {
             s1.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/4] Neural Sequence & Pattern Analysis Verified</span>`;
+            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/3] Tokenizer sequence transformation complete</span>`;
             s2.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>`;
+            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/3] Evaluating Deep Dense neural activations...</span>`;
         }
     }, 150);
 
@@ -1278,29 +1273,18 @@ function renderScanAnimation(container, title, subtitle) {
         const s3 = document.getElementById('anim-step-3');
         if (s2 && s3) {
             s2.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/4] Forensic Signal Analysis Complete</span>`;
+            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/3] Deep Neural layers evaluated</span>`;
             s3.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>`;
+            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/3] Finalizing model output score...</span>`;
         }
     }, 300);
-
-    setTimeout(() => {
-        const s3 = document.getElementById('anim-step-3');
-        const s4 = document.getElementById('anim-step-4');
-        if (s3 && s4) {
-            s3.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s3.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[3/4] Live Web Sources Cross-Verification Complete</span>`;
-            s4.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s4.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>`;
-        }
-    }, 450);
 }
 
 async function runTextScan() {
     const text = document.getElementById('scan-text-input').value.trim();
-    if (!text || text.length < 10) { showToast('Please enter at least 10 characters', 'error'); return; }
+    if (!text || text.length < 5) { showToast('Please enter at least 5 characters', 'error'); return; }
     const result = document.getElementById('text-scan-result');
-    renderScanAnimation(result, 'Text Claim Real-Time Verification Active', 'Analyzing text sequence & cross-checking live news databases...');
+    renderScanAnimation(result, 'Keras Model Inference Running', 'Analyzing claim with trained Keras Deep Learning model...');
     try {
         const r = await fetch('/api/ai-scan', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
         const d = await r.json();
@@ -1317,29 +1301,9 @@ function renderScanResult(container, d) {
     const icon = isFake ? 'ph-warning-circle' : 'ph-check-circle';
     const circumference = 2 * Math.PI * 40;
     const offset = circumference - (circumference * d.confidence / 100);
-    const confLabel = d.confidence_label || (d.confidence >= 90 ? 'Very High' : d.confidence >= 75 ? 'High' : d.confidence >= 62 ? 'Moderate' : 'Low');
-    
-    // Verification section
-    const ver = d.verification || {};
-    let verHtml = '';
-    if (ver.sources_found > 0) {
-        const vstatus = ver.verification_status || '';
-        const vcolor = vstatus === 'verified_multiple_sources' ? '#34a853' : vstatus === 'partially_verified' ? '#f59e0b' : '#9aa0a6';
-        verHtml = `
-        <div class="mt-4 p-4 rounded-xl border" style="border-color:${vcolor}30;background:${vcolor}08">
-            <p class="text-[10px] font-black uppercase tracking-widest mb-2" style="color:${vcolor}">
-                🔍 Cross-Verification: ${ver.sources_found} source(s) found
-            </p>
-            ${(ver.matching_articles || []).map(a => `
-                <div class="flex items-start gap-2 mb-2">
-                    <i class="ph-fill ${a.is_reputable ? 'ph-seal-check text-tl-green' : 'ph-article text-ink-500'} text-sm mt-0.5 shrink-0"></i>
-                    <div>
-                        <a href="${a.url}" target="_blank" class="text-[10px] font-bold text-tl-blue hover:underline line-clamp-1">${a.title}</a>
-                        <p class="text-[9px] text-ink-500">${a.source} ${a.is_reputable ? '· ✓ Reputable' : ''}</p>
-                    </div>
-                </div>`).join('')}
-        </div>`;
-    }
+    const confLabel = d.confidence_label || (isFake ? 'Fake / Misinformation' : '100% Real News');
+    const realPct = (d.real_prob !== undefined ? (d.real_prob * 100) : (isFake ? (100 - d.confidence) : d.confidence)).toFixed(1);
+    const fakePct = (d.fake_prob !== undefined ? (d.fake_prob * 100) : (isFake ? d.confidence : (100 - d.confidence))).toFixed(1);
 
     container.innerHTML = `
         <div class="border-2 ${isFake ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
@@ -1347,11 +1311,10 @@ function renderScanResult(container, d) {
                 <i class="ph-fill ${icon} text-white text-4xl"></i>
                 <div class="flex-1">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <h4 class="text-2xl font-black text-white">${d.verdict}</h4>
+                        <h4 class="text-2xl font-black text-white">${d.verdict === 'REAL' ? '🟢 REAL NEWS' : '🔴 FAKE NEWS'}</h4>
                         <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
                     </div>
-                    <p class="text-white/70 text-xs mt-0.5">${isFake ? 'Misinformation indicators detected' : 'Content appears credible and factual'}</p>
-                    <p class="text-white/50 text-[9px] font-mono mt-1">Signal Score: ${d.signal_score >= 0 ? '+' : ''}${d.signal_score || 0}</p>
+                    <p class="text-white/80 text-xs mt-1">Direct Model Output: <strong class="text-white">${d.confidence}% Confidence</strong></p>
                 </div>
                 <div class="relative flex items-center justify-center shrink-0">
                     <svg class="score-ring" width="80" height="80" viewBox="0 0 90 90">
@@ -1363,9 +1326,36 @@ function renderScanResult(container, d) {
                 </div>
             </div>
             <div class="p-5">
+                <!-- Direct Neural Network Probability Distribution -->
+                <div class="mb-4 bg-white dark:bg-paper-800 rounded-xl p-4 border border-paper-200 dark:border-white/10 shadow-sm">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3 flex items-center justify-between">
+                        <span><i class="ph-fill ph-chart-bar mr-1 text-tl-purple"></i> Neural Network Probability Distribution</span>
+                        <span class="text-[9px] font-mono text-tl-purple">Pure Model Mode</span>
+                    </p>
+                    <div class="space-y-2.5 text-xs">
+                        <div>
+                            <div class="flex justify-between font-bold mb-1">
+                                <span class="text-tl-green flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Real Probability</span>
+                                <span class="font-mono text-tl-green">${realPct}%</span>
+                            </div>
+                            <div class="w-full bg-paper-200 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-tl-green h-full rounded-full transition-all duration-700" style="width: ${realPct}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between font-bold mb-1">
+                                <span class="text-tl-red flex items-center gap-1"><i class="ph-fill ph-x-circle"></i> Fake Probability</span>
+                                <span class="font-mono text-tl-red">${fakePct}%</span>
+                            </div>
+                            <div class="w-full bg-paper-200 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-tl-red h-full rounded-full transition-all duration-700" style="width: ${fakePct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 ${(d.fake_signals && d.fake_signals.length) ? `
-                <div class="mb-4">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-2">⚠ Misinformation Signals (${d.fake_signals.length})</p>
+                <div class="mb-3">
                     <div class="space-y-1.5">
                         ${d.fake_signals.map(s=>`
                         <div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-2">
@@ -1376,8 +1366,7 @@ function renderScanResult(container, d) {
                 </div>` : ''}
                 
                 ${(d.real_signals && d.real_signals.length) ? `
-                <div class="mb-4">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-2">✓ Credibility Markers (${d.real_signals.length})</p>
+                <div class="mb-3">
                     <div class="space-y-1.5">
                         ${d.real_signals.map(s=>`
                         <div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-2">
@@ -1387,19 +1376,15 @@ function renderScanResult(container, d) {
                     </div>
                 </div>` : ''}
 
-                ${verHtml}
-
-                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10 flex items-start gap-2 flex-wrap">
-                    <p class="text-[10px] text-ink-500 flex-1">${d.explanation}</p>
-                    <span class="text-[9px] bg-tl-purple/10 text-tl-purple px-2 py-1 rounded-full font-black shrink-0">
-                        <i class="ph-fill ph-brain"></i> ${d.model || 'Ensemble v3'}
+                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10 flex items-start gap-2 flex-wrap justify-between">
+                    <p class="text-[11px] text-ink-700 dark:text-ink-100 font-medium">${d.explanation}</p>
+                    <span class="text-[9px] bg-tl-purple/10 text-tl-purple px-2.5 py-1 rounded-full font-black shrink-0 flex items-center gap-1">
+                        <i class="ph-fill ph-cpu"></i> ${d.model || 'Keras Deep Learning Model'}
                     </span>
                 </div>
             </div>
         </div>`;
 }
-
-
 
 async function loadScanHistory() {
 
