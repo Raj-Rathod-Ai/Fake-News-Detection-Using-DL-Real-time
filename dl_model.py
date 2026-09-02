@@ -46,7 +46,8 @@ class FakeNewsDLInferenceEngine:
         self.tokenizer = None
         self.model = None
         self.is_loaded = False
-        self._initialize()
+        import threading
+        threading.Thread(target=self._initialize, daemon=True).start()
 
     def _initialize(self):
         # 1. Load official Tokenizer (.pkl)
