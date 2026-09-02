@@ -181,7 +181,8 @@ class FakeNewsDLInferenceEngine:
         try:
             if self.use_keras and self.keras_model is not None and self.tokenizer is not None:
                 padded = self._preprocess(text)
-                raw_output = self.keras_model.predict(padded, verbose=0)
+                raw_call = self.keras_model(padded, training=False)
+                raw_output = np.array(raw_call)
 
                 # Handle both binary sigmoid (shape [1,1]) and softmax (shape [1,2])
                 if raw_output.shape[-1] == 1:
