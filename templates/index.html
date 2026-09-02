@@ -767,7 +767,29 @@ function nav(page) {
 // =====================================================================
 async function fetchNews(cat) {
     const app = document.getElementById('app');
-    app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+    const cacheKey = 'tl_cache_news_' + (cat || 'home');
+
+    // 1. Instant Stale-While-Revalidate: If we have last API response stored, show it immediately!
+    const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
+    if (cached) {
+        try {
+            const cachedArticles = JSON.parse(cached);
+            if (Array.isArray(cachedArticles) && cachedArticles.length > 0) {
+                state.articles = cachedArticles;
+                app.innerHTML = `
+                    <div class="col-span-full flex items-end justify-between mb-2">
+                        <div class="border-l-4 border-tl-purple pl-4">
+                            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
+                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
+                        </div>
+                    </div>
+                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+                renderSidebars();
+            }
+        } catch(e) {}
+    } else {
+        app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+    }
 
     let url = cat === 'local'
         ? `/api/news?category=local&city=${encodeURIComponent(state.city)}`
@@ -778,7 +800,15 @@ async function fetchNews(cat) {
     try {
         const r = await fetch(url);
         const d = await r.json();
-        state.articles = d.articles || [];
+        if (d.articles && d.articles.length > 0) {
+            state.articles = d.articles;
+            localStorage.setItem(cacheKey, JSON.stringify(d.articles));
+            localStorage.setItem('tl_cache_news_home', JSON.stringify(d.articles));
+        } else if (!state.articles || state.articles.length === 0) {
+            const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
+            if (fallbackCached) state.articles = JSON.parse(fallbackCached);
+        }
+
         app.innerHTML = `
             <div class="col-span-full flex items-end justify-between mb-2">
                 <div class="border-l-4 border-tl-purple pl-4">
@@ -790,7 +820,20 @@ async function fetchNews(cat) {
             ${state.articles.map((a,i) => renderCard(a,i)).join('')}
             ${state.articles.length === 0 ? '<div class="col-span-full py-32 text-center text-ink-500 font-serif italic text-lg">No reports found in current archives.</div>' : ''}`;
     } catch(e) {
-        app.innerHTML = `<div class="col-span-full py-32 text-center text-tl-red font-bold">Failed to sync with news bureau.</div>`;
+        if (!state.articles || state.articles.length === 0) {
+            const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
+            if (fallbackCached) {
+                state.articles = JSON.parse(fallbackCached);
+                app.innerHTML = `
+                    <div class="col-span-full flex items-end justify-between mb-2">
+                        <div class="border-l-4 border-tl-purple pl-4">
+                            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
+                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports (stored live update)</p>
+                        </div>
+                    </div>
+                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+            }
+        }
     }
     renderSidebars();
 }
@@ -992,15 +1035,24 @@ let _sseConnected = false;
 let _prevPrices = {};
 
 async function fetchMarkets() {
+    // 1. Instant cache load from localStorage if available
+    const cached = localStorage.getItem('tl_cache_markets');
+    if (cached && (!state.markets || state.markets.length === 0)) {
+        try { processMarketData(JSON.parse(cached)); } catch(e) {}
+    }
+
     try {
         const r = await fetch('/api/markets');
         const d = await r.json();
-        processMarketData(d);
+        if (d && (d.markets || d.items)) {
+            localStorage.setItem('tl_cache_markets', JSON.stringify(d));
+            processMarketData(d);
+        }
     } catch(e) {}
 }
 
 function processMarketData(d) {
-    const newMarkets = d.markets || [];
+    const newMarkets = d.markets || d.items || [];
     const status = d.market_status || {};
     
     // Detect price changes for animation
@@ -1015,7 +1067,7 @@ function processMarketData(d) {
     
     state.markets = newMarkets;
     state.marketStatus = status;
-    state.liveCount = d.live_count || 0;
+    state.liveCount = d.live_count || newMarkets.length || 0;
     
     renderTickerBar();
     renderSidebars();
@@ -1124,58 +1176,122 @@ function formatTeamScore(ms, teamKey) {
     return `${r}/${w}${ov}`;
 }
 
+function renderCricketCards(d) {
+    const hub = document.getElementById('cricket-hub');
+    if (!hub) return;
+    const matches = d.typeMatches || [];
+    let cards = '';
+    for (const tm of matches) {
+        for (const sm of tm.seriesMatches || []) {
+            for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
+                const mi = m.matchInfo;
+                if (!mi) continue;
+                const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
+                const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
+
+                const s1 = formatTeamScore(m.matchScore, 'team1Score');
+                const s2 = formatTeamScore(m.matchScore, 'team2Score');
+
+                const stateStr = mi.state || '';
+                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
+                const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
+                const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
+                const statusNote = mi.status || stateStr;
+
+                cards += `
+                    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+                        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
+                                    <span class="truncate">${t1}</span>
+                                </div>
+                                <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
+                                    <span class="truncate">${t2}</span>
+                                </div>
+                                <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
+                            </div>
+                        </div>
+                        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red animate-pulse' : 'text-ink-500'}">${badgeText}</div>
+                            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
+                        </div>
+                    </div>`;
+            }
+        }
+    }
+    hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 MATCHES</span>` + (cards || '<span class="text-xs text-ink-500 italic">No matches available</span>');
+}
+
 async function fetchCricket() {
+    // 1. Instant load from localStorage
+    const cached = localStorage.getItem('tl_cache_cricket');
+    if (cached) {
+        try { renderCricketCards(JSON.parse(cached)); } catch(e) {}
+    }
+
     try {
         const r = await fetch('/api/cricket');
         const d = await r.json();
-        const hub = document.getElementById('cricket-hub');
-        const matches = d.typeMatches || [];
-        let cards = '';
-        for (const tm of matches) {
-            for (const sm of tm.seriesMatches || []) {
-                for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
-                    const mi = m.matchInfo;
-                    if (!mi) continue;
-                    const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
-                    const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
-
-                    const s1 = formatTeamScore(m.matchScore, 'team1Score');
-                    const s2 = formatTeamScore(m.matchScore, 'team2Score');
-
-                    const stateStr = mi.state || '';
-                    const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
-                    const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
-                    const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
-                    const statusNote = mi.status || stateStr;
-
-                    cards += `
-                        <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
-                            <div class="flex flex-col gap-1.5 flex-1 min-w-0">
-                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                    <div class="flex items-center gap-1.5 truncate">
-                                        <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
-                                        <span class="truncate">${t1}</span>
-                                    </div>
-                                    <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
-                                </div>
-                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                    <div class="flex items-center gap-1.5 truncate">
-                                        <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
-                                        <span class="truncate">${t2}</span>
-                                    </div>
-                                    <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
-                                </div>
-                            </div>
-                            <div class="ml-2 text-right shrink-0 max-w-[100px]">
-                                <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red animate-pulse' : 'text-ink-500'}">${badgeText}</div>
-                                <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
-                            </div>
-                        </div>`;
-                }
-            }
+        if (d && d.typeMatches && d.typeMatches.length > 0) {
+            localStorage.setItem('tl_cache_cricket', JSON.stringify(d));
+            renderCricketCards(d);
         }
-        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 MATCHES</span>` + (cards || '<span class="text-xs text-ink-500 italic">No matches available</span>');
     } catch(e) {}
+}
+
+// =====================================================================
+// WEATHER & LOCATION
+// =====================================================================
+function renderWeather(d) {
+    const box = document.getElementById('weather-box');
+    const tempEl = document.getElementById('weather-temp');
+    const locEl = document.getElementById('weather-loc');
+    if (!box || !tempEl || !locEl) return;
+
+    const temp = d?.current?.temp_c !== undefined ? Math.round(d.current.temp_c) : '--';
+    const loc = d?.location?.name || d?.location?.region || 'Delhi';
+    tempEl.textContent = `${temp}°C`;
+    locEl.textContent = loc;
+    box.classList.remove('opacity-0');
+}
+
+function requestLoc() {
+    const cached = localStorage.getItem('tl_cache_weather');
+    if (cached) {
+        try { renderWeather(JSON.parse(cached)); } catch(e) {}
+    }
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                try {
+                    const r = await fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+                    const d = await r.json();
+                    localStorage.setItem('tl_cache_weather', JSON.stringify(d));
+                    renderWeather(d);
+                } catch(e) {}
+            },
+            async () => {
+                try {
+                    const r = await fetch('/api/weather');
+                    const d = await r.json();
+                    localStorage.setItem('tl_cache_weather', JSON.stringify(d));
+                    renderWeather(d);
+                } catch(e) {}
+            },
+            { timeout: 5000 }
+        );
+    } else {
+        fetch('/api/weather').then(r=>r.json()).then(d=>{
+            localStorage.setItem('tl_cache_weather', JSON.stringify(d));
+            renderWeather(d);
+        }).catch(()=>{});
+    }
 }
 
 

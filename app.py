@@ -151,9 +151,56 @@ def init_db():
                 rating INTEGER,
                 created_at TEXT
             );
+            CREATE TABLE IF NOT EXISTS api_cache (
+                cache_key TEXT PRIMARY KEY,
+                json_data TEXT,
+                updated_at TEXT
+            );
         """)
         db.commit()
         db.close()
+
+_persistent_api_cache = {}
+_api_cache_lock = threading.Lock()
+
+def save_last_api_response(cache_key: str, data: Any):
+    """Store the latest live API response into memory and SQLite for zero-downtime persistence."""
+    try:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        json_str = json.dumps(data)
+        with _api_cache_lock:
+            _persistent_api_cache[cache_key] = {"data": data, "ts": now_iso}
+
+        def _db_save():
+            try:
+                con = sqlite3.connect(DB_PATH)
+                con.execute("INSERT OR REPLACE INTO api_cache (cache_key, json_data, updated_at) VALUES (?, ?, ?)", (cache_key, json_str, now_iso))
+                con.commit()
+                con.close()
+            except Exception:
+                pass
+        threading.Thread(target=_db_save, daemon=True).start()
+    except Exception as e:
+        print(f"[API Cache Save] Error: {e}")
+
+def get_last_api_response(cache_key: str) -> Any:
+    """Retrieve the last recorded live API response from memory or persistent SQLite storage."""
+    with _api_cache_lock:
+        if cache_key in _persistent_api_cache:
+            return _persistent_api_cache[cache_key]["data"]
+
+    try:
+        con = sqlite3.connect(DB_PATH)
+        row = con.execute("SELECT json_data FROM api_cache WHERE cache_key = ?", (cache_key,)).fetchone()
+        con.close()
+        if row and row[0]:
+            data = json.loads(row[0])
+            with _api_cache_lock:
+                _persistent_api_cache[cache_key] = {"data": data, "ts": ""}
+            return data
+    except Exception:
+        pass
+    return None
 
 def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
 
@@ -764,6 +811,7 @@ def refresh_markets():
     updated_data = {
         "items": items,
         "markets": items,
+        "indices": items[:3],
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "live_count": live_count,
         "total_count": len(items),
@@ -773,6 +821,7 @@ def refresh_markets():
     with _market_lock:
         _market_cache.update(updated_data)
 
+    save_last_api_response("markets", updated_data)
 
     try:
         broadcast_market_update({"markets": items, "market_status": status})
@@ -791,6 +840,13 @@ def get_cached_markets() -> dict:
     with _market_lock:
         if _market_cache:
             return dict(_market_cache)
+
+    last_saved = get_last_api_response("markets")
+    if last_saved and isinstance(last_saved, dict) and last_saved.get("items"):
+        with _market_lock:
+            _market_cache.update(last_saved)
+        threading.Thread(target=refresh_markets, daemon=True).start()
+        return last_saved
 
     items = [
         {"symbol": "NIFTY 50", "price": 22450.0, "price_str": "22,450.00", "change": "+0.45%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
@@ -1054,16 +1110,20 @@ def api_news():
     query = request.args.get("query")
     category = request.args.get("category","").lower()
 
-    target = query or category or "HEADLINES"
+    target = (query or category or "HEADLINES").strip()
+    cache_key = f"news_{target.upper()}"
 
     # 1. Primary Engine: Google News RSS Feed (100% Real Live News Articles)
     rss_articles = fetch_google_news_rss(target)
     if rss_articles:
+        save_last_api_response(cache_key, rss_articles)
+        save_last_api_response("news_HEADLINES", rss_articles)
         return jsonify({"articles": rss_articles, "query": query or category or "Headlines"})
 
     # 2. Try Real-Time News Data RapidAPI
     rt_articles = fetch_real_time_news_data(query=target)
     if rt_articles:
+        save_last_api_response(cache_key, rt_articles)
         return jsonify({"articles": rt_articles, "query": query or category or "Headlines"})
 
     # 3. Try NewsAPI
@@ -1090,9 +1150,15 @@ def api_news():
                         "source": {"name": a.get("source",{}).get("name","News Bureau")}
                     })
             if cleaned:
+                save_last_api_response(cache_key, cleaned)
                 return jsonify({"articles": cleaned, "query": query or category or "Headlines"})
     except Exception:
         pass
+
+    # 4. Fallback to Last Known Good Live API Response (Never show blank/dummy)
+    last_news = get_last_api_response(cache_key) or get_last_api_response("news_HEADLINES")
+    if last_news:
+        return jsonify({"articles": last_news, "query": query or category or "Headlines", "cached": True})
 
     return jsonify({"articles": [], "query": query or category or "Headlines"})
 
@@ -1469,6 +1535,13 @@ def api_cricket():
         with _cricket_lock:
             _cricket_cache["data"] = merged_data
             _cricket_cache["ts"] = now_ts
+        save_last_api_response("cricket", merged_data)
+    else:
+        last_cric = get_last_api_response("cricket")
+        if last_cric:
+            with _cricket_lock:
+                _cricket_cache["data"] = last_cric
+            return jsonify(last_cric)
 
     return jsonify(_cricket_cache["data"])
 
@@ -1515,10 +1588,12 @@ def api_weather():
             temp_c = round(temp_k - 273.15, 1) if temp_k > 200 else temp_k
             cond_text = (first_entry.get("weather") or [{}])[0].get("main", "Clear")
 
-            return jsonify({
+            w_res = {
                 "current": {"temp_c": temp_c, "condition": {"text": cond_text}},
                 "location": {"name": loc_name, "region": region_name}
-            })
+            }
+            save_last_api_response("weather", w_res)
+            return jsonify(w_res)
     except Exception as e:
         print(f"[OpenWeather13 RapidAPI] Error: {e}")
 
@@ -1531,11 +1606,16 @@ def api_weather():
                 if loc_name != "India":
                     res_data["location"]["name"] = loc_name
                     res_data["location"]["region"] = region_name
+                save_last_api_response("weather", res_data)
                 return jsonify(res_data)
         except Exception:
             pass
 
-    # 3. Default Weather Response with Geocoded Location
+    # 3. Last Known Good Live Weather from Persistent Cache
+    last_weather = get_last_api_response("weather")
+    if last_weather:
+        return jsonify(last_weather)
+
     return jsonify({
         "current": {"temp_c": 28, "condition": {"text": "Sunny"}},
         "location": {"name": loc_name, "region": region_name or "NCR"}
