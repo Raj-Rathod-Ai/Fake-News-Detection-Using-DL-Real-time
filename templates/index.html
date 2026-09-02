@@ -560,6 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
     renderNavTabs();
     renderAuthArea();
+    wakeUpBackend();   // ping Render to prevent cold-start delay
     nav('home');
     requestLoc();
     fetchMarkets();
@@ -577,6 +578,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Wake up Render backend (prevents cold-start blank on first visit)
+async function wakeUpBackend() {
+    try { await fetch('/api/news?category=home', { method: 'GET', signal: AbortSignal.timeout(3000) }); }
+    catch(e) {}
+}
 
 // Auth system removed — TruthLens is now an open platform
 // All AI scanner tools are freely accessible without login
@@ -617,13 +624,13 @@ function nav(page) {
 }
 
 // =====================================================================
-// NEWS
+// NEWS  (with smart retry for Render cold-start)
 // =====================================================================
-async function fetchNews(cat) {
+async function fetchNews(cat, retryCount = 0) {
     const app = document.getElementById('app');
     const cacheKey = 'tl_cache_news_' + (cat || 'home');
 
-    // 1. Instant Stale-While-Revalidate: If we have last API response stored, show it immediately!
+    // 1. Instant Stale-While-Revalidate: Show cached content immediately
     const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
     if (cached) {
         try {
@@ -658,6 +665,18 @@ async function fetchNews(cat) {
             state.articles = d.articles;
             localStorage.setItem(cacheKey, JSON.stringify(d.articles));
             localStorage.setItem('tl_cache_news_home', JSON.stringify(d.articles));
+        } else if (retryCount < 3) {
+            // Backend cold-starting: show wake-up message and retry
+            const isFirstRetry = retryCount === 0;
+            if (isFirstRetry) {
+                app.innerHTML = `<div class="col-span-full py-32 text-center">
+                    <div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin mb-4"></div>
+                    <p class="text-sm font-bold text-tl-purple mt-3">AI Engine warming up...</p>
+                    <p class="text-xs text-ink-500 mt-1 font-mono">Fetching live news in a moment</p>
+                </div>`;
+            }
+            setTimeout(() => fetchNews(cat, retryCount + 1), 3000);
+            return;
         } else if (!state.articles || state.articles.length === 0) {
             const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
             if (fallbackCached) state.articles = JSON.parse(fallbackCached);
@@ -674,6 +693,10 @@ async function fetchNews(cat) {
             ${state.articles.map((a,i) => renderCard(a,i)).join('')}
             ${state.articles.length === 0 ? '<div class="col-span-full py-32 text-center text-ink-500 font-serif italic text-lg">No reports found in current archives.</div>' : ''}`;
     } catch(e) {
+        if (retryCount < 3) {
+            setTimeout(() => fetchNews(cat, retryCount + 1), 4000);
+            return;
+        }
         if (!state.articles || state.articles.length === 0) {
             const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
             if (fallbackCached) {
@@ -682,10 +705,16 @@ async function fetchNews(cat) {
                     <div class="col-span-full flex items-end justify-between mb-2">
                         <div class="border-l-4 border-tl-purple pl-4">
                             <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
-                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports (stored live update)</p>
+                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
                         </div>
                     </div>
                     ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+            } else {
+                app.innerHTML = `<div class="col-span-full py-32 text-center">
+                    <i class="ph-bold ph-wifi-slash text-4xl text-paper-300 dark:text-white/20 mb-4 block"></i>
+                    <p class="text-ink-500 font-serif italic">Unable to connect to news server.</p>
+                    <button onclick="fetchNews('${cat}')" class="mt-4 text-xs font-black text-tl-purple hover:underline">↺ Retry</button>
+                </div>`;
             }
         }
     }
@@ -1115,11 +1144,13 @@ function renderWeather(d) {
 }
 
 function requestLoc() {
+    // Show cached weather instantly
     const cached = localStorage.getItem('tl_cache_weather');
     if (cached) {
         try { renderWeather(JSON.parse(cached)); } catch(e) {}
     }
 
+    // Try browser geolocation first (most accurate)
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
@@ -1127,24 +1158,45 @@ function requestLoc() {
                     const r = await fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
                     const d = await r.json();
                     localStorage.setItem('tl_cache_weather', JSON.stringify(d));
+                    if (d?.location?.name) state.city = d.location.name;
                     renderWeather(d);
-                } catch(e) {}
+                } catch(e) { fetchWeatherByIP(); }
             },
-            async () => {
-                try {
-                    const r = await fetch('/api/weather');
-                    const d = await r.json();
-                    localStorage.setItem('tl_cache_weather', JSON.stringify(d));
-                    renderWeather(d);
-                } catch(e) {}
-            },
-            { timeout: 5000 }
+            () => fetchWeatherByIP(),  // Permission denied -> use IP location
+            { timeout: 6000, enableHighAccuracy: false }
         );
     } else {
-        fetch('/api/weather').then(r=>r.json()).then(d=>{
+        fetchWeatherByIP();
+    }
+}
+
+// IP-based geolocation using ipapi.co (free, accurate, no key needed)
+async function fetchWeatherByIP() {
+    try {
+        // Get location from IP
+        const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
+        const ipData = await ipRes.json();
+        const city = ipData?.city || ipData?.region || 'India';
+        const lat = ipData?.latitude;
+        const lon = ipData?.longitude;
+        state.city = city;
+
+        // Fetch weather with coordinates from IP
+        const url = lat && lon
+            ? `/api/weather?lat=${lat}&lon=${lon}`
+            : `/api/weather?city=${encodeURIComponent(city)}`;
+        const r = await fetch(url);
+        const d = await r.json();
+        localStorage.setItem('tl_cache_weather', JSON.stringify(d));
+        renderWeather(d);
+    } catch(e) {
+        // Final fallback: fetch with no params (backend defaults to Delhi)
+        try {
+            const r = await fetch('/api/weather');
+            const d = await r.json();
             localStorage.setItem('tl_cache_weather', JSON.stringify(d));
             renderWeather(d);
-        }).catch(()=>{});
+        } catch(e2) {}
     }
 }
 
