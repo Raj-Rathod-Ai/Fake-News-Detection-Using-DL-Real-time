@@ -21,6 +21,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Lightweight Health Endpoint for Pingers / Uptime Monitors
+if hasattr(st, "query_params") and st.query_params.get("health") in ["1", "true", "check"]:
+    st.json({
+        "status": "healthy",
+        "service": "TruthLens Streamlit Intelligence",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "model_loaded": True
+    })
+    st.stop()
+
 # Helper function to read from Streamlit Secrets or Environment
 def get_secret(key: str, default: str = "") -> str:
     if hasattr(st, "secrets") and key in st.secrets:

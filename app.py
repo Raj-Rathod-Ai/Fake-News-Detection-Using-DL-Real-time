@@ -1406,6 +1406,32 @@ def ai_scan():
 
 
 
+@app.route("/health")
+@app.route("/api/health")
+def health_check():
+    """Lightweight instant health check for Render uptime monitoring."""
+    return jsonify({
+        "status": "healthy",
+        "service": "TruthLens AI Verified Intelligence",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "model_loaded": True
+    }), 200
+
+
+def _self_keep_alive():
+    """Background keep-alive ping loop to prevent Render free-tier instance sleeping."""
+    time.sleep(30)
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "https://fake-news-detection-using-ml-real-time.onrender.com")
+    while True:
+        try:
+            time.sleep(840)  # Ping every 14 minutes (Render sleeps at 15 mins)
+            requests.get(f"{render_url}/health", timeout=10)
+        except Exception:
+            pass
+
+threading.Thread(target=_self_keep_alive, daemon=True).start()
+
+
 @app.route("/api/scan-history")
 def scan_history():
     """Returns the last 20 shared scan history records (open public feed)."""
