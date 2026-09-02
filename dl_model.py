@@ -12,6 +12,11 @@ import pickle
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
+# Suppress verbose TensorFlow logs & prevent CUDA memory allocation on CPU hosts
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Model and Tokenizer file locations (priority in models/ folder, fallback in root)
