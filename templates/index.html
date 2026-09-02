@@ -364,57 +364,28 @@
             </button>
         </div>
 
-        <!-- Scanner Tabs -->
-        <div class="flex border-b border-paper-200 dark:border-white/10 overflow-x-auto no-scrollbar">
-            <button onclick="switchScanTab('streamlit')" class="scan-tab active px-5 py-3 text-xs font-black uppercase tracking-widest text-tl-purple border-b-2 border-tl-purple whitespace-nowrap" data-tab="streamlit">
-                <i class="ph-fill ph-brain mr-1.5 text-tl-purple"></i>Streamlit Neural Scanner
-            </button>
-            <button onclick="switchScanTab('text')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="text">
-                <i class="ph-bold ph-text-aa mr-1.5"></i>Local Text Scan
-            </button>
-            <button onclick="switchScanTab('history')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="history">
-                <i class="ph-bold ph-clock-counter-clockwise mr-1.5"></i>Scan History
-            </button>
+        <!-- Scanner Header / Tabs -->
+        <div class="flex border-b border-paper-200 dark:border-white/10 overflow-x-auto no-scrollbar items-center justify-between px-6 py-3 bg-paper-50 dark:bg-ink-900">
+            <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-tl-purple">
+                <i class="ph-fill ph-brain text-base text-tl-purple"></i>
+                <span>Streamlit Neural AI Engine</span>
+                <span class="bg-tl-green/20 text-tl-green text-[10px] px-2 py-0.5 rounded-full font-bold">Cloud Live</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="https://truthlens5.streamlit.app/" target="_blank" class="text-xs text-tl-purple font-bold hover:underline flex items-center gap-1">
+                    <span>Open in new tab</span>
+                    <i class="ph-bold ph-arrow-square-out"></i>
+                </a>
+            </div>
         </div>
 
-        <div class="p-6">
-            <!-- STREAMLIT EMBED TAB (PRIMARY) -->
+        <div class="p-4 sm:p-6">
+            <!-- STREAMLIT EMBED TAB -->
             <div id="scan-tab-streamlit" class="scan-content">
-                <div class="mb-3 flex items-center justify-between gap-3 bg-paper-50 dark:bg-ink-900 p-3 rounded-xl border border-paper-200 dark:border-white/10">
-                    <div class="flex items-center gap-2 text-xs flex-1">
-                        <span class="font-bold text-ink-700 dark:text-ink-200 shrink-0">Streamlit URL:</span>
-                        <input id="streamlit-url-input" type="text" value="https://truthlens5.streamlit.app/?embed=true" 
-                               class="bg-white dark:bg-paper-800 border border-paper-300 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-ink-800 dark:text-white w-full outline-none focus:border-tl-purple font-mono"
-                               placeholder="https://truthlens5.streamlit.app/?embed=true" />
-                    </div>
-                    <button onclick="updateStreamlitIframe()" class="bg-tl-purple text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 hover:opacity-90">
-                        Connect
-                    </button>
-                </div>
-                <div class="relative w-full rounded-2xl overflow-hidden border border-paper-200 dark:border-white/10 bg-white dark:bg-paper-800 shadow-inner" style="min-height: 580px;">
+                <div class="relative w-full rounded-2xl overflow-hidden border border-paper-200 dark:border-white/10 bg-white dark:bg-paper-800 shadow-inner" style="min-height: 620px;">
                     <iframe id="streamlit-frame" src="https://truthlens5.streamlit.app/?embed=true" 
-                            class="w-full border-0" style="height: 580px;" allow="camera; microphone; clipboard-read; clipboard-write;"
+                            class="w-full border-0" style="height: 620px;" allow="camera; microphone; clipboard-read; clipboard-write;"
                             title="TruthLens Streamlit Neural Cloud"></iframe>
-                </div>
-            </div>
-
-            <!-- TEXT SCAN -->
-            <div id="scan-tab-text" class="scan-content hidden">
-                <textarea id="scan-text-input" rows="5" placeholder="Paste a news headline, article text, or claim you want to verify..." 
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white resize-none transition-all"></textarea>
-                <div class="flex items-center justify-between mt-3">
-                    <span class="text-xs text-ink-500" id="char-count">0 / 5000 characters</span>
-                    <button onclick="runTextScan()" class="bg-gradient-to-r from-tl-purple to-tl-blue text-white px-6 py-2.5 rounded-xl font-black text-sm hover:opacity-90 transition-all active:scale-95 flex items-center gap-2">
-                        <i class="ph-fill ph-sparkle"></i> Scan Now
-                    </button>
-                </div>
-                <div id="text-scan-result" class="mt-5 hidden"></div>
-            </div>
-
-            <!-- HISTORY -->
-            <div id="scan-tab-history" class="scan-content hidden">
-                <div id="scan-history-content" class="space-y-3">
-                    <div class="text-center py-8 text-ink-500 text-sm">Loading scan history...</div>
                 </div>
             </div>
         </div>
