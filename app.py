@@ -74,6 +74,22 @@ from dl_model import FakeNewsDLInferenceEngine
 dl_engine = FakeNewsDLInferenceEngine()
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HEALTH CHECK & KEEP-ALIVE ROUTES (Prevents Server Sleeping on Free Tier)
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route("/health", methods=["GET"])
+@app.route("/api/health", methods=["GET"])
+@app.route("/healthz", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "TruthLens AI News Verification",
+        "model_loaded": getattr(dl_engine, "is_keras_active", True),
+        "model_type": "Keras Deep Learning Sequential (Embedding + Dense)",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": "mongodb" if mongo_db is not None else "sqlite"
+    }), 200
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DATABASE LAYER (MongoDB with Automatic SQLite Fallback)
 # ─────────────────────────────────────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.dirname(__file__), 'truthlens.db')
@@ -488,144 +504,40 @@ def compute_signals(text: str) -> dict:
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PREDICT FAKE NEWS (Deep Learning + Tavily Search + Factual Override)
+# PREDICT FAKE NEWS (Pure Keras Deep Learning Model Engine)
+# Set USE_EXTERNAL_API_VERIFICATION = True whenever external API grounding is desired
 # ─────────────────────────────────────────────────────────────────────────────
+USE_EXTERNAL_API_VERIFICATION = False
+
 def predict_fake(text: str) -> dict:
-    signals = compute_signals(text)
-    net = signals["net_score"]
-
-    # 0. Impossible Statistical & Futuristic Claim Filter
-    if re.search(r'\b(999|500|600|700|800)\s*(runs?|run)\b', text.lower()) or re.search(r'\b(2027|2028|2029|2030)\b', text.lower()):
-        return {
-            "verdict": "FAKE",
-            "confidence": 99.0,
-            "confidence_label": "Fake / Misinformation",
-            "is_fake": True,
-            "prediction": 1,
-            "fake_signals": ["⚠ Impossible sports statistical claim or futuristic season claim"],
-            "real_signals": [],
-            "signal_score": -50,
-            "explanation": "TruthLens Sports Fact-Check: Statistically impossible cricket claim (individual scores cannot exceed match limits; futuristic seasons have not occurred).",
-            "model": "Sports Knowledge Database Filter"
-        }
-
-    # 0. Outdated Political Claim Override
-    if signals.get("is_outdated_political"):
-        return {
-            "verdict": "FAKE",
-            "confidence": 98.0,
-            "confidence_label": "Fake / Misinformation",
-            "is_fake": True,
-            "prediction": 1,
-            "fake_signals": signals["fake_signals"],
-            "real_signals": [],
-            "signal_score": signals["net_score"],
-            "explanation": f"TruthLens Political Fact-Check: {signals.get('outdated_msg')}",
-            "model": "Political Knowledge Database Filter"
-        }
-
-    # 0. Sensationalist Smear / Fake Accusation Override
-    if signals.get("is_sensational_smear"):
-        return {
-            "verdict": "FAKE",
-            "confidence": 98.0,
-            "confidence_label": "Fake / Misinformation",
-            "is_fake": True,
-            "prediction": 1,
-            "fake_signals": signals["fake_signals"],
-            "real_signals": [],
-            "signal_score": signals["net_score"],
-            "explanation": "TruthLens Fact-Check: Unverified sensationalist accusation/arrest rumor against a public leader. Zero official press releases or reputable news outlets confirm this claim.",
-            "model": "Smear & Hoax Detection Filter"
-        }
-
-
-    # 1. FIXED SPORTS factual check logic
-    year_match = re.search(r'\b(19|20)\d{2}\b', text.lower())
-    SPORTS_TEAMS = ["rcb","csk","mi","kkr","srh","gt","rr","dc"]
-
-    if ("ipl" in text.lower() or "champion" in text.lower() or "title" in text.lower() or "won" in text.lower()) and year_match:
-        year = int(year_match.group())
-        detected_team = next((team for team in SPORTS_TEAMS if re.search(r'\b' + team + r'\b', text.lower())), None)
-
-        if detected_team and year in IPL_WINNERS:
-            actual_winner = IPL_WINNERS[year]
-            if detected_team == actual_winner:
-                return {
-                    "verdict": "REAL",
-                    "confidence": 100.0,
-                    "confidence_label": "100% Verified Real",
-                    "is_fake": False,
-                    "prediction": 0,
-                    "fake_signals": [],
-                    "real_signals": [f"[OK] Verified IPL {year} winner: {actual_winner.upper()}"],
-                    "signal_score": 0,
-                    "explanation": f"100% Confirmed IPL {year} winner: {actual_winner.upper()}!",
-                    "model": "Sports Knowledge Database Override"
-                }
-            else:
-                return {
-                    "verdict": "FAKE",
-                    "confidence": 98.0,
-                    "confidence_label": "Fake / Misinformation",
-                    "is_fake": True,
-                    "prediction": 1,
-                    "fake_signals": [f"⚠ Incorrect IPL champion claim: Actual IPL {year} winner was {actual_winner.upper()}"],
-                    "real_signals": [],
-                    "signal_score": 0,
-                    "explanation": f"TruthLens Sports Fact-Check: False sports claim. {detected_team.upper()} did NOT win IPL {year}. The actual champion was {actual_winner.upper()}.",
-                    "model": "Sports Knowledge Database Override"
-                }
-
-
-
-    # 2. PyTorch Deep Learning Prediction
+    """
+    Evaluates news credibility using pure Keras Deep Learning Model inference.
+    """
     dl_res = dl_engine.predict(text)
-    dl_fake_prob = dl_res.get("fake_prob", 0.5)
-    dl_real_prob = dl_res.get("real_prob", 0.5)
-
-    # 3. Hybrid Ensemble Decision Logic
-    fake_pattern_count = len(signals["found_conspiracy"]) + len(signals["found_clickbait"])
-
-    if signals["found_sports"] and signals["found_verbs"] and (signals["found_sources"] or dl_real_prob > 0.6):
-        is_fake = False
-        confidence = 100.0
-        reason = "Authentic sports and journalistic reporting patterns"
-    elif fake_pattern_count >= 2:
-        is_fake = True
-        confidence = min(98.0, 78 + fake_pattern_count * 5)
-        reason = f"Multiple misinformation markers detected: {', '.join(signals['found_conspiracy'][:2] or signals['found_clickbait'][:2])}"
-    elif net >= 20:
-        is_fake = True
-        confidence = min(96.0, 72 + net * 0.3)
-        reason = "High density of clickbait and unverified phrases"
-    elif net <= -25 and not signals.get("is_sensational_smear"):
-        is_fake = False
-        confidence = 100.0
-        reason = "Strong presence of verifiable statistics and reputable sources"
-    else:
-        is_fake = dl_fake_prob > 0.48
-        confidence = max(65.0, min(96.0, dl_res.get("confidence", 75.0)))
-        reason = "Deep Neural Network sequence pattern classification"
+    is_fake = bool(dl_res.get("is_fake", False))
+    real_prob = float(dl_res.get("real_prob", 0.5))
+    fake_prob = float(dl_res.get("fake_prob", 0.5))
+    confidence = float(dl_res.get("confidence", 50.0))
 
     verdict = "FAKE" if is_fake else "REAL"
-    if verdict == "REAL":
-        confidence = 100.0
-        conf_label = "100% Verified Real"
-    else:
-        conf_label = "Fake / Misinformation"
+    conf_label = "Fake / Misinformation" if is_fake else "Real / Authentic News"
+
+    fake_signals = [f"⚠ Neural Sequence Misinformation Probability: {round(fake_prob * 100, 1)}%"] if is_fake else []
+    real_signals = [f"✓ Neural Sequence Authenticity Probability: {round(real_prob * 100, 1)}%"] if not is_fake else []
 
     return {
         "verdict": verdict,
-        "confidence": round(confidence, 1),
+        "confidence": confidence,
         "confidence_label": conf_label,
         "is_fake": is_fake,
+        "fake_prob": fake_prob,
+        "real_prob": real_prob,
         "prediction": 1 if is_fake else 0,
-        "fake_signals": signals["fake_signals"],
-        "real_signals": signals["real_signals"],
-        "signal_score": signals["net_score"],
-        "explanation": f"TruthLens DL Engine: {reason}",
-        "model": dl_res.get("model_version", "PyTorch Light-DL (Conv1D+BiLSTM+Attention)")
+        "fake_signals": fake_signals,
+        "real_signals": real_signals,
+        "signal_score": round((real_prob - fake_prob) * 100, 1),
+        "explanation": f"Keras Deep Learning Neural Network: {round(real_prob*100, 1)}% Real Probability vs {round(fake_prob*100, 1)}% Fake Probability.",
+        "model": dl_res.get("model_version", "Keras Deep Learning Neural Network (Embedding + Dense)")
     }
 
 
@@ -1183,81 +1095,26 @@ def ai_scan():
             if now_ts - entry["ts"] < 1800:
                 return jsonify(entry["data"])
 
-    # Run Rule/DL Engine & Tavily Web Search CONCURRENTLY IN PARALLEL
-    fut_rule = scan_executor.submit(predict_fake, text)
-    fut_tavily = scan_executor.submit(search_tavily_live_news, text)
+    # 1. Pure Keras Deep Learning Model Evaluation
+    result = predict_fake(text)
 
-    result = fut_rule.result()
-    try:
-        verification = fut_tavily.result(timeout=5.0)
-    except Exception:
-        verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
-
-    result["verification"] = verification
-    articles = verification.get("matching_articles", [])
-    is_headline_confirmed = verify_claim_against_articles(text, articles)
-
-    # 1. If explicit rule/sports DB/smear/political override triggered, preserve and return instantly
-    if result.get("model") in ["Sports Knowledge Database Filter", "Sports Knowledge Database Override", "Smear & Hoax Detection Filter", "Political Knowledge Database Filter"]:
-        pass
-    else:
-        # 2. Try Mistral AI LLM Fact Check for nuanced claims with live web context
-        llm_res = None
+    # 2. Check if external APIs are enabled
+    if USE_EXTERNAL_API_VERIFICATION:
         try:
-            fut_llm = scan_executor.submit(llm_fact_check, text, articles)
-            llm_res = fut_llm.result(timeout=5.5)
+            fut_tavily = scan_executor.submit(search_tavily_live_news, text)
+            verification = fut_tavily.result(timeout=5.0)
         except Exception:
-            llm_res = None
-
-        if llm_res and isinstance(llm_res, dict) and "verdict" in llm_res:
-            result["verdict"] = llm_res.get("verdict", result["verdict"])
-            result["confidence"] = float(llm_res.get("confidence", result["confidence"]))
-            result["confidence_label"] = llm_res.get("confidence_label", "Verified Intelligence")
-            result["is_fake"] = bool(llm_res.get("is_fake", result["is_fake"]))
-            if llm_res.get("fake_signals"):
-                result["fake_signals"] = llm_res["fake_signals"]
-            if llm_res.get("real_signals"):
-                result["real_signals"] = llm_res["real_signals"]
-            result["explanation"] = f"TruthLens Fact-Check: {llm_res.get('explanation', result['explanation'])}"
-            result["model"] = "Mistral AI + Tavily Real-Time Grounding"
-        elif verification.get("sources_found", 0) > 0 and is_headline_confirmed:
-            # Web Grounding Confirmation
-            result["is_fake"] = False
-            result["verdict"] = "REAL"
-            result["confidence"] = 100.0
-            result["confidence_label"] = "100% Verified Real"
-            result["real_signals"] = [f"[OK] Confirmed by {verification['sources_found']} live reputable news outlets"]
-            result["fake_signals"] = []
-            result["explanation"] = f"TruthLens Live Web Grounding: Confirmed by {verification['sources_found']} live reputable news sources."
-            result["model"] = "Tavily Real-Time Live Web Intelligence"
-        elif result.get("is_fake"):
-            # Model / Rules detected fake signals
-            if not result.get("fake_signals"):
-                result["fake_signals"] = ["⚠ Misinformation markers and pattern anomalies detected"]
-            result["explanation"] = result.get("explanation") or "TruthLens DL Engine: Synthetic phrasing or misinformation patterns detected."
-        else:
-            # Clean statement with no negative signals
-            if verification.get("sources_found", 0) > 0:
-                result["is_fake"] = False
-                result["verdict"] = "REAL"
-                result["confidence"] = 92.0
-                result["confidence_label"] = "Verified Real"
-                result["real_signals"] = [f"[OK] Corroborated by {verification['sources_found']} web sources"]
-                result["explanation"] = "TruthLens Intelligence: Authentic sequence reporting pattern aligned with live information."
-            else:
-                result["is_fake"] = False
-                result["verdict"] = "REAL"
-                result["confidence"] = 85.0
-                result["confidence_label"] = "Credible Report"
-                result["real_signals"] = ["✓ Clean sequence syntax with 0 misinformation markers"]
-                result["explanation"] = "TruthLens DL Engine: Natural sequence syntax verified clean of clickbait or deceptive signals."
+            verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
+        result["verification"] = verification
+    else:
+        result["verification"] = {"sources_found": 0, "matching_articles": [], "verification_status": "model_pure_mode"}
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
 
     # Record to Scan History & Increment User Scan Count
     try:
-        title = generate_gemini_title(text)
+        title = text[:50] + ("..." if len(text) > 50 else "")
         scan_id = str(uuid.uuid4())
         now_iso = datetime.now(timezone.utc).isoformat()
         uid = session.get('user_id', 'guest_user')
