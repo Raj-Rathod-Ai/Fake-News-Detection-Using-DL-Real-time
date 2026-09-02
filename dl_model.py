@@ -22,16 +22,23 @@ TOKENIZER_PKL_PATH = os.path.join(MODEL_DIR, 'tokenizer.pkl')
 MAX_SEQ_LEN = 300
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Optional Keras/TF Import
+# Optional Keras/TF Import (Low-Memory Single-Thread Configuration for Cloud)
 # ─────────────────────────────────────────────────────────────────────────────
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 try:
     import tensorflow as tf
     from tensorflow import keras
-    # Suppress TF logs
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    # Suppress TF logs and constrain thread pool to prevent OOM
     tf.get_logger().setLevel('ERROR')
+    try:
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+    except Exception:
+        pass
     KERAS_AVAILABLE = True
-except ImportError:
+except Exception:
     KERAS_AVAILABLE = False
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,24 +157,24 @@ class FakeNewsDLInferenceEngine:
         """Tokenize and pad text for Keras model input."""
         try:
             if hasattr(self.tokenizer, 'texts_to_sequences'):
-                # Standard Keras Tokenizer
                 sequences = self.tokenizer.texts_to_sequences([text])
-                from tensorflow.keras.preprocessing.sequence import pad_sequences
-                padded = pad_sequences(sequences, maxlen=MAX_SEQ_LEN, padding='post', truncating='post')
-                return padded
+                seq = sequences[0] if sequences else []
+                if len(seq) > MAX_SEQ_LEN:
+                    padded = seq[:MAX_SEQ_LEN]
+                else:
+                    padded = seq + [0] * (MAX_SEQ_LEN - len(seq))
+                return np.array([padded], dtype=np.int32)
             elif hasattr(self.tokenizer, 'encode'):
-                # HuggingFace-style tokenizer fallback
                 ids = self.tokenizer.encode(text)
                 ids = ids[:MAX_SEQ_LEN]
                 ids = ids + [0] * max(0, MAX_SEQ_LEN - len(ids))
-                return np.array([ids])
+                return np.array([ids], dtype=np.int32)
             else:
-                # Generic: try word_index dict
                 word_index = getattr(self.tokenizer, 'word_index', {})
                 words = re.sub(r'[^\w\s]', ' ', text.lower()).split()
                 seq = [word_index.get(w, 0) for w in words[:MAX_SEQ_LEN]]
                 seq = seq + [0] * max(0, MAX_SEQ_LEN - len(seq))
-                return np.array([seq])
+                return np.array([seq], dtype=np.int32)
         except Exception as e:
             print(f"[WARN] Preprocessing error: {e}")
             return np.zeros((1, MAX_SEQ_LEN), dtype=np.int32)
