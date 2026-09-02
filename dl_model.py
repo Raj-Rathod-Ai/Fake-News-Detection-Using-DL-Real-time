@@ -16,6 +16,9 @@ from typing import Dict, List, Tuple, Any
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -121,7 +124,7 @@ class FakeNewsDLInferenceEngine:
         # 2. Load Keras Model
         if KERAS_AVAILABLE and os.path.exists(self.model_path):
             try:
-                self.keras_model = keras.models.load_model(self.model_path)
+                self.keras_model = keras.models.load_model(self.model_path, compile=False)
                 self.is_keras_active = True
                 print(f"[OK] Keras Deep Learning Model loaded from {self.model_path}")
             except Exception as e:
