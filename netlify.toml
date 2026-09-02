@@ -6,6 +6,13 @@
 [build.environment]
   PYTHON_VERSION = "3.11"
 
+# Proxy all /api/* requests seamlessly to the live Render Backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   # Single-page app fallback
   from = "/*"

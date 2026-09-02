@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: fake-news-detection-using-ml-real-time
+    runtime: python
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120"
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: FLASK_ENV
+        value: "production"
+      - key: PRODUCTION_MODE
+        value: "True"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: GUNICORN_CMD_ARGS
+        value: "--workers=1 --threads=2 --timeout=120"
