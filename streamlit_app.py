@@ -511,14 +511,14 @@ with tab_cricket:
 with tab_markets:
     st.markdown("#### 📈 Indian & Global Indices & Commodities")
     mkts = [
-        {"name": "NIFTY 50", "price": "₹24,850.30", "change": "+0.45%"},
-        {"name": "SENSEX", "price": "₹81,420.15", "change": "+0.38%"},
-        {"name": "BANK NIFTY", "price": "₹51,240.80", "change": "+0.52%"},
-        {"name": "GOLD (MCX 10g)", "price": "₹72,400", "change": "+0.20%"},
-        {"name": "SILVER (MCX 1kg)", "price": "₹84,200", "change": "-0.15%"},
-        {"name": "USD / INR", "price": "₹83.92", "change": "-0.04%"},
-        {"name": "BITCOIN", "price": "$68,500", "change": "+2.10%"},
-        {"name": "ETHEREUM", "price": "$3,550", "change": "+1.80%"},
+        {"name": "NIFTY 50", "price": "₹23,914.45", "change": "-0.69%"},
+        {"name": "SENSEX", "price": "₹76,570.35", "change": "-0.50%"},
+        {"name": "BANK NIFTY", "price": "₹51,400.00", "change": "+0.32%"},
+        {"name": "GOLD (MCX 10g)", "price": "₹1,52,020", "change": "+0.45%"},
+        {"name": "SILVER (MCX 1kg)", "price": "₹2,35,930", "change": "+0.35%"},
+        {"name": "USD / INR", "price": "₹94.96", "change": "+0.02%"},
+        {"name": "BITCOIN", "price": "$77,100", "change": "+1.85%"},
+        {"name": "ETHEREUM", "price": "$3,550", "change": "+1.20%"},
     ]
     cols = st.columns(4)
     for idx, item in enumerate(mkts):
