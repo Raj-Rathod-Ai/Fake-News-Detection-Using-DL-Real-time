@@ -14,8 +14,8 @@
 ## 🌐 Live Demonstrations
 
 - **Web Application (Netlify):** [truthlens5.netlify.app](https://truthlens5.netlify.app)
+- **Streamlit Live App:** [TruthLens — AI Verified Intelligence · Streamlit](https://truthlens5.streamlit.app/)
 - **Backend API & Health (Render):** [fake-news-detection-using-ml-real-time.onrender.com/health](https://fake-news-detection-using-ml-real-time.onrender.com/health)
-- **Streamlit Intelligence App:** [`streamlit_app.py`](file:///c:/Final%20Project/streamlit_app.py)
 
 ---
 
@@ -157,7 +157,3 @@ MONGO_URI=your_mongodb_atlas_uri
 2. Set **Publish directory** to `templates`.
 3. The included [`netlify.toml`](file:///c:/Final%20Project/netlify.toml) will automatically route all `/api/*` requests to your Render backend.
 
----
-
-## 📄 License
-This project is open-source and available under the [MIT License](LICENSE).
