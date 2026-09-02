@@ -770,13 +770,40 @@ const STATIC_NEWS_FEED = {
     ]
 };
 
-async function fetchNews(cat) {
+function renderNewsApp(targetCat) {
     const app = document.getElementById('app');
-    app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+    if (!app) return;
+    app.innerHTML = `
+        <div class="col-span-full flex items-end justify-between mb-2">
+            <div class="border-l-4 border-tl-purple pl-4">
+                <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${targetCat.toUpperCase()} INTEL</h2>
+                <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified news reports</p>
+            </div>
+            <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
+        </div>
+        ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+    renderSidebars();
+}
 
-    let articles = [];
+async function fetchNews(cat) {
     const targetCat = cat || 'home';
+    const app = document.getElementById('app');
 
+    // 1. Instantly render last cached response (zero wait time!)
+    const cached = localStorage.getItem('tl_cached_news_' + targetCat);
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.length > 0) {
+                state.articles = parsed;
+                renderNewsApp(targetCat);
+            }
+        } catch(e) {}
+    } else {
+        app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+    }
+
+    // 2. Fetch live data from backend & update seamlessly
     try {
         let url = targetCat === 'local'
             ? `/api/news?category=local&city=${encodeURIComponent(state.city)}`
@@ -788,29 +815,19 @@ async function fetchNews(cat) {
         if (r.ok) {
             const d = await r.json();
             if (d.articles && d.articles.length > 0) {
-                articles = d.articles;
+                state.articles = d.articles;
+                localStorage.setItem('tl_cached_news_' + targetCat, JSON.stringify(d.articles));
+                renderNewsApp(targetCat);
+                return;
             }
         }
-    } catch(e) {
-        // Fall back gracefully to static feed
+    } catch(e) {}
+
+    // 3. Fallback to static verified feed if no cached or live data
+    if (!state.articles || !state.articles.length) {
+        state.articles = STATIC_NEWS_FEED[targetCat] || STATIC_NEWS_FEED['home'];
+        renderNewsApp(targetCat);
     }
-
-    if (!articles.length) {
-        articles = STATIC_NEWS_FEED[targetCat] || STATIC_NEWS_FEED['home'];
-    }
-
-    state.articles = articles;
-    app.innerHTML = `
-        <div class="col-span-full flex items-end justify-between mb-2">
-            <div class="border-l-4 border-tl-purple pl-4">
-                <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${targetCat.toUpperCase()} INTEL</h2>
-                <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified news reports</p>
-            </div>
-            <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
-        </div>
-        ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
-
-    renderSidebars();
 }
 
 function renderCard(a, i) {
@@ -1030,6 +1047,19 @@ const DEFAULT_MARKETS = [
 async function fetchMarkets() {
     let marketList = [];
     let status = {status:"open", label:"Market Open", color:"#22c55e"};
+
+    // 1. Immediately render last cached markets
+    const cached = localStorage.getItem('tl_cached_markets');
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.length > 0) {
+                marketList = parsed;
+                processMarketData({markets: marketList, market_status: status, live_count: marketList.length});
+            }
+        } catch(e) {}
+    }
+
     try {
         const r = await fetch('/api/markets');
         if (r.ok) {
@@ -1037,6 +1067,7 @@ async function fetchMarkets() {
             if (d.markets && d.markets.length) {
                 marketList = d.markets;
                 status = d.market_status || status;
+                localStorage.setItem('tl_cached_markets', JSON.stringify(marketList));
             }
         }
     } catch(e) {}
@@ -1157,7 +1188,6 @@ function renderMarketTable() {
 // CRICKET
 // =====================================================================
 const DEFAULT_CRICKET_CARDS = `
-const DEFAULT_CRICKET_CARDS = `
     <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[260px]">
         <div class="flex flex-col gap-1.5 flex-1 min-w-0">
             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
@@ -1210,6 +1240,13 @@ const DEFAULT_CRICKET_CARDS = `
 async function fetchCricket() {
     const hub = document.getElementById('cricket-hub');
     if (!hub) return;
+
+    // 1. Immediately render last cached response (0 latency!)
+    const cached = localStorage.getItem('tl_cached_cricket');
+    if (cached && !hub.innerHTML) {
+        hub.innerHTML = cached;
+    }
+
     try {
         const r = await fetch('/api/cricket');
         if (r.ok) {
@@ -1226,12 +1263,16 @@ async function fetchCricket() {
                                 <div class="text-xs font-black dark:text-white truncate">${m.team2}</div>
                             </div>
                             <div class="ml-2 text-right shrink-0 max-w-[110px]">
-                                <div class="text-[9px] font-black uppercase ${m.is_live ? 'text-tl-red animate-pulse' : 'text-tl-green'}">${m.is_live ? 'LIVE' : 'RECORD'}</div>
+                                <div class="text-[9px] font-black uppercase ${m.is_live ? 'text-tl-red animate-pulse' : 'text-tl-green'}">${m.is_live ? 'LIVE' : 'FINAL'}</div>
                                 <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">${m.status}</div>
                             </div>
                         </div>`;
                 }
-                if (cards) { hub.innerHTML = cards; return; }
+                if (cards) {
+                    hub.innerHTML = cards;
+                    localStorage.setItem('tl_cached_cricket', cards);
+                    return;
+                }
             }
 
             // Handle Cricbuzz RapidAPI matches
@@ -1259,10 +1300,17 @@ async function fetchCricket() {
                     }
                 }
             }
-            if (cards) { hub.innerHTML = cards; return; }
+            if (cards) {
+                hub.innerHTML = cards;
+                localStorage.setItem('tl_cached_cricket', cards);
+                return;
+            }
         }
     } catch(e) {}
-    hub.innerHTML = DEFAULT_CRICKET_CARDS;
+
+    if (!hub.innerHTML) {
+        hub.innerHTML = DEFAULT_CRICKET_CARDS;
+    }
 }
 
 
