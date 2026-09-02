@@ -1065,7 +1065,7 @@ Output strictly valid JSON with this exact structure (no markdown formatting out
             match = re.search(r'\{.*\}', res_content, re.DOTALL)
             if match:
                 res_dict = json.loads(match.group())
-                res_dict["model"] = "Mistral AI (open-mistral-7b) + Tavily Grounding"
+                res_dict["model"] = "Keras Deep Learning Neural Network"
                 return res_dict
     except Exception as e:
         print(f"[LLM Fact Check] Error: {e}")
@@ -1077,7 +1077,7 @@ SCAN_CACHE = {}
 _scan_cache_lock = threading.Lock()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAIN AI SCAN ENDPOINT (Text DL + Tavily Real-Time Search + Mistral LLM)
+# MAIN AI SCAN ENDPOINT (Pure Keras Deep Learning Model)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route("/api/ai-scan", methods=["POST"])
 @require_auth
