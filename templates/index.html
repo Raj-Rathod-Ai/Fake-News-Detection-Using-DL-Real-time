@@ -271,11 +271,9 @@
             </div>
         </div>
         <div>
-            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Tools</h4>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Verification</h4>
             <div class="space-y-2">
-                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Scanner</button>
-                <button onclick="openScanPanel('image')" class="block hover:text-tl-purple font-medium">Image Detector</button>
-                <button onclick="openScanPanel('video')" class="block hover:text-tl-purple font-medium">Deepfake Detector</button>
+                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Fact-Checker</button>
                 <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
             </div>
         </div>
@@ -357,8 +355,8 @@
                     <i class="ph-fill ph-shield-check text-white text-xl"></i>
                 </div>
                 <div>
-                    <h3 class="font-black text-ink-900 dark:text-white text-lg">AI Detection Suite</h3>
-                    <p class="text-xs text-ink-500">Ensemble v3 · SVM+RF+LR + Signal Engine · News Verification</p>
+                    <h3 class="font-black text-ink-900 dark:text-white text-lg">AI News Fact-Checker</h3>
+                    <p class="text-xs text-ink-500">Keras Deep Learning · Live Web Intelligence · News Verification</p>
                 </div>
             </div>
             <button onclick="closeScanner()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white">
@@ -371,17 +369,8 @@
             <button onclick="switchScanTab('text')" class="scan-tab active px-5 py-3 text-xs font-black uppercase tracking-widest text-tl-purple border-b-2 border-tl-purple whitespace-nowrap" data-tab="text">
                 <i class="ph-bold ph-text-aa mr-1.5"></i>Text Scan
             </button>
-            <button onclick="switchScanTab('image')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="image">
-                <i class="ph-bold ph-image mr-1.5"></i>Image Check
-            </button>
-            <button onclick="switchScanTab('video')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="video">
-                <i class="ph-bold ph-video mr-1.5"></i>Deepfake
-            </button>
-            <button onclick="switchScanTab('voice')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="voice">
-                <i class="ph-bold ph-waveform mr-1.5"></i>Voice Scan
-            </button>
             <button onclick="switchScanTab('history')" class="scan-tab px-5 py-3 text-xs font-black uppercase tracking-widest text-ink-500 hover:text-tl-purple border-b-2 border-transparent hover:border-tl-purple whitespace-nowrap" data-tab="history">
-                <i class="ph-bold ph-clock-counter-clockwise mr-1.5"></i>History
+                <i class="ph-bold ph-clock-counter-clockwise mr-1.5"></i>Scan History
             </button>
         </div>
 
@@ -397,69 +386,6 @@
                     </button>
                 </div>
                 <div id="text-scan-result" class="mt-5 hidden"></div>
-            </div>
-
-            <!-- IMAGE SCAN -->
-            <div id="scan-tab-image" class="scan-content hidden">
-                <div class="mb-3">
-                    <input type="text" id="image-caption-input" placeholder="Optional context: Add news headline or claim associated with this image..." 
-                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-                </div>
-                <div class="upload-zone p-10 text-center cursor-pointer" id="image-drop-zone"
-                     onclick="document.getElementById('image-upload').click()"
-                     ondragover="event.preventDefault();this.classList.add('drag-over')"
-                     ondragleave="this.classList.remove('drag-over')"
-                     ondrop="handleImageDrop(event)">
-                    <i class="ph-bold ph-cloud-arrow-up text-5xl text-tl-purple mb-3"></i>
-                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Image to Analyze</h4>
-                    <p class="text-xs text-ink-500">PNG, JPG, JPEG, GIF, WEBP · Max 20MB</p>
-                    <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageFile(this.files[0])">
-                </div>
-                <div id="image-scan-result" class="mt-5 hidden"></div>
-            </div>
-
-            <!-- VIDEO SCAN -->
-            <div id="scan-tab-video" class="scan-content hidden">
-                <div class="mb-3">
-                    <input type="text" id="video-caption-input" placeholder="Optional context: Add claim, speaker name, or event description..." 
-                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-orange bg-paper-50 dark:bg-ink-900 dark:text-white">
-                </div>
-                <div class="upload-zone p-10 text-center cursor-pointer" id="video-drop-zone"
-                     onclick="document.getElementById('video-upload').click()"
-                     ondragover="event.preventDefault();this.classList.add('drag-over')"
-                     ondragleave="this.classList.remove('drag-over')"
-                     ondrop="handleVideoDrop(event)">
-                    <i class="ph-bold ph-video text-5xl text-tl-orange mb-3"></i>
-                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Video for Deepfake Analysis</h4>
-                    <p class="text-xs text-ink-500">MP4, MOV, AVI, MKV, WEBM · Max 50MB</p>
-                    <input type="file" id="video-upload" accept="video/*" class="hidden" onchange="handleVideoFile(this.files[0])">
-                </div>
-                <div class="bg-tl-orange/5 border border-tl-orange/20 rounded-2xl p-4 mt-4 flex gap-3">
-                    <i class="ph-fill ph-warning text-tl-orange text-xl shrink-0 mt-0.5"></i>
-                    <div class="text-xs text-ink-700 dark:text-ink-100">
-                        <strong>Privacy Notice:</strong> Uploaded videos are processed securely and discarded immediately following forensic analysis.
-                    </div>
-                </div>
-                <div id="video-scan-result" class="mt-5 hidden"></div>
-            </div>
-
-            <!-- VOICE SCAN -->
-            <div id="scan-tab-voice" class="scan-content hidden">
-                <div class="mb-3">
-                    <input type="text" id="voice-caption-input" placeholder="Optional context: Add speaker identity or claimed speech context..." 
-                        class="w-full border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-tl-blue bg-paper-50 dark:bg-ink-900 dark:text-white">
-                </div>
-                <div class="upload-zone p-10 text-center cursor-pointer" id="voice-drop-zone"
-                     onclick="document.getElementById('voice-upload').click()"
-                     ondragover="event.preventDefault();this.classList.add('drag-over')"
-                     ondragleave="this.classList.remove('drag-over')"
-                     ondrop="handleVoiceDrop(event)">
-                    <i class="ph-bold ph-waveform text-5xl text-tl-blue mb-3"></i>
-                    <h4 class="font-black text-ink-900 dark:text-white mb-1">Upload Audio for Voice Synthesis Analysis</h4>
-                    <p class="text-xs text-ink-500">MP3, WAV, M4A, OGG, AAC · Max 20MB</p>
-                    <input type="file" id="voice-upload" accept="audio/*" class="hidden" onchange="handleVoiceFile(this.files[0])">
-                </div>
-                <div id="voice-scan-result" class="mt-5 hidden"></div>
             </div>
 
             <!-- HISTORY -->
@@ -988,8 +914,8 @@ function renderRightSidebar() {
         <!-- AI Scanner CTA -->
         <div class="sidebar-card bg-gradient-to-br from-tl-purple to-tl-blue p-5 text-white ai-glow">
             <i class="ph-fill ph-shield-check text-4xl mb-3 block"></i>
-            <h4 class="font-black text-lg mb-1">AI Fact Checker</h4>
-            <p class="text-xs text-white/70 mb-4 leading-relaxed">Detect fake news, manipulated images & deepfake videos using our ML-powered system.</p>
+            <h4 class="font-black text-lg mb-1">AI Fact-Checker</h4>
+            <p class="text-xs text-white/70 mb-4 leading-relaxed">Detect fake news and unverified claims using our Keras Deep Learning & Real-Time Intelligence system.</p>
             <button onclick="openScanPanel('text')" class="w-full bg-white text-tl-purple py-2.5 rounded-xl font-black text-sm hover:bg-white/90 transition-all">
                 Launch AI Scanner
             </button>
@@ -1473,204 +1399,7 @@ function renderScanResult(container, d) {
         </div>`;
 }
 
-async function handleImageFile(file) {
-    if (!file) return;
-    const result = document.getElementById('image-scan-result');
-    const previewUrl = URL.createObjectURL(file);
-    const caption = (document.getElementById('image-caption-input')?.value || '').trim();
-    renderScanAnimation(result, 'Image Forensic News Verification Active', `Analyzing ${file.name} pixel matrix, compression layers & live news...`);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    if (caption) formData.append('caption', caption);
-    try {
-        const r = await fetch('/api/detect-image', { method:'POST', body:formData });
-        const d = await r.json();
-        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
-        const isManip = d.is_manipulated;
-        const confLabel = d.confidence_label || (isManip ? 'Fake / Manipulated Image' : '100% Verified Real');
-        
-        result.innerHTML = `
-            <div class="border-2 ${isManip ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
-                <div class="verdict-${isManip ? 'fake' : 'real'} p-5 flex items-center gap-4">
-                    <img src="${previewUrl}" class="w-20 h-20 rounded-xl object-cover border-2 border-white/40 shadow-md shrink-0 bg-black/20" alt="Uploaded Image Preview" title="Uploaded image: ${file.name}">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2 flex-wrap mb-1">
-                            <h4 class="text-xl font-black text-white tracking-wide">${isManip ? '🔴 FAKE / MANIPULATED IMAGE' : '🟢 100% REAL NEWS IMAGE'}</h4>
-                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
-                        </div>
-                        <p class="text-white/80 text-xs truncate">Confidence Score: <strong class="text-white">${d.confidence}%</strong> · File: ${file.name} (${d.file_size_kb}KB)</p>
-                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Claim: "${caption}"</p>` : ''}
-                    </div>
-                </div>
-                <div class="p-5">
-                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Forensic Checks Performed (${(d.checks_run || []).length})</p>
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
-                    </div>
-                    ${(d.suspicious_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Manipulation Signals</p>
-                        <div class="space-y-1">
-                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    ${(d.real_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Credibility & Authenticity Markers</p>
-                        <div class="space-y-1">
-                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
-                </div>
-            </div>`;
-    } catch(e) {
-        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Image analysis failed.</div>`;
-    }
-}
 
-function handleImageDrop(e) {
-    e.preventDefault();
-    document.getElementById('image-drop-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleImageFile(file);
-}
-
-async function handleVideoFile(file) {
-    if (!file) return;
-    const result = document.getElementById('video-scan-result');
-    const previewUrl = URL.createObjectURL(file);
-    const caption = (document.getElementById('video-caption-input')?.value || '').trim();
-    renderScanAnimation(result, 'Video Deepfake Verification Active', `Analyzing ${file.name} temporal frame variance & facial landmarks...`);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    if (caption) formData.append('caption', caption);
-    try {
-        const r = await fetch('/api/detect-deepfake', { method:'POST', body:formData });
-        const d = await r.json();
-        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
-        const isDF = d.is_deepfake;
-        const confLabel = d.confidence_label || (isDF ? 'High Deepfake Risk' : '100% Authentic Video');
-        
-        result.innerHTML = `
-            <div class="border-2 ${isDF ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
-                <div class="verdict-${isDF ? 'fake' : 'real'} p-5 flex items-center gap-4">
-                    <div class="w-20 h-20 rounded-xl bg-black/50 overflow-hidden flex items-center justify-center border-2 border-white/30 shadow-md shrink-0">
-                        <video src="${previewUrl}" class="w-full h-full object-cover" muted loop autoplay playsinline></video>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2 flex-wrap mb-1">
-                            <h4 class="text-xl font-black text-white tracking-wide">${isDF ? '🔴 SUSPECTED DEEPFAKE VIDEO' : '🟢 100% AUTHENTIC VIDEO'}</h4>
-                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
-                        </div>
-                        <p class="text-white/80 text-xs truncate">Confidence: <strong class="text-white">${d.confidence}%</strong> · Frames Analyzed: ${d.frames_analyzed} · File: ${file.name} (${d.file_size_mb}MB)</p>
-                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Claim: "${caption}"</p>` : ''}
-                    </div>
-                </div>
-                <div class="p-5">
-                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Forensic Video Checks (${(d.checks_run || []).length})</p>
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
-                    </div>
-                    ${(d.suspicious_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Facial Signals</p>
-                        <div class="space-y-1">
-                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    ${(d.real_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Video Credibility Markers</p>
-                        <div class="space-y-1">
-                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
-                </div>
-            </div>`;
-    } catch(e) {
-        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Video analysis failed.</div>`;
-    }
-}
-
-function handleVideoDrop(e) {
-    e.preventDefault();
-    document.getElementById('video-drop-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleVideoFile(file);
-}
-
-async function handleVoiceFile(file) {
-    if (!file) return;
-    const result = document.getElementById('voice-scan-result');
-    const previewUrl = URL.createObjectURL(file);
-    const caption = (document.getElementById('voice-caption-input')?.value || '').trim();
-    renderScanAnimation(result, 'Audio Voice Synthesis Verification Active', `Scanning ${file.name} pitch variance & vocoder frequency spectrum...`);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    if (caption) formData.append('caption', caption);
-    try {
-        const r = await fetch('/api/detect-voice', { method:'POST', body:formData });
-        const d = await r.json();
-        if (!r.ok) { result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">${d.error}</div>`; return; }
-        const isSynth = d.is_synthetic;
-        const confLabel = d.confidence_label || (isSynth ? 'Synthetic AI Voice Risk' : '100% Authentic Voice');
-        
-        result.innerHTML = `
-            <div class="border-2 ${isSynth ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
-                <div class="verdict-${isSynth ? 'fake' : 'real'} p-5 flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-xl bg-black/40 flex items-center justify-center text-white text-2xl shrink-0 border border-white/20 shadow-md">
-                        <i class="ph-fill ${isSynth ? 'ph-waveform-slash' : 'ph-waveform'}"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2 flex-wrap mb-1">
-                            <h4 class="text-xl font-black text-white tracking-wide">${isSynth ? '🔴 SYNTHETIC / AI VOICE' : '🟢 100% AUTHENTIC VOICE'}</h4>
-                            <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
-                        </div>
-                        <p class="text-white/80 text-xs truncate">Confidence: <strong class="text-white">${d.confidence}%</strong> · File: ${file.name} (${d.file_size_kb}KB)</p>
-                        ${caption ? `<p class="text-white/70 text-[10px] truncate mt-0.5 italic">Speaker / Context: "${caption}"</p>` : ''}
-                    </div>
-                </div>
-                <div class="p-5">
-                    <div class="mb-4">
-                        <audio src="${previewUrl}" controls class="w-full h-8 rounded-lg outline-none"></audio>
-                    </div>
-                    <p class="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-2">Acoustic Checks (${(d.checks_run || []).length})</p>
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        ${(d.checks_run || []).map(c=>`<span class="text-[10px] bg-paper-100 dark:bg-white/10 text-ink-700 dark:text-ink-100 px-3 py-1 rounded-full font-bold">✓ ${c}</span>`).join('')}
-                    </div>
-                    ${(d.suspicious_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-1.5">⚠ Misinformation & Vocoder Signals</p>
-                        <div class="space-y-1">
-                            ${d.suspicious_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-x-circle text-tl-red mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    ${(d.real_signals||[]).length ? `
-                    <div class="mb-3">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-1.5">✓ Natural Vocal Resonance Markers</p>
-                        <div class="space-y-1">
-                            ${d.real_signals.map(s=>`<div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-1.5 text-xs text-ink-700 dark:text-ink-100"><i class="ph-fill ph-check-circle text-tl-green mt-0.5 shrink-0"></i>${s}</div>`).join('')}
-                        </div>
-                    </div>` : ''}
-                    <p class="text-xs text-ink-500 mt-3 pt-3 border-t border-paper-200 dark:border-white/10">${d.explanation}</p>
-                </div>
-            </div>`;
-    } catch(e) {
-        result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4">Audio analysis failed.</div>`;
-    }
-}
-
-function handleVoiceDrop(e) {
-    e.preventDefault();
-    document.getElementById('voice-drop-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleVoiceFile(file);
-}
 
 async function loadScanHistory() {
 

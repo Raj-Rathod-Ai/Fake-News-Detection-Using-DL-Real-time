@@ -7,7 +7,10 @@ import sys
 import os
 import unittest
 
-sys.path.insert(0, os.path.dirname(__file__))
+# Ensure project root is in sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from dl_model import FakeNewsDLInferenceEngine
 
@@ -18,10 +21,10 @@ class TestDeepLearningModel(unittest.TestCase):
         self.engine = FakeNewsDLInferenceEngine()
 
     def test_tokenizer_and_model_loading(self):
-        self.assertIsNotNone(self.engine.tokenizer, "Tokenizer should be loaded from tokenizer.pkl")
-        self.assertIsNotNone(self.engine.keras_model, "Keras model should be loaded from fake_news_detection_model.keras")
+        self.assertIsNotNone(self.engine.tokenizer, "Tokenizer should be loaded from models/tokenizer.pkl")
+        self.assertIsNotNone(self.engine.keras_model, "Keras model should be loaded from models/fake_news_detection_model.keras")
         self.assertTrue(self.engine.is_keras_active, "Keras engine should be active")
-        print("[TEST OK] Keras Model and Tokenizer successfully loaded.")
+        print("[TEST OK] Keras Model and Tokenizer successfully loaded from models/ directory.")
 
     def test_dl_prediction_real_news(self):
         sample_real = "WASHINGTON (Reuters) - The U.S. Senate on Thursday approved a major budget resolution after an all-night debate."

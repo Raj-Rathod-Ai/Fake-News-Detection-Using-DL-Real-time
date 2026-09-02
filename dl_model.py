@@ -1,8 +1,8 @@
 """
 TruthLens Deep Learning & NLP Core Engine
 Architecture: Keras Deep Learning Sequential Neural Network (Embedding + GlobalAveragePooling1D + Multi-Layer Dense + Dropout)
-Trained Model: fake_news_detection_model.keras
-Tokenizer: tokenizer.pkl (Keras Tokenizer)
+Trained Model: models/fake_news_detection_model.keras
+Tokenizer: models/tokenizer.pkl (Keras Tokenizer)
 Optimized for real-time fake news detection, high accuracy, and fast inference.
 """
 
@@ -13,8 +13,21 @@ import numpy as np
 from typing import Dict, List, Tuple, Any
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, 'fake_news_detection_model.keras')
-DEFAULT_TOKENIZER_PATH = os.path.join(BASE_DIR, 'tokenizer.pkl')
+
+# Model and Tokenizer file locations (priority in models/ folder, fallback in root)
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+
+def _find_file(filename: str) -> str:
+    in_models = os.path.join(MODELS_DIR, filename)
+    if os.path.exists(in_models):
+        return in_models
+    in_base = os.path.join(BASE_DIR, filename)
+    if os.path.exists(in_base):
+        return in_base
+    return in_models
+
+DEFAULT_MODEL_PATH = _find_file('fake_news_detection_model.keras')
+DEFAULT_TOKENIZER_PATH = _find_file('tokenizer.pkl')
 
 # Optional Keras / TensorFlow Import
 KERAS_AVAILABLE = False
@@ -77,8 +90,8 @@ class FakeNewsDLInferenceEngine:
 
     def __init__(self, model_path: str = None, tokenizer_path: str = None, max_len: int = 500):
         self.max_len = max_len
-        self.model_path = model_path or DEFAULT_MODEL_PATH
-        self.tokenizer_path = tokenizer_path or DEFAULT_TOKENIZER_PATH
+        self.model_path = model_path or _find_file('fake_news_detection_model.keras')
+        self.tokenizer_path = tokenizer_path or _find_file('tokenizer.pkl')
 
         self.tokenizer = None
         self.keras_model = None
@@ -94,7 +107,7 @@ class FakeNewsDLInferenceEngine:
             try:
                 with open(self.tokenizer_path, 'rb') as f:
                     self.tokenizer = pickle.load(f)
-                print(f"[OK] Keras Tokenizer loaded from {os.path.basename(self.tokenizer_path)}")
+                print(f"[OK] Keras Tokenizer loaded from {self.tokenizer_path}")
             except Exception as e:
                 print(f"[WARN] Failed to load tokenizer from {self.tokenizer_path}: {e}")
         else:
@@ -105,7 +118,7 @@ class FakeNewsDLInferenceEngine:
             try:
                 self.keras_model = keras.models.load_model(self.model_path)
                 self.is_keras_active = True
-                print(f"[OK] Keras Deep Learning Model loaded from {os.path.basename(self.model_path)}")
+                print(f"[OK] Keras Deep Learning Model loaded from {self.model_path}")
             except Exception as e:
                 print(f"[WARN] Failed to load Keras model from {self.model_path}: {e}")
                 self.is_keras_active = False

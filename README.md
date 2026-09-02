@@ -1,4 +1,4 @@
-# 🔍 TruthLens — Real-Time Multi-Modal AI News Verification & Intelligence
+# 🔍 TruthLens — Real-Time AI Fake News Detection & Intelligence
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://python.org)
 [![Keras / TensorFlow](https://img.shields.io/badge/Keras%20%2F%20TensorFlow-Deep%20Learning-red.svg)](https://keras.io)
@@ -6,24 +6,18 @@
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg)](https://render.com)
 [![Netlify](https://img.shields.io/badge/Deploy-Netlify-00C7B7.svg)](https://netlify.com)
 
-**TruthLens** is an advanced, production-ready AI intelligence platform designed to detect misinformation, synthetic media, and deepfakes across multiple modalities (**Text, Images, Deepfake Videos, and Synthetic Audio**) with sub-second latency and real-time live web grounding.
+**TruthLens** is an advanced, production-ready AI intelligence platform designed to detect fake news, misinformation, and unverified claims with sub-second latency, deep neural sequence classification, and real-time live web grounding.
 
 ---
 
 ## 🚀 Key Features
 
-### 🧠 1. Multi-Modal AI Verification Suite
+### 🧠 1. Real-Time AI News Verification
 - **Text Fake News Detection (`/api/ai-scan`)**:
-  - **Keras Deep Learning Neural Network** (`fake_news_detection_model.keras` + `tokenizer.pkl`) with Embedding, GlobalAveragePooling1D, and Deep Dense layers for high-accuracy sequence classification.
+  - **Keras Deep Learning Neural Network** (`models/fake_news_detection_model.keras` + `models/tokenizer.pkl`) with Embedding, GlobalAveragePooling1D, and Deep Dense layers for sequence pattern classification.
   - **Dual-Engine Architecture**: Native Keras/TensorFlow inference with pure-NumPy heuristic fallback.
-  - **Tavily Real-Time Web Intelligence**: Verifies live breaking news (1-hour breaking news to 100-year historical events) with smart query extraction and token caching.
-  - **Mistral / Gemini AI LLM Fact-Checking**: Provides structured reasoning, nuanced context, and credibility signals.
-- **Image Forensic Scanner (`/api/detect-image`)**:
-  - Error Level Analysis (ELA), EXIF metadata tamper detection, Laplacian noise variance, and generative AI artifact classification.
-- **Deepfake Video Scanner (`/api/detect-deepfake`)**:
-  - OpenCV-powered frame extraction, facial boundary warping detection, temporal coherence analysis, and face swap anomaly checks.
-- **Synthetic Voice Detector (`/api/detect-voice`)**:
-  - Acoustic zero-crossing rate (ZCR) analysis, neural vocoder high-frequency phase anomaly scan, and organic RMS energy dynamic variance.
+  - **Tavily Real-Time Web Grounding**: Cross-verifies breaking claims against live reputable news sources with intelligent query extraction and token caching.
+  - **AI LLM Explanations**: Provides structured reasoning, credibility signals, and context.
 
 ### 🌐 2. Real-Time Intelligence Feeds
 - **Live Financial Markets**: Real-time SSE streaming for Indian indices (SENSEX, NIFTY 50), top equities, forex, precious metals (Gold, Silver), and crypto.
@@ -41,19 +35,22 @@
 
 ```
 Fake-News-Detection-Using-ML-Real-time/
-├── app.py                             # Flask backend & API routing
-├── dl_model.py                        # Keras Deep Learning inference engine
-├── fake_news_detection_model.keras    # Trained Keras Deep Learning model
-├── tokenizer.pkl                      # Fitted Keras text Tokenizer
-├── test_dl_model.py                   # Automated unit test suite
-├── dataset_downloader.py              # Dataset fetcher & preprocessor
-├── requirements.txt                   # Python dependencies
-├── Procfile                           # Gunicorn process manager for Render
-├── render.yaml                        # Render blueprint configuration
-├── netlify.toml                       # Netlify SPA & API proxy configuration
+├── models/
+│   ├── fake_news_detection_model.keras    # Trained Keras Deep Learning model
+│   └── tokenizer.pkl                      # Fitted Keras text Tokenizer
+├── tests/
+│   └── test_dl_model.py                   # Automated unit test suite
 ├── templates/
-│   └── index.html                     # Responsive, glassmorphism frontend
-└── uploads/                           # Temporary upload storage
+│   └── index.html                         # Responsive, glassmorphism frontend
+├── app.py                                 # Flask backend & API routing
+├── dl_model.py                            # Keras Deep Learning inference engine
+├── dataset_downloader.py                  # Dataset fetcher & preprocessor
+├── requirements.txt                       # Python dependencies
+├── Procfile                               # Gunicorn process manager for Render
+├── render.yaml                            # Render blueprint configuration
+├── netlify.toml                           # Netlify SPA & API proxy configuration
+├── .env.example                           # Environment configuration template
+└── .gitignore                             # Clean Git ignore configuration
 ```
 
 ---
@@ -146,7 +143,7 @@ Open **`http://localhost:3000`** in your browser.
 
 Run the test suite to verify the Keras model, tokenizer, and edge-case handling:
 ```bash
-python test_dl_model.py
+python -m unittest discover tests
 ```
 
 ---
