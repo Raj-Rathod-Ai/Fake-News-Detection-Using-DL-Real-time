@@ -1245,6 +1245,8 @@ def ai_scan():
             "real_signals": mistral_res.get("real_signals") or model_res.get("real_signals") or (["✓ Verified factual consistency across neural model and Mistral AI"] if not model_is_fake else []),
             "explanation": mistral_res.get("explanation") or model_res.get("explanation") or f"TruthLens Consensus: Evaluated as {final_verdict}.",
             "model": "Neural Model + Mistral AI Consensus",
+            "pipeline_used": "model_mistral",
+            "engines": ["ML Model", "Mistral AI"],
             "verification": verification
         }
     else:
@@ -1267,6 +1269,8 @@ def ai_scan():
             result = grounded_res
             result["verification"] = verification
             result["model"] = "Tavily Live Search + Mistral AI Grounding"
+            result["pipeline_used"] = "tavily_mistral"
+            result["engines"] = ["Tavily Search", "Mistral AI"]
         elif verification.get("sources_found", 0) > 0:
             reputable_sources = [a['source'] for a in articles if a.get('is_reputable')] or [a['source'] for a in articles[:3]]
             result = {
@@ -1278,12 +1282,16 @@ def ai_scan():
                 "real_signals": [f"[OK] Corroborated by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])})"],
                 "explanation": f"TruthLens Live Grounding: Confirmed by {verification['sources_found']} live authoritative news reports ({', '.join(reputable_sources[:3])}).",
                 "model": "Tavily Real-Time Live Web Grounding",
+                "pipeline_used": "tavily_only",
+                "engines": ["Tavily Search"],
                 "verification": verification
             }
         else:
             result = model_res
             result["verification"] = verification
             result["model"] = "Deep Learning Neural Model"
+            result["pipeline_used"] = "model_only"
+            result["engines"] = ["ML Model"]
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}

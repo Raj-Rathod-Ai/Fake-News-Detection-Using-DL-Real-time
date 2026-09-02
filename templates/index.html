@@ -1399,7 +1399,55 @@ function renderScanResult(container, d) {
     const circumference = 2 * Math.PI * 40;
     const offset = circumference - (circumference * d.confidence / 100);
     const confLabel = d.confidence_label || (d.confidence >= 90 ? 'Very High' : d.confidence >= 75 ? 'High' : d.confidence >= 62 ? 'Moderate' : 'Low');
-    
+
+    // ── Engine badges based on pipeline_used ──
+    const pipelineMap = {
+        'model_mistral': {
+            label: 'ML Model + Mistral AI',
+            chips: [
+                { name: 'ML Model', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+                { name: 'Mistral AI', icon: 'ph-fill ph-lightning', color: '#f97316', bg: '#f9731620' },
+            ]
+        },
+        'tavily_mistral': {
+            label: 'Tavily Live + Mistral AI',
+            chips: [
+                { name: 'Tavily Search', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' },
+                { name: 'Mistral AI', icon: 'ph-fill ph-lightning', color: '#f97316', bg: '#f9731620' },
+            ]
+        },
+        'tavily_only': {
+            label: 'Tavily Live Search',
+            chips: [
+                { name: 'Tavily Live', icon: 'ph-fill ph-globe', color: '#3b82f6', bg: '#3b82f620' },
+            ]
+        },
+        'model_only': {
+            label: 'ML Neural Model',
+            chips: [
+                { name: 'ML Model', icon: 'ph-fill ph-brain', color: '#a855f7', bg: '#a855f720' },
+            ]
+        }
+    };
+    const pipe = pipelineMap[d.pipeline_used] || {
+        label: d.model || 'AI Engine',
+        chips: [{ name: d.model || 'AI Engine', icon: 'ph-fill ph-cpu', color: '#a855f7', bg: '#a855f720' }]
+    };
+
+    const engineBadgesHtml = `
+    <div class="mb-4 p-3.5 rounded-2xl bg-paper-100 dark:bg-white/5 border border-paper-200 dark:border-white/10">
+        <p class="text-[9px] font-black uppercase tracking-widest text-ink-500 mb-2.5">⚙ Verification Engine Used</p>
+        <div class="flex flex-wrap gap-2">
+            ${pipe.chips.map(c => `
+            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border" style="background:${c.bg};border-color:${c.color}30">
+                <i class="${c.icon} text-sm" style="color:${c.color}"></i>
+                <span class="text-xs font-black" style="color:${c.color}">${c.name}</span>
+                <span class="w-1.5 h-1.5 rounded-full animate-pulse ml-0.5" style="background:${c.color}"></span>
+            </div>`).join('')}
+        </div>
+        <p class="text-[9px] text-ink-400 dark:text-ink-500 mt-2 font-mono">Pipeline: ${pipe.label}</p>
+    </div>`;
+
     // Verification section
     const ver = d.verification || {};
     let verHtml = '';
@@ -1433,6 +1481,10 @@ function renderScanResult(container, d) {
                     </div>
                     <p class="text-white/70 text-xs mt-0.5">${isFake ? 'Misinformation indicators detected' : 'Content appears credible and factual'}</p>
                     <p class="text-white/50 text-[9px] font-mono mt-1">Signal Score: ${d.signal_score >= 0 ? '+' : ''}${d.signal_score || 0}</p>
+                    <!-- Engine chips in header -->
+                    <div class="flex gap-1.5 mt-2 flex-wrap">
+                        ${pipe.chips.map(c => `<span class="text-[8px] font-black bg-white/20 text-white px-2 py-0.5 rounded-full flex items-center gap-1"><i class="${c.icon} text-[9px]"></i>${c.name}</span>`).join('')}
+                    </div>
                 </div>
                 <div class="relative flex items-center justify-center shrink-0">
                     <svg class="score-ring" width="80" height="80" viewBox="0 0 90 90">
@@ -1444,6 +1496,7 @@ function renderScanResult(container, d) {
                 </div>
             </div>
             <div class="p-5">
+                ${engineBadgesHtml}
                 ${(d.fake_signals && d.fake_signals.length) ? `
                 <div class="mb-4">
                     <p class="text-[10px] font-black uppercase tracking-widest text-tl-red mb-2">⚠ Misinformation Signals (${d.fake_signals.length})</p>
@@ -1455,7 +1508,7 @@ function renderScanResult(container, d) {
                         </div>`).join('')}
                     </div>
                 </div>` : ''}
-                
+
                 ${(d.real_signals && d.real_signals.length) ? `
                 <div class="mb-4">
                     <p class="text-[10px] font-black uppercase tracking-widest text-tl-green mb-2">✓ Credibility Markers (${d.real_signals.length})</p>
@@ -1470,14 +1523,12 @@ function renderScanResult(container, d) {
 
                 ${verHtml}
 
-                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10 flex items-start gap-2 flex-wrap">
-                    <p class="text-[10px] text-ink-500 flex-1">${d.explanation}</p>
-                    <span class="text-[9px] bg-tl-purple/10 text-tl-purple px-2 py-1 rounded-full font-black shrink-0">
-                        <i class="ph-fill ph-brain"></i> ${d.model || 'Neural DL Engine'}
-                    </span>
+                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10">
+                    <p class="text-[10px] text-ink-500">${d.explanation}</p>
                 </div>
             </div>
         </div>`;
+}
 }
 
 async function loadScanHistory() {
