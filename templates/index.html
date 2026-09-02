@@ -1157,36 +1157,52 @@ function renderMarketTable() {
 // CRICKET
 // =====================================================================
 const DEFAULT_CRICKET_CARDS = `
-    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[260px]">
         <div class="flex flex-col gap-1.5 flex-1 min-w-0">
             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">I</div><span class="truncate">IND</span></div>
-                <span class="font-mono font-black text-xs shrink-0">284/4 (48.2)</span>
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-blue-600 shrink-0">I</div><span class="truncate">IND</span></div>
+                <span class="font-mono font-black text-xs shrink-0">186/4 (18.4)</span>
             </div>
             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
                 <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-[9px] font-black text-yellow-600 shrink-0">A</div><span class="truncate">AUS</span></div>
-                <span class="font-mono font-black text-xs shrink-0">280/8</span>
+                <span class="font-mono font-black text-xs shrink-0">184/7 (20.0)</span>
             </div>
         </div>
-        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+        <div class="ml-2 text-right shrink-0 max-w-[110px]">
             <div class="text-[9px] font-black uppercase tracking-widest text-tl-green">RECENT</div>
             <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">IND won by 6 wkts</div>
         </div>
     </div>
-    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[260px]">
         <div class="flex flex-col gap-1.5 flex-1 min-w-0">
             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">R</div><span class="truncate">RCB</span></div>
-                <span class="font-mono font-black text-xs shrink-0">218/5 (20)</span>
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-red-600 shrink-0">E</div><span class="truncate">ENG</span></div>
+                <span class="font-mono font-black text-xs shrink-0">275/6 (50)</span>
             </div>
             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-[9px] font-black text-yellow-600 shrink-0">C</div><span class="truncate">CSK</span></div>
-                <span class="font-mono font-black text-xs shrink-0">191/7 (20)</span>
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[9px] font-black text-emerald-600 shrink-0">S</div><span class="truncate">SA</span></div>
+                <span class="font-mono font-black text-xs shrink-0">242 (46.2)</span>
             </div>
         </div>
-        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+        <div class="ml-2 text-right shrink-0 max-w-[110px]">
+            <div class="text-[9px] font-black uppercase tracking-widest text-tl-blue">FINAL</div>
+            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">ENG won by 33 runs</div>
+        </div>
+    </div>
+    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[260px]">
+        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-700 dark:text-slate-200 shrink-0">N</div><span class="truncate">NZ</span></div>
+                <span class="font-mono font-black text-xs shrink-0">340 & 180/3</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-[9px] font-black text-green-700 shrink-0">P</div><span class="truncate">PAK</span></div>
+                <span class="font-mono font-black text-xs shrink-0">290 (84.1)</span>
+            </div>
+        </div>
+        <div class="ml-2 text-right shrink-0 max-w-[110px]">
             <div class="text-[9px] font-black uppercase tracking-widest text-tl-red animate-pulse">LIVE</div>
-            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">RCB won by 27 runs</div>
+            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">NZ lead by 230 runs</div>
         </div>
     </div>`;
 
@@ -1204,17 +1220,19 @@ async function fetchCricket() {
                     for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
                         const mi = m.matchInfo;
                         if (!mi) continue;
-                        const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
-                        const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
-                        const s1 = (m.matchScore?.team1Score?.inngs1?.runs || '') + '/' + (m.matchScore?.team1Score?.inngs1?.wickets || '');
-                        const s2 = (m.matchScore?.team2Score?.inngs1?.runs || '') + '/' + (m.matchScore?.team2Score?.inngs1?.wickets || '');
+                        const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || 'Team 1';
+                        const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || 'Team 2';
+                        const ms1 = m.matchScore?.team1Score?.inngs1;
+                        const ms2 = m.matchScore?.team2Score?.inngs1;
+                        const s1 = ms1 ? `${ms1.runs || 0}/${ms1.wickets || 0} (${ms1.overs || 0})` : 'Yet to bat';
+                        const s2 = ms2 ? `${ms2.runs || 0}/${ms2.wickets || 0} (${ms2.overs || 0})` : 'Yet to bat';
                         cards += `
-                            <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+                            <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[260px]">
                                 <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                                     <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2"><span class="truncate">${t1}</span><span class="font-mono font-black text-xs shrink-0">${s1}</span></div>
                                     <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2"><span class="truncate">${t2}</span><span class="font-mono font-black text-xs shrink-0">${s2}</span></div>
                                 </div>
-                                <div class="ml-2 text-right shrink-0 max-w-[100px]"><div class="text-[9px] font-black uppercase text-tl-red">MATCH</div><div class="text-[9px] font-bold text-ink-500 truncate">${mi.status || 'Live'}</div></div>
+                                <div class="ml-2 text-right shrink-0 max-w-[110px]"><div class="text-[9px] font-black uppercase text-tl-red">${mi.state === 'In Progress' ? 'LIVE' : 'MATCH'}</div><div class="text-[9px] font-bold text-ink-500 truncate">${mi.status || 'Live'}</div></div>
                             </div>`;
                     }
                 }
