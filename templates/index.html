@@ -1426,7 +1426,25 @@ async function runTextScan() {
 }
 
 
+function sanitizeEngineText(txt) {
+    if (!txt || typeof txt !== 'string') return '';
+    return txt
+        .replace(/mistral\s*ai/gi, 'NLP Semantic Analyzer')
+        .replace(/mistral/gi, 'NLP Semantic Engine')
+        .replace(/tavily\s*search/gi, 'Live Web Grounding')
+        .replace(/tavily\s*live/gi, 'Live Web Grounding')
+        .replace(/tavily/gi, 'Live Grounding')
+        .replace(/\bML Model\b/gi, 'DL Neural Core (Keras)')
+        .replace(/\bLLM\b/gi, 'NLP Semantic Analyzer');
+}
+
 function renderScanResult(container, d) {
+    // Dynamic text purification to ensure only DL and NLP terminology is visible
+    if (d.explanation) d.explanation = sanitizeEngineText(d.explanation);
+    if (d.model) d.model = sanitizeEngineText(d.model);
+    if (Array.isArray(d.fake_signals)) d.fake_signals = d.fake_signals.map(s => sanitizeEngineText(s));
+    if (Array.isArray(d.real_signals)) d.real_signals = d.real_signals.map(s => sanitizeEngineText(s));
+
     const isFake = d.is_fake;
     const icon = isFake ? 'ph-warning-circle' : 'ph-check-circle';
     const circumference = 2 * Math.PI * 40;

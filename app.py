@@ -1357,6 +1357,25 @@ def ai_scan():
         result["pipeline_used"] = "model_only"
         result["engines"] = ["Deep Learning Core", "NLP Semantic Analyzer"]
 
+    # Sanitize any residual AI provider names to present as in-house DL + NLP architecture
+    def sanitize_ai_text(val):
+        if isinstance(val, str):
+            t = re.sub(r'(?i)\bmistral\s*ai\b', 'NLP Semantic Analyzer', val)
+            t = re.sub(r'(?i)\bmistral\b', 'NLP Engine', t)
+            t = re.sub(r'(?i)\btavily\s*search\b', 'Live Web Grounding', t)
+            t = re.sub(r'(?i)\btavily\s*live\b', 'Live Web Grounding', t)
+            t = re.sub(r'(?i)\btavily\b', 'Live Fact Grounding', t)
+            t = re.sub(r'(?i)\bML Model\b', 'DL Neural Core (Keras)', t)
+            t = re.sub(r'(?i)\bLLM\b', 'NLP Semantic Engine', t)
+            return t
+        elif isinstance(val, list):
+            return [sanitize_ai_text(item) for item in val]
+        elif isinstance(val, dict):
+            return {k: sanitize_ai_text(v) for k, v in val.items()}
+        return val
+
+    result = sanitize_ai_text(result)
+
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
 
