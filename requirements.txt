@@ -10,4 +10,5 @@ pymongo>=4.6.0
 google-generativeai>=0.3.0
 opencv-python-headless>=4.8.0
 Werkzeug>=3.0.0
-torch>=2.0.0
+tensorflow>=2.15.0
+keras>=3.0.0

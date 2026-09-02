@@ -1,17 +1,15 @@
 """
 TruthLens Automated Test Suite
-Verifies PyTorch / NumPy Deep Learning model, tokenization, Tavily token conservation,
-MongoDB / SQLite database layer, and Multi-Modal endpoint responses.
+Verifies Keras Deep Learning model, Tokenizer, Fallback Engine, and Inference Pipeline.
 """
 
 import sys
 import os
-import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from dl_model import FakeNewsDLInferenceEngine, SimpleTokenizer
+from dl_model import FakeNewsDLInferenceEngine
 
 
 class TestDeepLearningModel(unittest.TestCase):
@@ -19,37 +17,37 @@ class TestDeepLearningModel(unittest.TestCase):
     def setUp(self):
         self.engine = FakeNewsDLInferenceEngine()
 
-    def test_tokenizer(self):
-        tokenizer = SimpleTokenizer(max_words=5000, max_len=64)
-        texts = ["Apple reports Q4 earnings up 15%", "Miracle cure banned by big pharma"]
-        tokenizer.fit_on_texts(texts)
+    def test_tokenizer_and_model_loading(self):
+        self.assertIsNotNone(self.engine.tokenizer, "Tokenizer should be loaded from tokenizer.pkl")
+        self.assertIsNotNone(self.engine.keras_model, "Keras model should be loaded from fake_news_detection_model.keras")
+        self.assertTrue(self.engine.is_keras_active, "Keras engine should be active")
+        print("[TEST OK] Keras Model and Tokenizer successfully loaded.")
 
-        seq = tokenizer.text_to_sequence("Apple reports earnings")
-        self.assertEqual(len(seq), 64)
-        self.assertGreater(seq[0], 0)
-        print("[TEST OK] Tokenizer converts text to padded sequence tensor")
-
-    def test_dl_prediction(self):
-        sample_real = "Apple Inc. reported quarterly earnings of $28.6 billion in Q4 2025."
+    def test_dl_prediction_real_news(self):
+        sample_real = "WASHINGTON (Reuters) - The U.S. Senate on Thursday approved a major budget resolution after an all-night debate."
         result_real = self.engine.predict(sample_real)
 
-        self.assertIn("verdict", result_real if "verdict" in result_real else {"verdict": "REAL"})
+        self.assertIn("fake_prob", result_real)
+        self.assertIn("real_prob", result_real)
         self.assertIn("confidence", result_real)
-        self.assertGreaterEqual(result_real["confidence"], 0)
-        self.assertLessEqual(result_real["confidence"], 100)
-        print(f"[TEST OK] DL Engine prediction: {result_real['model_version']} (Conf: {result_real['confidence']}%)")
+        self.assertGreaterEqual(result_real["real_prob"], 0.5, "Real news should have real_prob >= 0.5")
+        self.assertFalse(result_real["is_fake"])
+        print(f"[TEST OK] Real News DL Prediction: Real Prob={result_real['real_prob']}, Fake Prob={result_real['fake_prob']}")
 
     def test_fake_news_prediction(self):
-        sample_fake = "SHOCKING: Miracle cure suppressed by doctors! Share before deleted!"
+        sample_fake = "SHOCKING VIDEO: Pope Francis endorses Donald Trump for President in secret Vatican meeting! Share before deleted!"
         result_fake = self.engine.predict(sample_fake)
 
         self.assertIn("fake_prob", result_fake)
         self.assertIn("real_prob", result_fake)
+        self.assertIn("confidence", result_fake)
         print(f"[TEST OK] Fake News DL Scan: Fake Prob={result_fake['fake_prob']}, Real Prob={result_fake['real_prob']}")
 
     def test_empty_string(self):
         result = self.engine.predict("")
         self.assertEqual(result["confidence"], 50.0)
+        self.assertEqual(result["fake_prob"], 0.5)
+        self.assertEqual(result["real_prob"], 0.5)
         print("[TEST OK] Empty input handled cleanly with default fallback")
 
 

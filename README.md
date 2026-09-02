@@ -1,7 +1,7 @@
 # 🔍 TruthLens — Real-Time Multi-Modal AI News Verification & Intelligence
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-red.svg)](https://pytorch.org)
+[![Keras / TensorFlow](https://img.shields.io/badge/Keras%20%2F%20TensorFlow-Deep%20Learning-red.svg)](https://keras.io)
 [![Flask](https://img.shields.io/badge/Flask-3.0%2B-black.svg)](https://flask.palletsprojects.com)
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg)](https://render.com)
 [![Netlify](https://img.shields.io/badge/Deploy-Netlify-00C7B7.svg)](https://netlify.com)
@@ -14,10 +14,10 @@
 
 ### 🧠 1. Multi-Modal AI Verification Suite
 - **Text Fake News Detection (`/api/ai-scan`)**:
-  - **PyTorch Deep Neural Network** (`Conv1D` + `BiLSTM` + `Multi-Head Self-Attention` + `GELU Dense NN`) with **94.47% validation accuracy** and `ROC-AUC 0.9799`.
-  - **Dual-Engine Architecture**: Native PyTorch acceleration with pure-NumPy DL fallback optimized for free-tier memory constraints (<150MB RAM).
+  - **Keras Deep Learning Neural Network** (`fake_news_detection_model.keras` + `tokenizer.pkl`) with Embedding, GlobalAveragePooling1D, and Deep Dense layers for high-accuracy sequence classification.
+  - **Dual-Engine Architecture**: Native Keras/TensorFlow inference with pure-NumPy heuristic fallback.
   - **Tavily Real-Time Web Intelligence**: Verifies live breaking news (1-hour breaking news to 100-year historical events) with smart query extraction and token caching.
-  - **Mistral AI LLM Fact-Checking**: Provides structured reasoning, nuanced context, and credibility signals.
+  - **Mistral / Gemini AI LLM Fact-Checking**: Provides structured reasoning, nuanced context, and credibility signals.
 - **Image Forensic Scanner (`/api/detect-image`)**:
   - Error Level Analysis (ELA), EXIF metadata tamper detection, Laplacian noise variance, and generative AI artifact classification.
 - **Deepfake Video Scanner (`/api/detect-deepfake`)**:
@@ -41,26 +41,19 @@
 
 ```
 Fake-News-Detection-Using-ML-Real-time/
-├── app.py                      # Flask backend & API routing
-├── dl_model.py                 # PyTorch & NumPy Deep Learning engine
-├── train_dl_model.py           # Training script for DL model
-├── train_multimodal.py         # Multi-modal feature training
-├── dataset_downloader.py       # Dataset fetcher & preprocessor
-├── test_dl_model.py            # Automated unit test suite
-├── requirements.txt            # Python dependencies
-├── Procfile                    # Gunicorn process manager for Render
-├── render.yaml                 # Render blueprint configuration
-├── netlify.toml                # Netlify SPA & API proxy configuration
-├── models_dl/                  # Trained PyTorch weights & vocabulary
-│   ├── light_dl_model.pt       # PyTorch checkpoint (94.47% accuracy)
-│   ├── vocab.json              # Word vocabulary (25,000 tokens)
-│   ├── training_metrics.json   # Benchmark metrics
-│   ├── image_model.pkl         # Image forensic classifier
-│   ├── video_model.pkl         # Video temporal classifier
-│   └── voice_model.pkl         # Voice vocoder classifier
+├── app.py                             # Flask backend & API routing
+├── dl_model.py                        # Keras Deep Learning inference engine
+├── fake_news_detection_model.keras    # Trained Keras Deep Learning model
+├── tokenizer.pkl                      # Fitted Keras text Tokenizer
+├── test_dl_model.py                   # Automated unit test suite
+├── dataset_downloader.py              # Dataset fetcher & preprocessor
+├── requirements.txt                   # Python dependencies
+├── Procfile                           # Gunicorn process manager for Render
+├── render.yaml                        # Render blueprint configuration
+├── netlify.toml                       # Netlify SPA & API proxy configuration
 ├── templates/
-│   └── index.html              # Responsive, glassmorphism frontend
-└── uploads/                    # Temporary upload storage
+│   └── index.html                     # Responsive, glassmorphism frontend
+└── uploads/                           # Temporary upload storage
 ```
 
 ---
@@ -92,7 +85,7 @@ Fake-News-Detection-Using-ML-Real-time/
 
 ---
 
-### 🟢 Deploying Frontend on Netlify (Optional Decoupled Setup)
+## 🟢 Deploying Frontend on Netlify (Optional Decoupled Setup)
 
 If you prefer hosting the frontend on Netlify with the backend hosted on Render:
 
@@ -151,7 +144,7 @@ Open **`http://localhost:3000`** in your browser.
 
 ## 🧪 Running Automated Tests
 
-Run the test suite to verify the PyTorch model, tokenizer, and edge-case handling:
+Run the test suite to verify the Keras model, tokenizer, and edge-case handling:
 ```bash
 python test_dl_model.py
 ```
