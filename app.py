@@ -699,11 +699,11 @@ STATIC_FUEL = [
 ]
 
 FALLBACK_PRICES = {
-    "^BSESN": 81850.0, "^NSEI": 24950.0, "^NSEBANK": 51400.0, "NIFMDCP100.NS": 57800.0,
+    "^BSESN": 76570.0, "^NSEI": 23910.0, "^NSEBANK": 51400.0, "NIFMDCP100.NS": 57800.0,
     "RELIANCE.NS": 2980.0, "TCS.NS": 4180.0, "HDFCBANK.NS": 1680.0, "INFY.NS": 1880.0,
     "WIPRO.NS": 545.0, "ITC.NS": 495.0, "BAJFINANCE.NS": 7350.0, "MARUTI.NS": 12450.0,
-    "LT.NS": 3720.0, "ICICIBANK.NS": 1240.0, "SBIN.NS": 845.0, "INR=X": 83.85,
-    "GC=F": 2695.0, "SI=F": 31.80, "BTC-USD": 68500.0, "ETH-USD": 3550.0
+    "LT.NS": 3720.0, "ICICIBANK.NS": 1240.0, "SBIN.NS": 845.0, "INR=X": 95.00,
+    "GC=F": 4416.0, "SI=F": 65.50, "BTC-USD": 77100.0, "ETH-USD": 3550.0
 }
 
 
@@ -722,8 +722,23 @@ def refresh_markets():
     live_count = 0
 
     usd_inr = FALLBACK_PRICES["INR=X"]
+    # 1. Fetch live USD/INR exchange rate from open exchange API
+    try:
+        r_fx = requests.get("https://open.er-api.com/v6/latest/USD", timeout=3)
+        if r_fx.status_code == 200:
+            fx_rate = r_fx.json().get("rates", {}).get("INR")
+            if fx_rate:
+                usd_inr = float(fx_rate)
+    except Exception:
+        pass
+
     gold_usd = FALLBACK_PRICES["GC=F"]
     silver_usd = FALLBACK_PRICES["SI=F"]
+
+    browser_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+    }
 
     import urllib.request
     import urllib.parse
@@ -732,25 +747,42 @@ def refresh_markets():
         price = None
         change_pct = 0.0
 
-        try:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}?interval=1d"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-            raw_data = urllib.request.urlopen(req, timeout=3).read()
-            c_data = json.loads(raw_data)
-            c_meta = c_data['chart']['result'][0]['meta']
+        # Try Yahoo query1 then query2
+        for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]:
+            try:
+                url = f"https://{host}/v8/finance/chart/{urllib.parse.quote(ticker)}?interval=1d"
+                req = urllib.request.Request(url, headers=browser_headers)
+                raw_data = urllib.request.urlopen(req, timeout=3).read()
+                c_data = json.loads(raw_data)
+                c_meta = c_data['chart']['result'][0]['meta']
 
-            p_live = c_meta.get('regularMarketPrice')
-            p_prev = c_meta.get('chartPreviousClose') or c_meta.get('previousClose')
-            if p_live is not None:
-                price = float(p_live)
-                if p_prev and p_prev > 0:
-                    change_pct = round(((price - p_prev) / p_prev) * 100, 2)
-                live_count += 1
-        except Exception:
-            pass
+                p_live = c_meta.get('regularMarketPrice')
+                p_prev = c_meta.get('chartPreviousClose') or c_meta.get('previousClose')
+                if p_live is not None:
+                    price = float(p_live)
+                    if p_prev and p_prev > 0:
+                        change_pct = round(((price - p_prev) / p_prev) * 100, 2)
+                    live_count += 1
+                    break
+            except Exception:
+                continue
+
+        # Fallback for Crypto if Yahoo rate-limits
+        if price is None and ticker in ["BTC-USD", "ETH-USD"]:
+            try:
+                sym_pair = "BTCUSDT" if ticker == "BTC-USD" else "ETHUSDT"
+                r_crypto = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={sym_pair}", timeout=3)
+                if r_crypto.status_code == 200:
+                    price = float(r_crypto.json().get("price", 0))
+                    live_count += 1
+            except Exception:
+                pass
 
         if price is None:
-            price = FALLBACK_PRICES.get(ticker, 100.0)
+            if ticker == "INR=X":
+                price = usd_inr
+            else:
+                price = FALLBACK_PRICES.get(ticker, 100.0)
 
         if ticker == "INR=X": usd_inr = price
         elif ticker == "GC=F": gold_usd = price
@@ -772,11 +804,11 @@ def refresh_markets():
         if "unit" in meta: entry["unit"] = meta["unit"]
         items.append(entry)
 
-    # Derived Indian MCX Gold & Silver Prices (including Indian Import Duty + GST)
-    gold_mcx = round((gold_usd * usd_inr / 31.1034768) * 10 * 1.085, 0)
-    silver_mcx = round(silver_usd * usd_inr * 32.1507466 * 1.08, 0)
-    items.append({"symbol": "GOLD MCX", "price": gold_mcx, "price_str": f"₹{int(gold_mcx):,}", "change": "+0.15%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True})
-    items.append({"symbol": "SILVER MCX", "price": silver_mcx, "price_str": f"₹{int(silver_mcx):,}", "change": "+0.25%", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True})
+    # Derived Indian MCX Gold & Silver Prices with live Spot & live USD/INR
+    gold_mcx = round((gold_usd * usd_inr / 31.1034768) * 10 * 1.06, 0)
+    silver_mcx = round((silver_usd * usd_inr / 31.1034768) * 1000 * 1.06, 0)
+    items.append({"symbol": "GOLD MCX", "price": gold_mcx, "price_str": f"₹{int(gold_mcx):,}", "change": "+0.45%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True})
+    items.append({"symbol": "SILVER MCX", "price": silver_mcx, "price_str": f"₹{int(silver_mcx):,}", "change": "+0.35%", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True})
     items.extend(STATIC_FUEL)
 
 
