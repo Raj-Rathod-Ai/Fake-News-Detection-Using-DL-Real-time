@@ -1298,7 +1298,13 @@ def ai_scan():
         # ─────────────────────────────────────────────────────────────────────
         # STEP 4: Otherwise (Disagreement or Uncertain) -> Go to Tavily Live Search!
         # ─────────────────────────────────────────────────────────────────────
-        verification = search_tavily_live_news(text)
+        # Run Tavily search via executor with strict timeout (prevents 5s block)
+        verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
+        try:
+            fut_tav2 = scan_executor.submit(search_tavily_live_news, text)
+            verification = fut_tav2.result(timeout=4.0)
+        except Exception:
+            pass
         articles = verification.get("matching_articles", [])
 
         # Ground claim with live articles via Mistral
@@ -1306,7 +1312,7 @@ def ai_scan():
         if articles and MISTRAL_API_KEY:
             try:
                 fut_grounded = scan_executor.submit(llm_fact_check, text, articles)
-                grounded_res = fut_grounded.result(timeout=5.0)
+                grounded_res = fut_grounded.result(timeout=3.0)
             except Exception:
                 grounded_res = None
 
@@ -1341,24 +1347,27 @@ def ai_scan():
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
 
-    # Record to Shared Scan History (open platform, no user scoping)
-    try:
-        title = generate_gemini_title(text)
-        scan_id = str(uuid.uuid4())
-        now_iso = datetime.now(timezone.utc).isoformat()
-        if mongo_db is not None:
-            mongo_db.scan_history.insert_one({
-                "_id": scan_id, "id": scan_id,
-                "text_input": text[:500], "title": title, "verdict": result['verdict'],
-                "confidence": result['confidence'], "scan_type": "text", "created_at": now_iso
-            })
-        else:
-            db = get_db()
-            db.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
-                       (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
-            db.commit()
-    except Exception as e:
-        print(f"[Scan History] Recording error: {e}")
+    # Record to Shared Scan History in background (non-blocking)
+    def _save_history():
+        try:
+            title = generate_gemini_title(text)
+            scan_id = str(uuid.uuid4())
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if mongo_db is not None:
+                mongo_db.scan_history.insert_one({
+                    "_id": scan_id, "id": scan_id,
+                    "text_input": text[:500], "title": title, "verdict": result['verdict'],
+                    "confidence": result['confidence'], "scan_type": "text", "created_at": now_iso
+                })
+            else:
+                db = get_db()
+                db.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
+                           (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
+                db.commit()
+        except Exception as e:
+            print(f"[Scan History] Recording error: {e}")
+
+    threading.Thread(target=_save_history, daemon=True).start()
 
     return jsonify(result)
 
