@@ -1,294 +1,1749 @@
 """
-TruthLens AI — Intelligence & Fact-Checking Engine (Streamlit Backend)
-Features:
-- Keras Deep Learning Sequential Neural Network for Text Classification
-- Tavily API Live Web Search Grounding & Source Verification
-- Mistral AI Intelligence Reasoning Engine
-- MongoDB Cloud Database for Scan History Logging
-- Cricbuzz Cricket RapidAPI Live Match Feed
-- Real-Time Financial Markets Feed (Yahoo Finance / RapidAPI)
+TruthLens AI — Streamlit Application
+Serves the complete TruthLens AI Verified Intelligence interface with Keras Deep Learning Neural Engine.
 """
 
 import os
-import re
-import json
-import time
-import requests
-import numpy as np
 import streamlit as st
-from datetime import datetime, timezone
+import streamlit.components.v1 as components
 from dl_model import FakeNewsDLInferenceEngine
 
-# Page configuration
+# Configure Streamlit page for full width & clean layout
 st.set_page_config(
-    page_title="TruthLens AI — Real-Time News Intelligence",
+    page_title="TruthLens — AI Verified Intelligence",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Helper to read credentials from st.secrets or os.environ
-def get_secret(key: str, default: str = "") -> str:
-    if hasattr(st, "secrets") and key in st.secrets:
-        return str(st.secrets[key])
-    return os.environ.get(key, default)
-
-# Load API Credentials securely from st.secrets or environment
-CRICBUZZ_HOST = get_secret("CRICBUZZ_HOST", "cricbuzz-cricket.p.rapidapi.com")
-CRICBUZZ_KEY = get_secret("CRICBUZZ_KEY", "")
-FINANCE_RAPIDAPI_HOST = get_secret("FINANCE_RAPIDAPI_HOST", "yahoo-finance15.p.rapidapi.com")
-RAPIDAPI_KEY = get_secret("RAPIDAPI_KEY", "")
-MISTRAL_API_KEY = get_secret("MISTRAL_API_KEY", "")
-TAVILY_API_KEY = get_secret("TAVILY_API_KEY", "")
-MONGO_URI = get_secret("MONGO_URI", "")
-
-# Custom CSS for Embed Mode and Modern UI
+# Custom CSS to eliminate Streamlit default margins and headers for the custom frontend
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
     .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        max-width: 1000px;
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+        max-width: 100% !important;
     }
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 900;
-        text-align: center;
-        background: linear-gradient(135deg, #7C3AED 0%, #2563EB 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
-    }
-    .sub-title {
-        text-align: center;
-        color: #6B7280;
-        font-size: 0.95rem;
-        margin-bottom: 1.5rem;
-    }
-    .metric-card {
-        background: #F9FAFB;
-        border: 1px solid #E5E7EB;
-        border-radius: 12px;
-        padding: 1rem;
-        text-align: center;
+    iframe {
+        width: 100% !important;
+        min-height: 100vh !important;
+        border: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown('<h1 class="main-title">TruthLens AI News Intelligence</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Keras Deep Learning Neural Network · Tavily Web Grounding · Real-Time Intelligence</p>', unsafe_allow_html=True)
-
-# Load DL Model with Cache
-@st.cache_resource(show_spinner="Loading Keras Deep Learning Neural Network...")
-def get_inference_engine():
+# Cache and initialize Keras DL Model in background
+@st.cache_resource(show_spinner=False)
+def load_engine():
     return FakeNewsDLInferenceEngine()
 
-engine = get_inference_engine()
+engine = load_engine()
 
-# MongoDB Client Setup
-@st.cache_resource
-def get_mongo_db():
-    if not MONGO_URI:
-        return None
-    try:
-        import pymongo
-        client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
-        return client.get_database("truthlens_db")
-    except Exception as e:
-        return None
+# Read the HTML content
+HTML_CODE = """<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens — AI Verified Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-mongo_db = get_mongo_db()
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['DM Sans', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        paper: { 50:'#fdfcf8', 100:'#f1f3f4', 200:'#dadce0', 800:'#1a1a1a', 900:'#0f0f0f' },
+                        ink:   { 900:'#1a1a2e', 700:'#5f6368', 500:'#9aa0a6', 100:'#e8eaed' },
+                        tl: {
+                            blue:'#1a73e8', red:'#ea4335', green:'#34a853',
+                            yellow:'#fbbc04', purple:'#7c3aed', orange:'#f97316',
+                            cyan:'#06b6d4'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 
-# Main Navigation Tabs
-tab_scanner, tab_cricket, tab_markets = st.tabs([
-    "🔍 AI News Fact-Checker",
-    "🏏 Live Cricket Scores",
-    "📈 Financial Markets Feed"
-])
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; }
+        .dark body { background:#0f0f0f; color:#e8eaed; }
+        * { transition: background-color 0.25s ease, border-color 0.25s ease; }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 1: AI NEWS FACT-CHECKER (Keras + Tavily + Mistral + MongoDB)
-# ─────────────────────────────────────────────────────────────────────────────
-with tab_scanner:
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1:
-        if st.button("📰 Sample Real News", use_container_width=True):
-            st.session_state["sample_text"] = "WASHINGTON (Reuters) - The U.S. Senate on Thursday approved a major budget resolution after an all-night debate."
-    with col_s2:
-        if st.button("⚠️ Sample Fake Claim", use_container_width=True):
-            st.session_state["sample_text"] = "SHOCKING: Scientists confirm secret underground alien base occupied by reptilian creatures planning global invasion next month! Share immediately!"
-    with col_s3:
-        if st.button("🧹 Clear Box", use_container_width=True):
-            st.session_state["sample_text"] = ""
+        ::-webkit-scrollbar { width:4px; height:4px; }
+        ::-webkit-scrollbar-thumb { background:#dadce0; border-radius:10px; }
+        .dark ::-webkit-scrollbar-thumb { background:#333; }
+        .no-scrollbar::-webkit-scrollbar { display:none; }
 
-    default_val = st.session_state.get("sample_text", "")
-    text_input = st.text_area(
-        "Enter News Article Headline or Claim:",
-        value=default_val,
-        height=130,
-        placeholder="Type or paste any news text or claim to verify with Keras deep learning model..."
-    )
+        /* Loader */
+        .loader-bar { height:3px; background:#e8eaed; border-radius:10px; overflow:hidden; position:relative; }
+        .loader-bar::before {
+            content:''; position:absolute; height:100%; width:40%; left:-50%;
+            background:linear-gradient(90deg,#7c3aed,#1a73e8);
+            animation:loaderAnim 1.5s linear infinite;
+        }
+        @keyframes loaderAnim { 0%{left:-50%} 100%{left:110%} }
 
-    if st.button("🚀 Verify Claim with AI Neural Engine", use_container_width=True, type="primary"):
-        clean_text = text_input.strip()
-        if len(clean_text) < 5:
-            st.warning("⚠️ Please enter at least 5 characters to analyze.")
-        else:
-            with st.spinner("Analyzing neural linguistic patterns & checking real-time web sources..."):
-                # 1. Keras Deep Learning Prediction
-                dl_result = engine.predict(clean_text)
+        /* Ticker */
+        .ticker-move { display:flex; animation:tickerScroll 40s linear infinite; width:max-content; }
+        .ticker-move:hover { animation-play-state:paused; }
+        @keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
 
-                # 2. Optional Tavily Search Grounding
-                web_articles = []
-                if TAVILY_API_KEY:
-                    try:
-                        t_resp = requests.post(
-                            "https://api.tavily.com/search",
-                            json={"api_key": TAVILY_API_KEY, "query": clean_text[:200], "search_depth": "basic", "max_results": 3},
-                            timeout=4.0
-                        )
-                        if t_resp.status_code == 200:
-                            web_articles = t_resp.json().get("results", [])
-                    except Exception:
-                        pass
+        /* Nav */
+        .nav-item { position:relative; cursor:pointer; white-space:nowrap; transition:all 0.2s;
+                    font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
+        .nav-item:hover { color:#1a73e8; }
+        .nav-item.active { color:#7c3aed; }
+        .nav-item.active::after {
+            content:''; position:absolute; bottom:-10px; left:0; width:100%; height:3px;
+            background:linear-gradient(90deg,#7c3aed,#1a73e8); border-radius:10px;
+        }
 
-                # 3. Optional Mistral AI Reasoning
-                ai_explanation = None
-                if MISTRAL_API_KEY:
-                    try:
-                        m_resp = requests.post(
-                            "https://api.mistral.ai/v1/chat/completions",
-                            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
-                            json={
-                                "model": "open-mistral-7b",
-                                "messages": [
-                                    {"role": "system", "content": "You are a news fact-checking assistant. Explain in 2 concise sentences whether the user claim is factual or misinformation."},
-                                    {"role": "user", "content": f"Claim: {clean_text}"}
-                                ],
-                                "max_tokens": 150,
-                                "temperature": 0.1
-                            },
-                            timeout=4.0
-                        )
-                        if m_resp.status_code == 200:
-                            ai_explanation = m_resp.json()['choices'][0]['message']['content'].strip()
-                    except Exception:
-                        pass
+        /* Glass */
+        .glass { backdrop-filter:blur(16px); background:rgba(253,252,248,0.92); }
+        .dark .glass { background:rgba(15,15,15,0.92); }
 
-                # 4. Save to MongoDB
-                if mongo_db is not None:
-                    try:
-                        mongo_db.scan_history.insert_one({
-                            "text_input": clean_text[:300],
-                            "verdict": dl_result["verdict"],
-                            "confidence": dl_result["confidence"],
-                            "created_at": datetime.now(timezone.utc).isoformat()
-                        })
-                    except Exception:
-                        pass
+        /* Cards */
+        .news-card { border-radius:20px; overflow:hidden; border:1px solid rgba(0,0,0,0.06);
+                     transition:all 0.3s cubic-bezier(0.23,1,0.32,1); }
+        .news-card:hover { transform:translateY(-4px); box-shadow:0 20px 40px -10px rgba(0,0,0,0.15); }
+        .dark .news-card { border-color:rgba(255,255,255,0.06); }
 
-            # Display Verdict
-            is_fake = dl_result["is_fake"]
-            confidence = dl_result["confidence"]
-            real_prob = dl_result["real_prob"] * 100
-            fake_prob = dl_result["fake_prob"] * 100
+        /* Animations */
+        .fade-up { animation:fadeUp 0.5s cubic-bezier(0.23,1,0.32,1) forwards; opacity:0; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
 
-            st.markdown("---")
-            if is_fake:
-                st.error(f"### 🔴 FAKE NEWS DETECTED — {confidence}% Confidence")
-            else:
-                st.success(f"### 🟢 REAL NEWS VERIFIED — {confidence}% Confidence")
+        /* Score rings */
+        .score-ring { transform:rotate(-90deg); transform-origin:50% 50%; }
+        
+        /* Pulse dot */
+        .pulse-dot::before {
+            content:''; position:absolute; inset:0; border-radius:50%;
+            background:inherit; animation:pulseDot 2s ease-out infinite;
+        }
+        @keyframes pulseDot { 0%{opacity:0.7;transform:scale(1)} 100%{opacity:0;transform:scale(2.5)} }
 
-            # Probability Breakdown
-            st.markdown("#### 📊 Neural Network Probability Distribution")
-            p_col1, p_col2 = st.columns(2)
-            with p_col1:
-                st.metric("Real Probability", f"{real_prob:.1f}%")
-                st.progress(real_prob / 100.0)
-            with p_col2:
-                st.metric("Fake Probability", f"{fake_prob:.1f}%")
-                st.progress(fake_prob / 100.0)
+        /* Chatbot */
+        #chatbot-panel { transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+        
+        /* Market table */
+        .market-row:hover { background:rgba(26,115,232,0.04); }
+        .dark .market-row:hover { background:rgba(26,115,232,0.08); }
 
-            # AI Analysis Section
-            if ai_explanation:
-                st.info(f"💡 **AI Factual Analysis:** {ai_explanation}")
+        /* Upload zone */
+        .upload-zone { border:2px dashed #dadce0; border-radius:16px; transition:all 0.2s; }
+        .upload-zone:hover,.upload-zone.drag-over { border-color:#7c3aed; background:rgba(124,58,237,0.04); }
+        .dark .upload-zone { border-color:#333; }
 
-            # Grounded Sources
-            if web_articles:
-                with st.expander(f"🌐 Grounded Web Sources ({len(web_articles)} found)"):
-                    for art in web_articles:
-                        st.markdown(f"- [{art.get('title', 'Article Source')}]({art.get('url', '#')})")
-                        if art.get("content"):
-                            st.caption(art.get("content")[:200] + "...")
+        /* Toast */
+        .toast { transform:translateY(20px) scale(0.95); opacity:0;
+                  transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        .toast.show { transform:translateY(0) scale(1); opacity:1; }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 2: LIVE CRICKET SCORES (Cricbuzz RapidAPI)
-# ─────────────────────────────────────────────────────────────────────────────
-with tab_cricket:
-    st.subheader("🏏 Live & Recent Cricket Matches")
-    if not CRICBUZZ_KEY:
-        st.warning("⚠️ Cricbuzz API key not configured.")
-    else:
-        try:
-            with st.spinner("Fetching live cricket scores from Cricbuzz..."):
-                c_resp = requests.get(
-                    f"https://{CRICBUZZ_HOST}/matches/v1/live",
-                    headers={"X-RapidAPI-Key": CRICBUZZ_KEY, "X-RapidAPI-Host": CRICBUZZ_HOST},
-                    timeout=5.0
-                )
-                if c_resp.status_code == 200:
-                    c_data = c_resp.json()
-                    type_matches = c_data.get("typeMatches", [])
-                    matches_found = []
-                    for tm in type_matches:
-                        for sm in tm.get("seriesMatches", []):
-                            for match in sm.get("seriesAdWrapper", {}).get("matches", []):
-                                matches_found.append(match)
+        /* Verdict badge */
+        .verdict-real { background:linear-gradient(135deg,#34a853,#059669); }
+        .verdict-fake { background:linear-gradient(135deg,#ea4335,#dc2626); }
+        .verdict-deepfake { background:linear-gradient(135deg,#f97316,#ea4335); }
+        .verdict-authentic { background:linear-gradient(135deg,#34a853,#059669); }
+        .verdict-manipulated { background:linear-gradient(135deg,#f97316,#dc2626); }
 
-                    if matches_found:
-                        for m in matches_found[:6]:
-                            m_info = m.get("matchInfo", {})
-                            m_score = m.get("matchScore", {})
-                            team1 = m_info.get("team1", {}).get("teamName", "Team 1")
-                            team2 = m_info.get("team2", {}).get("teamName", "Team 2")
-                            status = m_info.get("status", "Match Live")
+        /* Scan animation */
+        @keyframes scanLine { 0%{top:0%} 100%{top:100%} }
+        .scan-line { position:absolute; left:0; right:0; height:2px; 
+                     background:linear-gradient(90deg,transparent,#7c3aed,transparent);
+                     animation:scanLine 1.5s ease-in-out infinite alternate; }
 
-                            with st.container():
-                                st.markdown(f"**{team1} vs {team2}** — *{status}*")
-                                st.caption(f"Series: {m_info.get('seriesName', 'Cricket Series')} | Venue: {m_info.get('venueInfo', {}).get('ground', 'Stadium')}")
-                                st.divider()
-                    else:
-                        st.info("No live matches currently in progress.")
-                else:
-                    st.info("Cricbuzz live match schedule updated. No active match stream.")
-        except Exception as e:
-            st.error(f"Error fetching cricket data: {e}")
+        /* Sidebar panels */
+        .sidebar-card { border-radius:16px; border:1px solid rgba(0,0,0,0.07); }
+        .dark .sidebar-card { border-color:rgba(255,255,255,0.07); }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 3: LIVE FINANCIAL MARKETS FEED
-# ─────────────────────────────────────────────────────────────────────────────
-with tab_markets:
-    st.subheader("📈 Live Market Indices & Commodities")
-    m_data = [
-        {"name": "NIFTY 50", "price": "24,850.30", "change": "+0.45%", "positive": True},
-        {"name": "SENSEX", "price": "81,420.15", "change": "+0.38%", "positive": True},
-        {"name": "GOLD (10g)", "price": "₹72,400", "change": "+0.20%", "positive": True},
-        {"name": "SILVER (1kg)", "price": "₹84,200", "change": "-0.15%", "positive": False},
-        {"name": "USD / INR", "price": "₹83.92", "change": "-0.04%", "positive": False},
-        {"name": "CRUDE OIL", "price": "$78.40", "change": "+1.12%", "positive": True},
+        /* AI glow */
+        .ai-glow { box-shadow:0 0 30px rgba(124,58,237,0.15); }
+        
+        /* OTP input */
+        .otp-input { width:48px; height:56px; text-align:center; font-size:24px; font-weight:700;
+                     border:2px solid #dadce0; border-radius:12px; outline:none; }
+        .otp-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.1); }
+        .dark .otp-input { background:#1a1a2e; border-color:#333; color:white; }
+        /* Currency styling */
+        .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
+        .price-amt { font-size:1.02em; font-weight:800; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body class="antialiased min-h-screen flex flex-col font-sans">
+
+<!-- CINEMATIC PRELOADER (TruthLens brand style) -->
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center" style="background:#000000;">
+    <div style="text-align:center;">
+        <div id="preloader-brand" style="
+            font-family:'Playfair Display',serif;font-size:clamp(2.5rem,10vw,5rem);
+            font-weight:900;font-style:italic;letter-spacing:-0.05em;color:white;display:inline-block;
+        "></div>
+        <div style="width:320px;height:1px;background:rgba(255,255,255,0.06);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
+            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
+        </div>
+        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#555;text-transform:uppercase;">Initializing AI Engine...</p>
+    </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" class="fixed bottom-6 right-6 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- STOCK TICKER BAR -->
+<div class="bg-ink-900 dark:bg-black border-b border-white/5 h-8 flex items-center overflow-hidden relative z-[60]">
+    <div class="shrink-0 bg-tl-purple px-4 h-full flex items-center z-10">
+        <span class="text-[9px] font-black text-white uppercase tracking-widest">LIVE</span><span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse opacity-70"></span>
+    </div>
+    <div class="ticker-move items-center gap-8" id="stock-ticker"></div>
+</div>
+
+<!-- HEADER -->
+<header class="glass border-b border-paper-200 dark:border-white/10 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center justify-between h-14">
+        <!-- Weather -->
+        <div class="flex items-center gap-3 w-1/3">
+            <button id="weather-box" onclick="requestLoc()" class="flex items-center gap-2 hover:bg-paper-100 dark:hover:bg-white/5 rounded-xl px-3 py-1.5 transition-all opacity-0">
+                <i id="weather-icon" class="ph-fill ph-cloud-sun text-tl-yellow text-2xl"></i>
+                <div class="hidden sm:flex flex-col">
+                    <span class="text-sm font-black dark:text-white leading-none" id="weather-temp">--°C</span>
+                    <span class="text-[9px] text-ink-500 font-bold uppercase tracking-wider truncate max-w-[100px]" id="weather-loc">Locating...</span>
+                </div>
+            </button>
+        </div>
+
+        <!-- Logo -->
+        <button onclick="nav('home')" class="flex flex-col items-center group">
+            <h1 class="text-3xl md:text-4xl font-serif font-black tracking-tighter text-ink-900 dark:text-white group-hover:text-tl-purple transition-colors">TruthLens</h1>
+            <span class="text-[8px] font-mono uppercase tracking-[0.2em] text-ink-500 group-hover:text-tl-purple transition-colors">AI Intelligence</span>
+        </button>
+
+        <!-- Actions -->
+        <div class="w-1/3 flex justify-end items-center gap-2 md:gap-3">
+            <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-paper-100 dark:hover:bg-white/10 transition-all text-ink-700 dark:text-ink-500">
+                <i class="ph-bold ph-moon hidden dark:block text-xl"></i>
+                <i class="ph-bold ph-sun block dark:hidden text-xl text-tl-yellow"></i>
+            </button>
+            <div id="auth-area"></div>
+        </div>
+    </div>
+
+    <!-- NAV TABS -->
+    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2">
+        <div class="max-w-[1680px] mx-auto px-4 md:px-6">
+            <nav class="flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 justify-center" id="nav-tabs"></nav>
+        </div>
+    </div>
+</header>
+
+<!-- SEARCH & SCANNER BAR -->
+<div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-5 px-4">
+    <div class="max-w-2xl mx-auto space-y-2">
+        <div class="relative flex items-center bg-paper-50 dark:bg-ink-900 border-2 border-paper-200 dark:border-white/10 rounded-2xl overflow-hidden focus-within:border-tl-purple transition-all shadow-sm" id="search-box">
+            <div class="pl-4 flex items-center shrink-0">
+                <i class="ph-bold ph-magnifying-glass text-xl text-ink-500" id="search-ico"></i>
+            </div>
+            <input id="main-search" type="text" placeholder="Search news or paste claim to verify..."
+                   class="flex-1 px-3 py-3.5 bg-transparent outline-none text-ink-900 dark:text-white text-base placeholder-ink-500"
+                   onkeypress="if(event.key==='Enter')handleSearch()">
+            <div class="flex items-center gap-2 pr-2 shrink-0">
+                <button onclick="toggleScanMode()" id="mode-btn"
+                    class="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border border-paper-200 dark:border-white/10 text-ink-700 dark:text-ink-100 hover:border-tl-purple hover:text-tl-purple transition-all">
+                    <span id="mode-lbl">Search</span>
+                </button>
+                <button onclick="handleSearch()"
+                    class="bg-tl-purple hover:bg-purple-800 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 shadow-lg">
+                    <i class="ph-bold ph-arrow-right text-lg" id="search-btn-icon"></i>
+                </button>
+            </div>
+        </div>
+        <div id="ai-label" class="hidden text-center text-[10px] text-tl-purple font-black uppercase tracking-widest flex items-center justify-center gap-2">
+            <i class="ph-fill ph-sparkle animate-pulse"></i> AI Verification Mode Active
+        </div>
+    </div>
+</div>
+
+<!-- CRICKET HUB -->
+<div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar" id="cricket-hub">
+        <span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>
+    </div>
+</div>
+
+<!-- MAIN GRID -->
+<main class="max-w-[1680px] mx-auto px-4 md:px-6 py-8 grid grid-cols-12 gap-6 min-h-screen">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="hidden xl:block col-span-2 space-y-4" id="sidebar-left"></aside>
+
+    <!-- CENTER FEED -->
+    <section class="col-span-12 xl:col-span-7">
+        <div id="app" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+    </section>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="hidden lg:block col-span-12 lg:col-span-3 xl:col-span-3 space-y-4" id="sidebar-right"></aside>
+</main>
+
+<!-- FOOTER -->
+<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-10 mt-auto">
+    <div class="max-w-[1680px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500">
+        <div>
+            <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2">TruthLens</h3>
+            <p class="opacity-70 text-sm leading-relaxed">AI-powered fake news detection & verified intelligence platform.</p>
+        </div>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Sections</h4>
+            <div class="space-y-2">
+                <button onclick="nav('home')" class="block hover:text-tl-blue font-medium">Headlines</button>
+                <button onclick="nav('india')" class="block hover:text-tl-blue font-medium">India</button>
+                <button onclick="nav('technology')" class="block hover:text-tl-blue font-medium">Technology</button>
+                <button onclick="nav('business')" class="block hover:text-tl-blue font-medium">Business</button>
+            </div>
+        </div>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Verification</h4>
+            <div class="space-y-2">
+                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Fact-Checker</button>
+                <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
+            </div>
+        </div>
+        <div class="text-right">
+            <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
+                class="bg-tl-purple/10 text-tl-purple hover:bg-tl-purple hover:text-white px-5 py-2 rounded-xl font-bold text-xs transition-all mb-3">
+                Send Feedback
+            </button>
+            <p class="text-[10px] opacity-50">© 2024 TruthLens. AI-powered.</p>
+        </div>
+    </div>
+</footer>
+
+<!-- FLOATING CHATBOT -->
+<div class="fixed bottom-6 left-6 z-[100]" id="chatbot-container">
+    <button onclick="toggleChat()" id="chat-fab"
+        class="w-14 h-14 bg-gradient-to-br from-tl-purple to-tl-blue rounded-2xl shadow-2xl flex items-center justify-center text-white hover:scale-110 transition-all active:scale-95">
+        <i class="ph-fill ph-chat-circle-dots text-2xl" id="chat-fab-icon"></i>
+    </button>
+    <div id="chatbot-panel" class="absolute bottom-16 left-0 w-80 md:w-96 bg-white dark:bg-paper-800 rounded-3xl shadow-2xl border border-paper-200 dark:border-white/10 overflow-hidden hidden">
+        <!-- Chat Header -->
+        <div class="bg-gradient-to-r from-tl-purple to-tl-blue p-4 flex items-center gap-3">
+            <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                <i class="ph-fill ph-sparkle text-white text-lg"></i>
+            </div>
+            <div>
+                <h4 class="font-black text-white text-sm">TruthLens AI</h4>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 bg-tl-green rounded-full animate-pulse"></span>
+                    <span class="text-[10px] text-white/70 font-bold">News Verification Expert</span>
+                </div>
+            </div>
+            <button onclick="toggleChat()" class="ml-auto text-white/70 hover:text-white">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+        </div>
+        <!-- Chat Messages -->
+        <div class="h-72 overflow-y-auto p-4 space-y-3 bg-paper-50 dark:bg-ink-900" id="chat-messages">
+            <div class="flex gap-2">
+                <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                    <i class="ph-fill ph-sparkle text-white text-xs"></i>
+                </div>
+                <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10">
+                    Namaste! I'm TruthLens AI 🇮🇳 Ask me to fact-check any claim, verify news sources, or discuss today's top stories!
+                </div>
+            </div>
+        </div>
+        <!-- Chat Input -->
+        <div class="p-3 border-t border-paper-200 dark:border-white/10 bg-white dark:bg-paper-800 flex gap-2">
+            <input id="chat-input" type="text" placeholder="Ask me to verify a claim..."
+                   class="flex-1 bg-paper-50 dark:bg-ink-900 border border-paper-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-tl-purple text-ink-900 dark:text-white"
+                   onkeypress="if(event.key==='Enter')sendChat()">
+            <button onclick="sendChat()" class="bg-tl-purple text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-purple-800 transition-all active:scale-90">
+                <i class="ph-bold ph-paper-plane-tilt text-base"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="auth-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-sm shadow-2xl relative border border-paper-200 dark:border-white/10 overflow-hidden">
+        <div class="bg-gradient-to-br from-tl-purple to-tl-blue p-8 text-center">
+            <i class="ph-fill ph-shield-check text-white text-5xl mb-2"></i>
+            <h2 class="text-2xl font-serif font-black text-white">TruthLens</h2>
+            <p class="text-white/70 text-xs mt-1">AI Intelligence Platform</p>
+        </div>
+        <button onclick="closeAuth()" class="absolute top-4 right-4 text-white/60 hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        <div id="auth-flow" class="p-8"></div>
+    </div>
+</div>
+
+<!-- AI SCANNER MODAL -->
+<div id="scanner-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-paper-200 dark:border-white/10">
+        <div class="p-6 border-b border-paper-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-tl-purple rounded-xl flex items-center justify-center">
+                    <i class="ph-fill ph-shield-check text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-ink-900 dark:text-white text-lg">AI News Fact-Checker</h3>
+                    <p class="text-xs text-ink-500">Keras Deep Learning Neural Network · Text News Verification</p>
+                </div>
+            </div>
+            <button onclick="closeScanner()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white">
+                <i class="ph-bold ph-x text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Scanner Header / Tabs -->
+        <div class="flex border-b border-paper-200 dark:border-white/10 overflow-x-auto no-scrollbar items-center justify-between px-6 py-3 bg-paper-50 dark:bg-ink-900">
+            <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-tl-purple">
+                <i class="ph-fill ph-brain text-base text-tl-purple"></i>
+                <span>Streamlit Neural AI Engine</span>
+                <span class="bg-tl-green/20 text-tl-green text-[10px] px-2 py-0.5 rounded-full font-bold">Cloud Live</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="https://truthlens5.streamlit.app/" target="_blank" class="text-xs text-tl-purple font-bold hover:underline flex items-center gap-1">
+                    <span>Open in new tab</span>
+                    <i class="ph-bold ph-arrow-square-out"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="p-4 sm:p-6">
+            <!-- STREAMLIT EMBED TAB -->
+            <div id="scan-tab-streamlit" class="scan-content">
+                <div class="relative w-full rounded-2xl overflow-hidden border border-paper-200 dark:border-white/10 bg-white dark:bg-paper-800 shadow-inner" style="min-height: 620px;">
+                    <iframe id="streamlit-frame" src="https://truthlens5.streamlit.app/?embed=true" 
+                            class="w-full border-0" style="height: 620px;" allow="camera; microphone; clipboard-read; clipboard-write;"
+                            title="TruthLens Streamlit Neural Cloud"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MARKET MODAL -->
+<div id="market-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl border border-paper-200 dark:border-white/10 flex flex-col">
+        <div class="p-5 border-b border-paper-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-tl-green rounded-xl flex items-center justify-center">
+                    <i class="ph-fill ph-chart-line-up text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-ink-900 dark:text-white">Indian Markets & Commodities</h3>
+                    <div class="flex items-center gap-2 flex-wrap"><p class="text-xs text-ink-500">Real-time · Yahoo Finance · SSE push</p><div id="market-status-badge-modal"></div></div>
+                </div>
+            </div>
+            <button onclick="closeMarket()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        </div>
+        <div class="overflow-y-auto p-5" id="market-table-container">
+            <div class="text-center py-10 text-ink-500">Loading market data...</div>
+        </div>
+    </div>
+</div>
+
+<!-- FEEDBACK MODAL -->
+<div id="feedback-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-md shadow-2xl border border-paper-200 dark:border-white/10 p-8">
+        <button onclick="document.getElementById('feedback-modal').classList.add('hidden');document.getElementById('feedback-modal').classList.remove('flex')"
+            class="absolute top-4 right-4 text-ink-500 hover:text-ink-900 dark:hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
+        <h3 class="text-xl font-black mb-1 dark:text-white">Platform Feedback</h3>
+        <p class="text-xs text-ink-500 mb-5">Help us improve TruthLens</p>
+        <div class="flex gap-2 mb-4">
+            <span class="text-ink-500 text-xs font-bold self-center">Rating:</span>
+            <div class="flex gap-1" id="star-rating">
+                <button onclick="setRating(1)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(2)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(3)" class="star text-2xl text-tl-yellow">★</button>
+                <button onclick="setRating(4)" class="star text-2xl text-paper-200">★</button>
+                <button onclick="setRating(5)" class="star text-2xl text-paper-200">★</button>
+            </div>
+        </div>
+        <textarea id="feedback-text" rows="4" class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white resize-none" placeholder="Share your experience..."></textarea>
+        <div class="flex justify-end mt-4 gap-3">
+            <button onclick="submitFeedback()" class="bg-tl-purple text-white px-6 py-2.5 rounded-xl font-black text-sm hover:bg-purple-800 transition-all">Submit</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+// =====================================================================
+// CINEMATIC PRELOADER (TruthLens brand style with GSAP-inspired animation)
+// =====================================================================
+(function() {
+    var brand = document.getElementById('preloader-brand');
+    var bar = document.getElementById('pl-bar');
+    var status = document.getElementById('pl-status');
+    if (!brand) return;
+
+    var text = 'TRUTHLENS';
+    var colors = ['#a855f7','#3b82f6','#10b981','#ef4444','#06b6d4'];
+    brand.innerHTML = '';
+    var chars = Array.from(text).map(function(c) {
+        var span = document.createElement('span');
+        span.textContent = c;
+        span.style.cssText = 'display:inline-block;opacity:0;filter:blur(20px);transform:translateY(15px) scale(0.95);will-change:filter,opacity,transform;';
+        brand.appendChild(span);
+        return span;
+    });
+
+    // Stagger reveal chars
+    chars.forEach(function(span, i) {
+        setTimeout(function() {
+            span.style.transition = 'opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease';
+            span.style.opacity = '1';
+            span.style.filter = 'blur(0)';
+            span.style.transform = 'translateY(0) scale(1)';
+        }, i * 90 + 200);
+    });
+
+    // Hover colors
+    chars.forEach(function(span) {
+        span.addEventListener('mouseenter', function() {
+            var col = colors[Math.floor(Math.random()*colors.length)];
+            span.style.color = col;
+            span.style.transform = 'translateY(-10px)';
+            span.style.textShadow = '0 0 25px ' + col + 'AA';
+        });
+        span.addEventListener('mouseleave', function() {
+            span.style.color = '';
+            span.style.transform = 'translateY(0)';
+            span.style.textShadow = '';
+        });
+    });
+
+    // Progress bar animation
+    var pct = 0;
+    var statusSteps = ['Initializing AI Engine...','Loading Signal Engine...','Fetching Market Data...','Calibrating Models...','Connecting News Feed...','Ready.'];
+    var stepIdx = 0;
+    var intv = setInterval(function() {
+        pct += Math.random() * 3 + 1;
+        if (pct >= 100) { pct = 100; clearInterval(intv); }
+        if (bar) bar.style.width = pct + '%';
+        var si = Math.min(Math.floor(pct / (100/statusSteps.length)), statusSteps.length-1);
+        if (si !== stepIdx && status) { stepIdx = si; status.textContent = statusSteps[si]; }
+    }, 55);
+
+    // Dismiss preloader
+    setTimeout(function() {
+        var pl = document.getElementById('preloader');
+        if (!pl) return;
+        pl.style.transition = 'opacity 0.9s ease';
+        pl.style.opacity = '0';
+        setTimeout(function() { if (pl.parentNode) pl.remove(); }, 950);
+    }, 2000);
+})();
+
+
+// =====================================================================
+// STATE
+// =====================================================================
+const state = {
+    page: 'home',
+    user: { id: 'guest_user', name: 'Guest User', email: 'guest@truthlens.ai', scan_count: 0 },
+    scanMode: false,
+    city: 'India',
+    articles: [],
+    bookmarks: JSON.parse(localStorage.getItem('tl_bookmarks') || '[]'),
+    markets: [],
+    chatHistory: [],
+    feedbackRating: 3,
+    activeTab: null
+};
+
+const TABS = [
+    { id:'home', label:'Headlines', icon:'ph-house' },
+    { id:'india', label:'India', icon:'ph-flag' },
+    { id:'world', label:'World', icon:'ph-globe' },
+    { id:'business', label:'Business', icon:'ph-chart-bar' },
+    { id:'technology', label:'Tech', icon:'ph-cpu' },
+    { id:'science', label:'Science', icon:'ph-atom' },
+    { id:'sports', label:'Sports', icon:'ph-soccer-ball' },
+    { id:'entertainment', label:'Entertainment', icon:'ph-popcorn' },
+    { id:'bookmarks', label:'Saved', icon:'ph-bookmark-simple' },
+];
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
+    await checkAuth();
+    renderNavTabs();
+    renderAuthArea();
+    nav('home');
+    requestLoc();
+    fetchMarkets();
+    fetchCricket();
+    connectMarketSSE();
+    setInterval(fetchCricket, 60000);
+    // Polling fallback every 10s if SSE fails
+    setInterval(() => { if (!_sseConnected) fetchMarkets(); }, 10000);
+    // Preloader handled by cinematic animation block above
+
+    // Char counter
+    document.getElementById('scan-text-input').addEventListener('input', function () {
+        document.getElementById('char-count').textContent = `${this.value.length} / 5000 characters`;
+    });
+});
+
+// =====================================================================
+// AUTH
+// =====================================================================
+async function checkAuth() {
+    try {
+        const r = await fetch('/api/auth/me');
+        const d = await r.json();
+        state.user = d.user;
+    } catch (e) { state.user = null; }
+}
+
+function renderAuthArea() {
+    const area = document.getElementById('auth-area');
+    if (!area) return;
+    area.innerHTML = `
+        <div class="flex items-center gap-2">
+            <button onclick="openScanPanel('text')" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
+                <i class="ph-fill ph-shield-check text-sm"></i> Launch AI Scanner
+            </button>
+            <button onclick="openScanPanel('history')" class="p-2 text-ink-500 hover:text-tl-purple hover:bg-paper-100 dark:hover:bg-white/10 rounded-xl transition-all" title="Scan History">
+                <i class="ph-bold ph-clock-counter-clockwise text-lg"></i>
+            </button>
+        </div>`;
+}
+
+
+function openAuth(view) {
+    document.getElementById('auth-modal').classList.remove('hidden');
+    document.getElementById('auth-modal').classList.add('flex');
+    renderAuthFlow(view);
+}
+function closeAuth() {
+    document.getElementById('auth-modal').classList.add('hidden');
+    document.getElementById('auth-modal').classList.remove('flex');
+}
+
+function renderAuthFlow(view) {
+    const flow = document.getElementById('auth-flow');
+    if (view === 'login') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Welcome Back</h3>
+            <p class="text-xs text-ink-500 mb-5">Sign in to access AI detection tools</p>
+            <div class="space-y-3">
+                <input id="auth-email" type="email" placeholder="Email address"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-password" type="password" placeholder="Password"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            </div>
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doLogin()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Sign In
+            </button>
+            <div class="flex items-center gap-3 my-4"><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div><span class="text-xs text-ink-500">or</span><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div></div>
+            <div class="text-center space-y-2">
+                <button onclick="renderAuthFlow('signup')" class="text-xs font-bold text-tl-blue hover:underline">Create account</button>
+                <span class="text-ink-500 text-xs mx-2">·</span>
+                <button onclick="renderAuthFlow('forgot')" class="text-xs font-bold text-ink-500 hover:text-tl-blue hover:underline">Forgot password?</button>
+            </div>`;
+    } else if (view === 'signup') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Create Account</h3>
+            <p class="text-xs text-ink-500 mb-5">Join TruthLens — Free AI fact-checking</p>
+            <div class="space-y-3">
+                <input id="auth-name" type="text" placeholder="Full name"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-email" type="email" placeholder="Email address"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+                <input id="auth-password" type="password" placeholder="Password (min 6 chars)"
+                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            </div>
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doSignup()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Create Account
+            </button>
+            <div class="text-center mt-4">
+                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Already have an account? Sign in</button>
+            </div>`;
+    } else if (view === 'forgot') {
+        flow.innerHTML = `
+            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Reset Password</h3>
+            <p class="text-xs text-ink-500 mb-5">Enter your email to receive reset instructions</p>
+            <input id="auth-email" type="email" placeholder="Email address"
+                class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
+            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
+            <button onclick="doForgot()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
+                Send Reset Link
+            </button>
+            <div class="text-center mt-4">
+                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-ink-500 hover:text-tl-blue">Back to login</button>
+            </div>`;
+    }
+}
+
+async function doLogin() {
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
+        const d = await r.json();
+        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
+        state.user = d.user;
+        closeAuth(); renderAuthArea(); showToast(`Welcome back, ${d.user.name || 'there'}!`, 'success');
+    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
+}
+
+async function doSignup() {
+    const name = document.getElementById('auth-name').value;
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password}) });
+        const d = await r.json();
+        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
+        state.user = d.user;
+        closeAuth(); renderAuthArea(); showToast(`Account created! Welcome, ${d.user.name || 'there'}!`, 'success');
+    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
+}
+
+async function doForgot() {
+    const email = document.getElementById('auth-email').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    try {
+        const r = await fetch('/api/auth/forgot-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('auth-flow').innerHTML = `
+                <div class="text-center py-6">
+                    <div class="w-16 h-16 bg-tl-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="ph-fill ph-check-circle text-tl-green text-4xl"></i>
+                    </div>
+                    <h3 class="font-black text-ink-900 dark:text-white text-lg mb-2">Reset Link Sent!</h3>
+                    <p class="text-xs text-ink-500 mb-4">Check your email for password reset instructions.</p>
+                    <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Back to login</button>
+                </div>`;
+        }
+    } catch(e) { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
+}
+
+async function doLogout() {
+    await fetch('/api/auth/logout', { method:'POST' });
+    state.user = null; renderAuthArea(); showToast('Signed out successfully');
+}
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+function renderNavTabs() {
+    const nav = document.getElementById('nav-tabs');
+    nav.innerHTML = TABS.map(t => `
+        <button onclick="nav('${t.id}')" class="nav-item flex items-center gap-1.5 text-ink-700 dark:text-ink-500 py-1 transition-all" id="nav-${t.id}">
+            <i class="ph-bold ${t.icon} text-sm"></i> ${t.label}
+        </button>`).join('');
+}
+
+function nav(page) {
+    state.page = page;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const activeNav = document.getElementById(`nav-${page}`);
+    if (activeNav) activeNav.classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+    if (page === 'bookmarks') renderBookmarks();
+    else fetchNews(page);
+}
+
+// =====================================================================
+// NEWS
+// =====================================================================
+const STATIC_NEWS_FEED = {
+    home: [
+        {title: "Union Cabinet Approves Major Semiconductor Manufacturing & AI Infrastructure Scheme", description: "Government allocates ₹76,000 crore to boost domestic chip design, packaging, and advanced computing hubs across India.", urlToImage: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800", url: "https://pib.gov.in", accuracy: 98, publishedAt: new Date().toISOString(), source: {name: "PIB News Bureau"}},
+        {title: "ISRO Prepares Chandrayaan-4 Sample Return Mission Architecture for 2028 Launch", description: "Indian Space Research Organisation details multi-module lunar exploration framework to bring back lunar soil samples.", urlToImage: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800", url: "https://isro.gov.in", accuracy: 99, publishedAt: new Date().toISOString(), source: {name: "ISRO Media"}},
+        {title: "RBI Keeps Benchmark Repo Rate Steady Amid Resilient Economic Growth Momentum", description: "Monetary Policy Committee maintains 6.5% interest rate while projecting strong 7.2% real GDP expansion for FY25.", urlToImage: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800", url: "https://rbi.org.in", accuracy: 97, publishedAt: new Date().toISOString(), source: {name: "RBI Bulletin"}},
+        {title: "India Surpasses 100 GW Renewable Solar Generation Milestone Ahead of 2030 Target", description: "Ministry of New and Renewable Energy reports historic clean power capacity milestone driven by rooftop and utility grid installations.", urlToImage: "https://images.unsplash.com/photo-1509391365360-2e959784a276?w=800", url: "https://mnre.gov.in", accuracy: 96, publishedAt: new Date().toISOString(), source: {name: "National Energy Bureau"}},
+        {title: "Global AI Ethics Accord Signed by 40 Nations at International Tech Summit", description: "Multilateral treaty establishes standardized safety benchmarks and algorithmic accountability requirements for foundation models.", urlToImage: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800", url: "https://reuters.com", accuracy: 95, publishedAt: new Date().toISOString(), source: {name: "Reuters Global"}},
+        {title: "Indian Team Gears Up for Upcoming Border-Gavaskar Trophy Test Match Series", description: "National selectors finalize 18-member squad with rigorous training camp scheduled in Perth ahead of the series opener.", urlToImage: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800", url: "https://bcci.tv", accuracy: 98, publishedAt: new Date().toISOString(), source: {name: "BCCI Sports"}}
+    ],
+    india: [
+        {title: "NITI Aayog Unveils Comprehensive Frontier Tech Innovation Index for Indian States", description: "New ranking evaluates state-level digital governance, patent filings, and startup ecosystem density across 28 states.", urlToImage: "https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800", url: "https://niti.gov.in", accuracy: 97, publishedAt: new Date().toISOString(), source: {name: "NITI Aayog"}},
+        {title: "High-Speed Vande Bharat Sleeper Trains Enter Final Trial Testing on Western Corridor", description: "Indian Railways confirms state-of-the-art 160 kmph passenger trainsets to begin regular service between key metropolitan centers.", urlToImage: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800", url: "https://indianrailways.gov.in", accuracy: 98, publishedAt: new Date().toISOString(), source: {name: "Rail Bhavan"}},
+        {title: "Digital Public Infrastructure Adoption Drives 45% Surge in Rural Financial Inclusion", description: "UPI transactions and Jan Dhan accounts reach record transaction velocity in tier-3 and rural districts.", urlToImage: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800", url: "https://npci.org.in", accuracy: 96, publishedAt: new Date().toISOString(), source: {name: "Financial Express"}}
+    ],
+    technology: [
+        {title: "Open-Source Reasoning Models Match Proprietary Benchmarks at 10x Lower Compute", description: "Researchers publish novel reinforcement learning distillation architecture reducing memory requirements for complex math.", urlToImage: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800", url: "https://arxiv.org", accuracy: 97, publishedAt: new Date().toISOString(), source: {name: "TechChronicle"}},
+        {title: "Next-Gen Quantum Error Correction Protocol Achieves 99.9% Fidelity Threshold", description: "Breakthrough topological qubit design stabilizes quantum calculations against environmental decoherence noise.", urlToImage: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800", url: "https://nature.com", accuracy: 99, publishedAt: new Date().toISOString(), source: {name: "Quantum Today"}}
+    ],
+    business: [
+        {title: "Nifty 50 and Sensex Scale Fresh Records on Strong Corporate Earnings & Foreign Inflows", description: "Indian benchmark indices gain as banking and IT heavyweights post double-digit revenue growth.", urlToImage: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800", url: "https://moneycontrol.com", accuracy: 98, publishedAt: new Date().toISOString(), source: {name: "Moneycontrol"}},
+        {title: "Foreign Direct Investment in Indian Clean Energy Sector Surges 28% Year-on-Year", description: "Global sovereign wealth funds inject capital into grid-scale battery storage and green hydrogen facilities.", urlToImage: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800", url: "https://livemint.com", accuracy: 96, publishedAt: new Date().toISOString(), source: {name: "Mint Bureau"}}
     ]
+};
 
-    cols = st.columns(3)
-    for idx, item in enumerate(m_data):
-        with cols[idx % 3]:
-            st.metric(
-                label=item["name"],
-                value=item["price"],
-                delta=item["change"]
-            )
+async function fetchNews(cat) {
+    const app = document.getElementById('app');
+    app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+
+    let articles = [];
+    const targetCat = cat || 'home';
+
+    try {
+        let url = targetCat === 'local'
+            ? `/api/news?category=local&city=${encodeURIComponent(state.city)}`
+            : !['india','world','business','technology','science','sports','entertainment','health'].includes(targetCat) && targetCat !== 'home'
+                ? `/api/news?query=${encodeURIComponent(targetCat)}`
+                : `/api/news?category=${encodeURIComponent(targetCat)}`;
+
+        const r = await fetch(url);
+        if (r.ok) {
+            const d = await r.json();
+            if (d.articles && d.articles.length > 0) {
+                articles = d.articles;
+            }
+        }
+    } catch(e) {
+        // Fall back gracefully to static feed
+    }
+
+    if (!articles.length) {
+        articles = STATIC_NEWS_FEED[targetCat] || STATIC_NEWS_FEED['home'];
+    }
+
+    state.articles = articles;
+    app.innerHTML = `
+        <div class="col-span-full flex items-end justify-between mb-2">
+            <div class="border-l-4 border-tl-purple pl-4">
+                <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${targetCat.toUpperCase()} INTEL</h2>
+                <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified news reports</p>
+            </div>
+            <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
+        </div>
+        ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+
+    renderSidebars();
+}
+
+function renderCard(a, i) {
+    const scoreColor = a.accuracy >= 90 ? 'tl-green' : a.accuracy >= 75 ? 'tl-yellow' : 'tl-red';
+    const saved = state.bookmarks.find(b => b.url === a.url);
+    const delay = Math.min(i * 0.06, 0.4);
+    const encoded = encodeURIComponent(JSON.stringify({title:a.title,url:a.url,urlToImage:a.urlToImage,source:a.source?.name}));
+    return `
+        <div class="news-card bg-white dark:bg-paper-800 fade-up" style="animation-delay:${delay}s">
+            <div class="relative aspect-[16/9] overflow-hidden bg-paper-100 dark:bg-paper-900">
+                <img src="${a.urlToImage}" alt="${a.title}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                     onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600'">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+                <div class="absolute top-3 left-3 flex gap-2">
+                    <span class="bg-white/95 dark:bg-paper-900/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg text-ink-700 dark:text-ink-100">
+                        ${a.source?.name || 'News Bureau'}
+                    </span>
+                </div>
+                <div class="absolute top-3 right-3">
+                    <div class="flex items-center gap-1 bg-white/95 dark:bg-paper-900/95 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                        <div class="w-1.5 h-1.5 rounded-full bg-${scoreColor}"></div>
+                        <span class="text-[9px] font-black text-${scoreColor}">${a.accuracy}%</span>
+                    </div>
+                </div>
+                <div class="absolute bottom-3 left-3">
+                    <span class="text-[9px] font-mono text-white/70">${formatDate(a.publishedAt)}</span>
+                </div>
+            </div>
+            <div class="p-4">
+                <h3 class="font-black text-ink-900 dark:text-white text-sm leading-snug mb-2 line-clamp-3 hover:text-tl-purple cursor-pointer transition-colors"
+                    onclick="window.open('${a.url}','_blank')">${a.title}</h3>
+                <p class="text-xs text-ink-500 leading-relaxed line-clamp-2 mb-4">${a.description || ''}</p>
+                <div class="flex items-center gap-2 justify-between">
+                    <button onclick="window.open('${a.url}','_blank')"
+                        class="flex-1 bg-ink-900 dark:bg-white text-white dark:text-ink-900 py-2 rounded-xl text-xs font-black hover:bg-tl-purple hover:dark:bg-tl-purple hover:dark:text-white transition-all text-center">
+                        Read Full Story
+                    </button>
+                    <button onclick="quickVerify('${encodeURIComponent(a.title)}')"
+                        class="w-9 h-9 bg-tl-purple/10 hover:bg-tl-purple text-tl-purple hover:text-white rounded-xl flex items-center justify-center transition-all" title="AI Verify">
+                        <i class="ph-fill ph-shield-check text-sm"></i>
+                    </button>
+                    <button onclick="toggleSave('${encoded}',this)"
+                        class="w-9 h-9 bg-paper-100 dark:bg-white/10 hover:bg-tl-yellow/20 rounded-xl flex items-center justify-center transition-all" title="Save">
+                        <i class="ph-${saved ? 'fill' : 'bold'} ph-bookmark-simple text-sm ${saved ? 'text-tl-yellow' : 'text-ink-500'}"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderBookmarks() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <div class="col-span-full border-l-4 border-tl-yellow pl-4 mb-2">
+            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white">Reading List</h2>
+            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.bookmarks.length} saved articles</p>
+        </div>
+        ${state.bookmarks.length === 0
+            ? '<div class="col-span-full py-32 text-center"><i class="ph-bold ph-bookmark-simple text-5xl text-paper-200 dark:text-white/10 mb-4 block"></i><p class="text-ink-500 font-serif italic">Your reading list is empty.</p></div>'
+            : state.bookmarks.map((a,i) => renderCard(a,i)).join('')}`;
+}
+
+function toggleSave(encoded, btn) {
+    const a = JSON.parse(decodeURIComponent(encoded));
+    const idx = state.bookmarks.findIndex(b => b.url === a.url);
+    const icon = btn.querySelector('i');
+    if (idx > -1) {
+        state.bookmarks.splice(idx, 1);
+        icon.className = 'ph-bold ph-bookmark-simple text-sm text-ink-500';
+        showToast('Removed from reading list');
+    } else {
+        state.bookmarks.push(a);
+        icon.className = 'ph-fill ph-bookmark-simple text-sm text-tl-yellow';
+        showToast('Saved to reading list!', 'success');
+    }
+    localStorage.setItem('tl_bookmarks', JSON.stringify(state.bookmarks));
+}
+
+// =====================================================================
+// SIDEBARS
+// =====================================================================
+function renderSidebars() {
+    renderLeftSidebar();
+    renderRightSidebar();
+}
+
+function renderLeftSidebar() {
+    const el = document.getElementById('sidebar-left');
+    if (!el) return;
+    el.innerHTML = `
+        <!-- Market Mini -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500">Markets</h4>
+                <button onclick="openMarket()" class="text-[9px] font-black text-tl-blue hover:underline">View All</button>
+            </div>
+            <div class="space-y-2">
+                ${state.markets.filter(m=>m.cat==='index').slice(0,4).map(m=>`
+                    <div class="flex items-center justify-between py-1 border-b border-paper-100 dark:border-white/5 last:border-0">
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                        <div class="text-right">
+                            <div class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</div>
+                            <div class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.up ? '▲' : '▼'} ${m.change}</div>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+        <!-- Gold & Silver -->
+        <div class="sidebar-card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/10 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400 mb-3">Precious Metals</h4>
+            <div class="space-y-3">
+                ${state.markets.filter(m=>m.cat==='metal').slice(0,3).map(m=>`
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">${m.symbol.includes('GOLD') ? '🥇' : m.symbol.includes('SILVER') ? '🥈' : '⚫'}</span>
+                            <div>
+                                <p class="text-xs font-black text-ink-900 dark:text-white">${m.symbol}</p>
+                                <p class="text-[9px] text-ink-500">${m.unit || ''}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                            <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+        <!-- Fuel Prices -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3">⛽ Fuel Prices (${state.city ? state.city.toUpperCase() : 'YOUR CITY'})</h4>
+            ${state.markets.filter(m=>m.cat==='fuel').map(m=>`
+                <div class="flex items-center justify-between py-2 border-b border-paper-100 dark:border-white/5 last:border-0">
+                    <div>
+                        <p class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</p>
+                        <p class="text-[9px] text-ink-500">${m.unit || ''}</p>
+                    </div>
+                    <p class="text-sm font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                </div>`).join('')}
+        </div>`;
+}
+
+function renderRightSidebar() {
+    const el = document.getElementById('sidebar-right');
+    if (!el) return;
+    el.innerHTML = `
+        <!-- AI Scanner CTA -->
+        <div class="sidebar-card bg-gradient-to-br from-tl-purple to-tl-blue p-5 text-white ai-glow">
+            <i class="ph-fill ph-shield-check text-4xl mb-3 block"></i>
+            <h4 class="font-black text-lg mb-1">AI Fact-Checker</h4>
+            <p class="text-xs text-white/70 mb-4 leading-relaxed">Detect fake news and unverified claims using our Keras Deep Learning Sequential Neural Network.</p>
+            <button onclick="openScanPanel('text')" class="w-full bg-white text-tl-purple py-2.5 rounded-xl font-black text-sm hover:bg-white/90 transition-all">
+                Launch AI Scanner
+            </button>
+        </div>
+
+
+        <!-- Stocks -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500">Top Stocks</h4>
+                <button onclick="openMarket()" class="text-[9px] font-black text-tl-blue hover:underline">Markets</button>
+            </div>
+            <div class="space-y-2">
+                ${state.markets.filter(m=>m.cat==='stock').slice(0,5).map(m=>`
+                    <div class="market-row flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer">
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                        <div class="text-right">
+                            <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                            <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Forex & Crypto -->
+        <div class="sidebar-card bg-white dark:bg-paper-800 p-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3">Forex & Crypto</h4>
+            ${state.markets.filter(m=>['forex','crypto'].includes(m.cat)).slice(0,5).map(m=>`
+                <div class="flex items-center justify-between py-2 border-b border-paper-100 dark:border-white/5 last:border-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">${m.cat==='crypto' ? '₿' : '💱'}</span>
+                        <span class="text-xs font-bold text-ink-900 dark:text-white">${m.symbol}</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-mono font-black text-ink-900 dark:text-white">${renderPrice(m)}</p>
+                        <p class="text-[9px] font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.change}</p>
+                    </div>
+                </div>`).join('')}
+        </div>`;
+}
+
+// =====================================================================
+// MARKETS
+// =====================================================================
+let _sseConnected = false;
+let _prevPrices = {};
+
+const DEFAULT_MARKETS = [
+    {symbol:"NIFTY 50", price:24850.30, price_str:"24,850.30", change:"+0.45%", arrow:"▲", up:true, cat:"index", sym:"₹", live:true},
+    {symbol:"SENSEX", price:81420.15, price_str:"81,420.15", change:"+0.38%", arrow:"▲", up:true, cat:"index", sym:"₹", live:true},
+    {symbol:"NIFTY BANK", price:51240.80, price_str:"51,240.80", change:"+0.52%", arrow:"▲", up:true, cat:"index", sym:"₹", live:true},
+    {symbol:"MIDCAP 100", price:58620.00, price_str:"58,620.00", change:"+0.65%", arrow:"▲", up:true, cat:"index", sym:"₹", live:true},
+    {symbol:"RELIANCE", price:2980.50, price_str:"2,980.50", change:"+0.75%", arrow:"▲", up:true, cat:"stock", sym:"₹", live:true},
+    {symbol:"TCS", price:4180.20, price_str:"4,180.20", change:"+0.30%", arrow:"▲", up:true, cat:"stock", sym:"₹", live:true},
+    {symbol:"HDFC BANK", price:1680.00, price_str:"1,680.00", change:"+0.40%", arrow:"▲", up:true, cat:"stock", sym:"₹", live:true},
+    {symbol:"INFOSYS", price:1880.50, price_str:"1,880.50", change:"+0.85%", arrow:"▲", up:true, cat:"stock", sym:"₹", live:true},
+    {symbol:"GOLD MCX", price:72400.00, price_str:"₹72,400", change:"+0.20%", arrow:"▲", up:true, cat:"metal", sym:"₹", unit:"/10g", live:true},
+    {symbol:"SILVER MCX", price:84200.00, price_str:"₹84,200", change:"-0.15%", arrow:"▼", up:false, cat:"metal", sym:"₹", unit:"/kg", live:true},
+    {symbol:"PETROL", price:94.72, price_str:"₹94.72", change:"+0.00%", arrow:"▲", up:true, cat:"fuel", sym:"₹", unit:"/Litre", live:true},
+    {symbol:"DIESEL", price:87.62, price_str:"₹87.62", change:"+0.00%", arrow:"▲", up:true, cat:"fuel", sym:"₹", unit:"/Litre", live:true},
+    {symbol:"LPG", price:903.00, price_str:"₹903.00", change:"+0.00%", arrow:"▲", up:true, cat:"fuel", sym:"₹", unit:"/Cylinder", live:true},
+    {symbol:"USD/INR", price:83.92, price_str:"₹83.92", change:"-0.04%", arrow:"▼", up:false, cat:"forex", sym:"₹", live:true},
+    {symbol:"BTC", price:68500.00, price_str:"$68,500", change:"+2.10%", arrow:"▲", up:true, cat:"crypto", sym:"$", live:true},
+    {symbol:"ETH", price:3550.00, price_str:"$3,550.00", change:"+1.80%", arrow:"▲", up:true, cat:"crypto", sym:"$", live:true}
+];
+
+async function fetchMarkets() {
+    let marketList = [];
+    let status = {status:"open", label:"Market Open", color:"#22c55e"};
+    try {
+        const r = await fetch('/api/markets');
+        if (r.ok) {
+            const d = await r.json();
+            if (d.markets && d.markets.length) {
+                marketList = d.markets;
+                status = d.market_status || status;
+            }
+        }
+    } catch(e) {}
+
+    if (!marketList.length) {
+        marketList = DEFAULT_MARKETS;
+    }
+    processMarketData({markets: marketList, market_status: status, live_count: marketList.length});
+}
+
+function processMarketData(d) {
+    const newMarkets = d.markets || [];
+    const status = d.market_status || {};
+    
+    newMarkets.forEach(m => {
+        const prev = _prevPrices[m.symbol];
+        if (prev !== undefined && prev !== m.price) {
+            m._priceUp = m.price > prev;
+            m._changed = true;
+        }
+        _prevPrices[m.symbol] = m.price;
+    });
+    
+    state.markets = newMarkets;
+    state.marketStatus = status;
+    state.liveCount = d.live_count || 0;
+    
+    renderTickerBar();
+    renderSidebars();
+    renderMarketStatusBadge(status);
+    if (document.getElementById('market-table-container') && 
+        !document.getElementById('market-modal').classList.contains('hidden')) {
+        renderMarketTable();
+    }
+}
+
+function connectMarketSSE() {
+    if (_sseConnected) return;
+    _sseConnected = true;
+    fetchMarkets();
+    setInterval(fetchMarkets, 15000);
+}
+
+function renderMarketStatusBadge(status) {
+    const badge = document.getElementById('market-status-badge');
+    if (!badge || !status) return;
+    const isOpen = status.status === 'open';
+    badge.innerHTML = `
+        <div class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full border"
+             style="color:${status.color || '#22c55e'};border-color:${status.color || '#22c55e'}30;background:${status.color || '#22c55e'}10">
+            <span class="w-1.5 h-1.5 rounded-full ${isOpen ? 'animate-pulse' : ''}" style="background:${status.color || '#22c55e'}"></span>
+            ${status.label || 'Market Open'}
+        </div>`;
+}
+
+function renderTickerBar() {
+    const ticker = document.getElementById('stock-ticker');
+    if (!ticker) return;
+    const items = state.markets.slice(0, 18).map(m => `
+        <div class="flex items-center gap-3 whitespace-nowrap text-[10px] px-5 hover:bg-white/5 cursor-pointer py-0.5" onclick="openMarket()">
+            <span class="font-black text-white/50 uppercase tracking-wider">${m.symbol}</span>
+            <span class="font-mono font-black text-white">${renderPrice(m)}</span>
+            <span class="font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.arrow || (m.up? '▲':'▼')} ${String(m.change || '').replace('+-','+').replace('++','+').replace('--','-')}</span>
+        </div>
+        <div class="h-3 w-px bg-white/10 shrink-0"></div>`).join('');
+    ticker.innerHTML = items + items;
+}
+
+function openMarket() {
+    document.getElementById('market-modal').classList.remove('hidden');
+    document.getElementById('market-modal').classList.add('flex');
+    renderMarketTable();
+}
+function closeMarket() {
+    document.getElementById('market-modal').classList.add('hidden');
+    document.getElementById('market-modal').classList.remove('flex');
+}
+
+function renderMarketTable() {
+    const container = document.getElementById('market-table-container');
+    const cats = [{id:'index',label:'📊 Indices'},{id:'stock',label:'🏢 Stocks'},{id:'metal',label:'⚗️ Metals'},
+                  {id:'fuel',label:'⛽ Fuel'},{id:'forex',label:'💱 Forex'},{id:'crypto',label:'₿ Crypto'}];
+    container.innerHTML = cats.map(cat => {
+        const items = state.markets.filter(m => m.cat === cat.id);
+        if (!items.length) return '';
+        return `
+            <div class="mb-6">
+                <h4 class="text-xs font-black uppercase tracking-widest text-ink-500 mb-2">${cat.label}</h4>
+                <div class="rounded-2xl border border-paper-200 dark:border-white/10 overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-paper-50 dark:bg-ink-900">
+                            <tr>
+                                <th class="text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Symbol</th>
+                                <th class="text-right px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Price</th>
+                                <th class="text-right px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-ink-500">Change</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-paper-100 dark:divide-white/5">
+                            ${items.map(m=>`
+                                <tr class="market-row">
+                                    <td class="px-4 py-3">
+                                        <span class="font-black text-ink-900 dark:text-white text-xs">${m.symbol}</span>
+                                        ${m.unit ? `<span class="text-[9px] text-ink-500 ml-1">${m.unit}</span>` : ''}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-mono font-black text-xs text-ink-900 dark:text-white">${renderPrice(m)}</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="text-xs font-bold ${m.up ? 'text-tl-green' : 'text-tl-red'}">${m.arrow || (m.up? '▲':'▼')} ${String(m.change || '').replace('+-','+').replace('++','+').replace('--','-')}</span>
+                                    </td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// =====================================================================
+// CRICKET
+// =====================================================================
+const DEFAULT_CRICKET_CARDS = `
+    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">I</div><span class="truncate">IND</span></div>
+                <span class="font-mono font-black text-xs shrink-0">284/4 (48.2)</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-[9px] font-black text-yellow-600 shrink-0">A</div><span class="truncate">AUS</span></div>
+                <span class="font-mono font-black text-xs shrink-0">280/8</span>
+            </div>
+        </div>
+        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+            <div class="text-[9px] font-black uppercase tracking-widest text-tl-green">RECENT</div>
+            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">IND won by 6 wkts</div>
+        </div>
+    </div>
+    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">R</div><span class="truncate">RCB</span></div>
+                <span class="font-mono font-black text-xs shrink-0">218/5 (20)</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                <div class="flex items-center gap-1.5 truncate"><div class="w-5 h-5 rounded-md bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-[9px] font-black text-yellow-600 shrink-0">C</div><span class="truncate">CSK</span></div>
+                <span class="font-mono font-black text-xs shrink-0">191/7 (20)</span>
+            </div>
+        </div>
+        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+            <div class="text-[9px] font-black uppercase tracking-widest text-tl-red animate-pulse">LIVE</div>
+            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5">RCB won by 27 runs</div>
+        </div>
+    </div>`;
+
+async function fetchCricket() {
+    const hub = document.getElementById('cricket-hub');
+    if (!hub) return;
+    try {
+        const r = await fetch('/api/cricket');
+        if (r.ok) {
+            const d = await r.json();
+            const matches = d.typeMatches || [];
+            let cards = '';
+            for (const tm of matches) {
+                for (const sm of tm.seriesMatches || []) {
+                    for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 4)) {
+                        const mi = m.matchInfo;
+                        if (!mi) continue;
+                        const t1 = mi.team1?.teamSName || mi.team1?.teamName?.slice(0,3) || '???';
+                        const t2 = mi.team2?.teamSName || mi.team2?.teamName?.slice(0,3) || '???';
+                        const s1 = (m.matchScore?.team1Score?.inngs1?.runs || '') + '/' + (m.matchScore?.team1Score?.inngs1?.wickets || '');
+                        const s2 = (m.matchScore?.team2Score?.inngs1?.runs || '') + '/' + (m.matchScore?.team2Score?.inngs1?.wickets || '');
+                        cards += `
+                            <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+                                <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+                                    <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2"><span class="truncate">${t1}</span><span class="font-mono font-black text-xs shrink-0">${s1}</span></div>
+                                    <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2"><span class="truncate">${t2}</span><span class="font-mono font-black text-xs shrink-0">${s2}</span></div>
+                                </div>
+                                <div class="ml-2 text-right shrink-0 max-w-[100px]"><div class="text-[9px] font-black uppercase text-tl-red">MATCH</div><div class="text-[9px] font-bold text-ink-500 truncate">${mi.status || 'Live'}</div></div>
+                            </div>`;
+                    }
+                }
+            }
+            if (cards) { hub.innerHTML = cards; return; }
+        }
+    } catch(e) {}
+    hub.innerHTML = DEFAULT_CRICKET_CARDS;
+}
+
+
+// =====================================================================
+// SEARCH & SCAN
+// =====================================================================
+function toggleScanMode() {
+    state.scanMode = !state.scanMode;
+    const lbl = document.getElementById('mode-lbl');
+    const ico = document.getElementById('search-ico');
+    const aiLbl = document.getElementById('ai-label');
+    const sbox = document.getElementById('search-box');
+    const input = document.getElementById('main-search');
+    if (state.scanMode) {
+        lbl.textContent = 'Verify';
+        ico.className = 'ph-fill ph-shield-check text-xl text-tl-purple animate-pulse';
+        aiLbl.classList.remove('hidden'); aiLbl.classList.add('flex');
+        sbox.classList.add('border-tl-purple');
+        input.placeholder = 'Paste any claim, headline or text to verify...';
+    } else {
+        lbl.textContent = 'Search';
+        ico.className = 'ph-bold ph-magnifying-glass text-xl text-ink-500';
+        aiLbl.classList.add('hidden'); aiLbl.classList.remove('flex');
+        sbox.classList.remove('border-tl-purple');
+        input.placeholder = 'Search news or paste claim to verify...';
+    }
+}
+
+function handleSearch() {
+    const q = document.getElementById('main-search').value.trim();
+    if (!q) return;
+    if (state.scanMode) {
+        openScanPanel('text');
+        setTimeout(() => { document.getElementById('scan-text-input').value = q; }, 100);
+    } else {
+        fetchNews(q);
+    }
+}
+
+function quickVerify(encodedTitle) {
+    const title = decodeURIComponent(encodedTitle);
+    openScanPanel('text');
+    setTimeout(() => {
+        document.getElementById('scan-text-input').value = title;
+        document.getElementById('char-count').textContent = `${title.length} / 5000 characters`;
+    }, 100);
+}
+
+
+// =====================================================================
+// AI SCANNER PANEL
+// =====================================================================
+function openScanPanel(tab) {
+    document.getElementById('scanner-modal').classList.remove('hidden');
+    document.getElementById('scanner-modal').classList.add('flex');
+    switchScanTab(tab);
+}
+
+function closeScanner() {
+    document.getElementById('scanner-modal').classList.add('hidden');
+    document.getElementById('scanner-modal').classList.remove('flex');
+}
+
+function switchScanTab(tab) {
+    document.querySelectorAll('.scan-tab').forEach(t => {
+        t.classList.remove('text-tl-purple','border-tl-purple');
+        t.classList.add('text-ink-500','border-transparent');
+    });
+    document.querySelectorAll('.scan-content').forEach(c => c.classList.add('hidden'));
+    const activeTab = document.querySelector(`[data-tab="${tab}"]`);
+    if (activeTab) {
+        activeTab.classList.remove('text-ink-500','border-transparent');
+        activeTab.classList.add('text-tl-purple','border-tl-purple');
+    }
+    const content = document.getElementById(`scan-tab-${tab}`);
+    if (content) content.classList.remove('hidden');
+    if (tab === 'history') loadScanHistory();
+}
+
+function updateStreamlitIframe() {
+    const inp = document.getElementById('streamlit-url-input');
+    if (!inp) return;
+    let url = inp.value.trim();
+    if (!url) return;
+    if (!url.includes('embed=true')) {
+        url += (url.includes('?') ? '&' : '?') + 'embed=true';
+    }
+    const frame = document.getElementById('streamlit-frame');
+    if (frame) frame.src = url;
+    localStorage.setItem('truthlens_streamlit_url', url);
+    showToast('Connected to Streamlit Backend!', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedUrl = localStorage.getItem('truthlens_streamlit_url');
+    if (savedUrl) {
+        const inp = document.getElementById('streamlit-url-input');
+        const frame = document.getElementById('streamlit-frame');
+        if (inp) inp.value = savedUrl;
+        if (frame) frame.src = savedUrl;
+    }
+});
+
+function renderScanAnimation(container, title, subtitle) {
+    container.classList.remove('hidden');
+    container.innerHTML = `
+        <div class="bg-paper-50 dark:bg-ink-900 border border-paper-200 dark:border-white/10 rounded-2xl p-5 scan-shimmer">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-tl-purple to-tl-blue flex items-center justify-center animate-spin">
+                    <i class="ph-bold ph-brain text-white text-base"></i>
+                </div>
+                <div>
+                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Keras Neural Network Inference Active'}</h4>
+                    <p class="text-xs text-ink-500">${subtitle || 'Processing text tokens through Keras Deep Learning model...'}</p>
+                </div>
+            </div>
+            <div class="space-y-2.5 font-mono text-xs">
+                <div id="anim-step-1" class="flex items-center gap-2 text-tl-purple font-bold transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div>
+                    <span>[1/3] Tokenizing text & building padded sequence matrix...</span>
+                </div>
+                <div id="anim-step-2" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
+                    <span>[2/3] Passing through Embedding & Deep Dense layers...</span>
+                </div>
+                <div id="anim-step-3" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
+                    <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
+                    <span>[3/3] Computing direct Neural Credibility Probability...</span>
+                </div>
+            </div>
+        </div>`;
+    
+    setTimeout(() => {
+        const s1 = document.getElementById('anim-step-1');
+        const s2 = document.getElementById('anim-step-2');
+        if (s1 && s2) {
+            s1.className = 'flex items-center gap-2 text-tl-green font-bold';
+            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/3] Tokenizer sequence transformation complete</span>`;
+            s2.className = 'flex items-center gap-2 text-tl-purple font-bold';
+            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/3] Evaluating Deep Dense neural activations...</span>`;
+        }
+    }, 150);
+
+    setTimeout(() => {
+        const s2 = document.getElementById('anim-step-2');
+        const s3 = document.getElementById('anim-step-3');
+        if (s2 && s3) {
+            s2.className = 'flex items-center gap-2 text-tl-green font-bold';
+            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/3] Deep Neural layers evaluated</span>`;
+            s3.className = 'flex items-center gap-2 text-tl-purple font-bold';
+            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/3] Finalizing model output score...</span>`;
+        }
+    }, 300);
+}
+
+async function runTextScan() {
+    const text = document.getElementById('scan-text-input').value.trim();
+    if (!text || text.length < 5) { showToast('Please enter at least 5 characters', 'error'); return; }
+    const result = document.getElementById('text-scan-result');
+    renderScanAnimation(result, 'Keras Model Inference Running', 'Analyzing claim with trained Keras Deep Learning model...');
+    try {
+        const r = await fetch('/api/ai-scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text})
+        });
+        const contentType = r.headers.get('content-type') || '';
+        let d;
+        if (contentType.includes('application/json')) {
+            d = await r.json();
+        } else {
+            const rawText = await r.text();
+            throw new Error(`Server returned status ${r.status}. The backend was waking up, please retry.`);
+        }
+        if (!r.ok) {
+            result.innerHTML = `<div class="text-tl-red font-bold text-sm p-4 bg-tl-red/10 rounded-xl border border-tl-red/20">${d.error || 'Server error occurred'}</div>`;
+            return;
+        }
+        renderScanResult(result, d);
+    } catch(e) {
+        console.error("Scan error:", e);
+        result.innerHTML = `
+            <div class="p-4 bg-tl-red/10 border border-tl-red/20 rounded-2xl text-center">
+                <p class="text-tl-red font-bold text-sm mb-1"><i class="ph-bold ph-warning mr-1"></i> Analysis Error</p>
+                <p class="text-xs text-ink-700 dark:text-ink-100 mb-3">${e.message || 'Connection timeout while reaching backend server.'}</p>
+                <button onclick="runTextScan()" class="bg-tl-purple text-white px-5 py-2 rounded-xl text-xs font-bold hover:opacity-90 shadow-md">
+                    <i class="ph-bold ph-arrow-clockwise mr-1"></i> Retry Scan Now
+                </button>
+            </div>`;
+    }
+}
+
+
+function renderScanResult(container, d) {
+    const isFake = d.is_fake;
+    const icon = isFake ? 'ph-warning-circle' : 'ph-check-circle';
+    const circumference = 2 * Math.PI * 40;
+    const offset = circumference - (circumference * d.confidence / 100);
+    const confLabel = d.confidence_label || (isFake ? 'Fake / Misinformation' : '100% Real News');
+    const realPct = (d.real_prob !== undefined ? (d.real_prob * 100) : (isFake ? (100 - d.confidence) : d.confidence)).toFixed(1);
+    const fakePct = (d.fake_prob !== undefined ? (d.fake_prob * 100) : (isFake ? d.confidence : (100 - d.confidence))).toFixed(1);
+
+    container.innerHTML = `
+        <div class="border-2 ${isFake ? 'border-tl-red/30 bg-red-50 dark:bg-red-900/10' : 'border-tl-green/30 bg-green-50 dark:bg-green-900/10'} rounded-2xl overflow-hidden shadow-xl">
+            <div class="verdict-${isFake ? 'fake' : 'real'} p-5 flex items-center gap-4">
+                <i class="ph-fill ${icon} text-white text-4xl"></i>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h4 class="text-2xl font-black text-white">${d.verdict === 'REAL' ? '🟢 REAL NEWS' : '🔴 FAKE NEWS'}</h4>
+                        <span class="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2.5 py-0.5 rounded-full">${confLabel}</span>
+                    </div>
+                    <p class="text-white/80 text-xs mt-1">Direct Model Output: <strong class="text-white">${d.confidence}% Confidence</strong></p>
+                </div>
+                <div class="relative flex items-center justify-center shrink-0">
+                    <svg class="score-ring" width="80" height="80" viewBox="0 0 90 90">
+                        <circle cx="45" cy="45" r="40" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
+                        <circle cx="45" cy="45" r="40" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"
+                                stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/>
+                    </svg>
+                    <span class="absolute text-base font-black text-white font-mono">${d.confidence}%</span>
+                </div>
+            </div>
+            <div class="p-5">
+                <!-- Direct Neural Network Probability Distribution -->
+                <div class="mb-4 bg-white dark:bg-paper-800 rounded-xl p-4 border border-paper-200 dark:border-white/10 shadow-sm">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-3 flex items-center justify-between">
+                        <span><i class="ph-fill ph-chart-bar mr-1 text-tl-purple"></i> Neural Network Probability Distribution</span>
+                        <span class="text-[9px] font-mono text-tl-purple">Pure Model Mode</span>
+                    </p>
+                    <div class="space-y-2.5 text-xs">
+                        <div>
+                            <div class="flex justify-between font-bold mb-1">
+                                <span class="text-tl-green flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Real Probability</span>
+                                <span class="font-mono text-tl-green">${realPct}%</span>
+                            </div>
+                            <div class="w-full bg-paper-200 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-tl-green h-full rounded-full transition-all duration-700" style="width: ${realPct}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between font-bold mb-1">
+                                <span class="text-tl-red flex items-center gap-1"><i class="ph-fill ph-x-circle"></i> Fake Probability</span>
+                                <span class="font-mono text-tl-red">${fakePct}%</span>
+                            </div>
+                            <div class="w-full bg-paper-200 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-tl-red h-full rounded-full transition-all duration-700" style="width: ${fakePct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                ${(d.fake_signals && d.fake_signals.length) ? `
+                <div class="mb-3">
+                    <div class="space-y-1.5">
+                        ${d.fake_signals.map(s=>`
+                        <div class="flex items-start gap-2 bg-tl-red/8 border border-tl-red/20 rounded-xl px-3 py-2">
+                            <i class="ph-fill ph-x-circle text-tl-red text-sm mt-0.5 shrink-0"></i>
+                            <span class="text-xs text-ink-700 dark:text-ink-100">${s}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+                
+                ${(d.real_signals && d.real_signals.length) ? `
+                <div class="mb-3">
+                    <div class="space-y-1.5">
+                        ${d.real_signals.map(s=>`
+                        <div class="flex items-start gap-2 bg-tl-green/8 border border-tl-green/20 rounded-xl px-3 py-2">
+                            <i class="ph-fill ph-check-circle text-tl-green text-sm mt-0.5 shrink-0"></i>
+                            <span class="text-xs text-ink-700 dark:text-ink-100">${s}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+
+                <div class="mt-3 pt-3 border-t border-paper-200 dark:border-white/10 flex items-start gap-2 flex-wrap justify-between">
+                    <p class="text-[11px] text-ink-700 dark:text-ink-100 font-medium">${d.explanation}</p>
+                    <span class="text-[9px] bg-tl-purple/10 text-tl-purple px-2.5 py-1 rounded-full font-black shrink-0 flex items-center gap-1">
+                        <i class="ph-fill ph-cpu"></i> ${d.model || 'Keras Deep Learning Model'}
+                    </span>
+                </div>
+            </div>
+        </div>`;
+}
+
+async function loadScanHistory() {
+
+    try {
+        const r = await fetch('/api/scan-history');
+        const d = await r.json();
+
+        const history = d.history || [];
+        document.getElementById('scan-history-content').innerHTML = history.length ? history.map(h => `
+            <div class="flex items-center gap-3 p-3 bg-paper-50 dark:bg-ink-900 rounded-xl border border-paper-200 dark:border-white/10">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${h.verdict==='REAL' ? 'bg-tl-green/15' : 'bg-tl-red/15'}">
+                    <i class="ph-fill ${h.verdict==='REAL' ? 'ph-check-circle text-tl-green' : 'ph-warning-circle text-tl-red'} text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${h.text_input || 'Scan item'}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[9px] font-black ${h.verdict==='REAL' ? 'text-tl-green' : 'text-tl-red'}">${h.verdict}</span>
+                        <span class="text-[9px] text-ink-500">${h.confidence}% confidence</span>
+                        <span class="text-[9px] text-ink-500 ml-auto">${new Date(h.created_at).toLocaleDateString('en-IN')}</span>
+                    </div>
+                </div>
+            </div>`).join('') :
+            '<div class="text-center py-8 text-ink-500 text-sm italic">No scan history yet. Start by scanning a news claim above!</div>';
+    } catch(e) {}
+}
+
+// =====================================================================
+// CHAT
+// =====================================================================
+function toggleChat() {
+    const panel = document.getElementById('chatbot-panel');
+    const icon = document.getElementById('chat-fab-icon');
+    panel.classList.toggle('hidden');
+    icon.className = panel.classList.contains('hidden') ? 'ph-fill ph-chat-circle-dots text-2xl' : 'ph-bold ph-x text-2xl';
+}
+
+async function sendChat() {
+    if (!state.user) { toggleChat(); openAuth('login'); return; }
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    addChatMessage('user', message);
+    addChatMessage('thinking', '');
+    state.chatHistory.push({role:'user', content:message});
+    try {
+        const r = await fetch('/api/chat', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({message, history: state.chatHistory})
+        });
+        const d = await r.json();
+        document.getElementById('chat-thinking')?.remove();
+        const reply = d.reply || 'Sorry, I could not process that request.';
+        state.chatHistory.push({role:'assistant', content:reply});
+        addChatMessage('assistant', reply);
+    } catch(e) {
+        document.getElementById('chat-thinking')?.remove();
+        addChatMessage('assistant', 'Network error. Please try again.');
+    }
+}
+
+function addChatMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    const el = document.createElement('div');
+    if (role === 'thinking') {
+        el.id = 'chat-thinking';
+        el.className = 'flex gap-2';
+        el.innerHTML = `
+            <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                <i class="ph-fill ph-sparkle text-white text-xs"></i>
+            </div>
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-paper-200 dark:border-white/10 flex gap-1.5 items-center">
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0s"></div>
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0.15s"></div>
+                <div class="w-2 h-2 bg-tl-purple rounded-full animate-bounce" style="animation-delay:0.3s"></div>
+            </div>`;
+    } else if (role === 'user') {
+        el.className = 'flex gap-2 justify-end';
+        el.innerHTML = `<div class="bg-gradient-to-br from-tl-purple to-tl-blue text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[80%] shadow-sm">${text}</div>`;
+    } else {
+        el.className = 'flex gap-2';
+        el.innerHTML = `
+            <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
+                <i class="ph-fill ph-sparkle text-white text-xs"></i>
+            </div>
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${text}</div>`;
+    }
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+}
+
+// =====================================================================
+// WEATHER
+// =====================================================================
+async function fetchWeather(lat, lon) {
+    try {
+        const r = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        const d = await r.json();
+        if (d.current) {
+            document.getElementById('weather-temp').textContent = `${Math.round(d.current.temp_c)}°C`;
+            document.getElementById('weather-loc').textContent = `${d.location.name}, ${d.location.region}`;
+            document.getElementById('weather-box').classList.remove('opacity-0');
+            state.city = d.location.name;
+            renderLeftSidebar();
+            const cond = d.current.condition?.text?.toLowerCase() || '';
+            const icon = document.getElementById('weather-icon');
+            if (cond.includes('rain')) icon.className = 'ph-fill ph-cloud-rain text-tl-blue text-2xl';
+            else if (cond.includes('cloud')) icon.className = 'ph-fill ph-cloud text-ink-500 text-2xl';
+            else if (cond.includes('sun') || cond.includes('clear')) icon.className = 'ph-fill ph-sun text-tl-yellow text-2xl';
+        }
+    } catch(e) {}
+}
+
+
+function requestLoc() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        err => { document.getElementById('weather-loc').textContent = 'India'; document.getElementById('weather-box').classList.remove('opacity-0'); },
+        {enableHighAccuracy:false, timeout:8000}
+    );
+}
+
+// =====================================================================
+// THEME
+// =====================================================================
+function toggleTheme() {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('tl_theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+
+// =====================================================================
+// FEEDBACK
+// =====================================================================
+function setRating(n) {
+    state.feedbackRating = n;
+    document.querySelectorAll('.star').forEach((s,i) => {
+        s.className = `star text-2xl ${i < n ? 'text-tl-yellow' : 'text-paper-200'}`;
+    });
+}
+
+async function submitFeedback() {
+    const message = document.getElementById('feedback-text').value.trim();
+    if (!message) { showToast('Please enter a message', 'error'); return; }
+    try {
+        await fetch('/api/feedback', { method:'POST', headers:{'Content-Type':'application/json'},
+                                       body: JSON.stringify({message, rating: state.feedbackRating}) });
+        document.getElementById('feedback-modal').classList.add('hidden');
+        document.getElementById('feedback-modal').classList.remove('flex');
+        showToast('Feedback submitted! Thank you.', 'success');
+    } catch(e) { showToast('Failed to submit', 'error'); }
+}
+
+// =====================================================================
+// UTILS
+// =====================================================================
+function showToast(msg, type='neutral') {
+    const container = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    const bg = type==='success' ? 'bg-tl-green' : type==='error' ? 'bg-tl-red' : 'bg-ink-900';
+    const icon = type==='success' ? 'ph-check-circle' : type==='error' ? 'ph-warning-circle' : 'ph-info';
+    t.className = `toast pointer-events-auto flex items-center gap-3 ${bg} text-white px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold border border-white/10`;
+    t.innerHTML = `<i class="ph-fill ${icon} text-xl"></i>${msg}`;
+    container.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 350); }, 3000);
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    try {
+        const date = new Date(d);
+        const diff = Date.now() - date;
+        if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+        return date.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+    } catch(e) { return ''; }
+}
+
+// Render price with separate currency symbol and amount for consistent sizing
+function renderPrice(m) {
+    try {
+        const ps = m.price_str || '';
+        if (ps && typeof ps === 'string') {
+            // find first digit index
+            const idx = ps.search(/\d/);
+            if (idx > 0) {
+                const cur = ps.slice(0, idx);
+                const amt = ps.slice(idx);
+                return `<span class="currency">${cur}</span><span class="price-amt">${amt}</span>`;
+            }
+            return ps;
+        }
+        // fallback: use symbol and formatted numeric
+        const decimals = (typeof m.decimals === 'number') ? m.decimals : 2;
+        const amt = (m.price != null) ? Number(m.price).toLocaleString('en-IN',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}) : 'N/A';
+        const curSym = m.sym || '&#8377;';
+        return `<span class="currency">${curSym}</span><span class="price-amt">${amt}</span>`;
+    } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
+}
+</script>
+</body>
+</html>
+"""
+
+# Render the complete TruthLens UI directly in Streamlit
+components.html(HTML_CODE, height=1200, scrolling=True)
