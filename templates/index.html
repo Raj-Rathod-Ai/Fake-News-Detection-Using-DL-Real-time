@@ -285,8 +285,6 @@
             <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Tools</h4>
             <div class="space-y-2">
                 <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Scanner</button>
-                <button onclick="openScanPanel('image')" class="block hover:text-tl-purple font-medium">Image Detector</button>
-                <button onclick="openScanPanel('video')" class="block hover:text-tl-purple font-medium">Deepfake Detector</button>
                 <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
             </div>
         </div>
@@ -346,18 +344,6 @@
     </div>
 </div>
 
-<!-- AUTH MODAL -->
-<div id="auth-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-white dark:bg-paper-800 rounded-3xl w-full max-w-sm shadow-2xl relative border border-paper-200 dark:border-white/10 overflow-hidden">
-        <div class="bg-gradient-to-br from-tl-purple to-tl-blue p-8 text-center">
-            <i class="ph-fill ph-shield-check text-white text-5xl mb-2"></i>
-            <h2 class="text-2xl font-serif font-black text-white">TruthLens</h2>
-            <p class="text-white/70 text-xs mt-1">AI Intelligence Platform</p>
-        </div>
-        <button onclick="closeAuth()" class="absolute top-4 right-4 text-white/60 hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
-        <div id="auth-flow" class="p-8"></div>
-    </div>
-</div>
 
 <!-- AI SCANNER MODAL -->
 <div id="scanner-modal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -544,7 +530,7 @@ window.addEventListener('load', () => {
 // =====================================================================
 const state = {
     page: 'home',
-    user: { id: 'guest_user', name: 'Guest User', email: 'guest@truthlens.ai', scan_count: 0 },
+    user: { id: 'open_user', name: 'TruthLens User' },
     scanMode: false,
     city: 'India',
     articles: [],
@@ -579,7 +565,6 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchMarkets();
     fetchCricket();
     connectMarketSSE();
-    checkAuth();
     setInterval(fetchCricket, 30000);
     setInterval(() => { if (!_sseConnected) fetchMarkets(); }, 15000);
 
@@ -593,16 +578,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// =====================================================================
-// AUTH
-// =====================================================================
-async function checkAuth() {
-    try {
-        const r = await fetch('/api/auth/me');
-        const d = await r.json();
-        state.user = d.user;
-    } catch (e) { state.user = null; }
-}
+// Auth system removed — TruthLens is now an open platform
+// All AI scanner tools are freely accessible without login
 
 function renderAuthArea() {
     const area = document.getElementById('auth-area');
@@ -610,135 +587,12 @@ function renderAuthArea() {
     area.innerHTML = `
         <div class="flex items-center gap-2">
             <button onclick="openScanPanel('text')" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
-                <i class="ph-fill ph-shield-check text-sm"></i> Launch AI Scanner
+                <i class="ph-fill ph-shield-check text-sm"></i> AI Scanner
             </button>
             <button onclick="openScanPanel('history')" class="p-2 text-ink-500 hover:text-tl-purple hover:bg-paper-100 dark:hover:bg-white/10 rounded-xl transition-all" title="Scan History">
                 <i class="ph-bold ph-clock-counter-clockwise text-lg"></i>
             </button>
         </div>`;
-}
-
-
-function openAuth(view) {
-    document.getElementById('auth-modal').classList.remove('hidden');
-    document.getElementById('auth-modal').classList.add('flex');
-    renderAuthFlow(view);
-}
-function closeAuth() {
-    document.getElementById('auth-modal').classList.add('hidden');
-    document.getElementById('auth-modal').classList.remove('flex');
-}
-
-function renderAuthFlow(view) {
-    const flow = document.getElementById('auth-flow');
-    if (view === 'login') {
-        flow.innerHTML = `
-            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Welcome Back</h3>
-            <p class="text-xs text-ink-500 mb-5">Sign in to access AI detection tools</p>
-            <div class="space-y-3">
-                <input id="auth-email" type="email" placeholder="Email address"
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-                <input id="auth-password" type="password" placeholder="Password"
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-            </div>
-            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
-            <button onclick="doLogin()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
-                Sign In
-            </button>
-            <div class="flex items-center gap-3 my-4"><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div><span class="text-xs text-ink-500">or</span><div class="flex-1 h-px bg-paper-200 dark:bg-white/10"></div></div>
-            <div class="text-center space-y-2">
-                <button onclick="renderAuthFlow('signup')" class="text-xs font-bold text-tl-blue hover:underline">Create account</button>
-                <span class="text-ink-500 text-xs mx-2">·</span>
-                <button onclick="renderAuthFlow('forgot')" class="text-xs font-bold text-ink-500 hover:text-tl-blue hover:underline">Forgot password?</button>
-            </div>`;
-    } else if (view === 'signup') {
-        flow.innerHTML = `
-            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Create Account</h3>
-            <p class="text-xs text-ink-500 mb-5">Join TruthLens — Free AI fact-checking</p>
-            <div class="space-y-3">
-                <input id="auth-name" type="text" placeholder="Full name"
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-                <input id="auth-email" type="email" placeholder="Email address"
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-                <input id="auth-password" type="password" placeholder="Password (min 6 chars)"
-                    class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-            </div>
-            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
-            <button onclick="doSignup()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
-                Create Account
-            </button>
-            <div class="text-center mt-4">
-                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Already have an account? Sign in</button>
-            </div>`;
-    } else if (view === 'forgot') {
-        flow.innerHTML = `
-            <h3 class="text-xl font-black text-ink-900 dark:text-white mb-1">Reset Password</h3>
-            <p class="text-xs text-ink-500 mb-5">Enter your email to receive reset instructions</p>
-            <input id="auth-email" type="email" placeholder="Email address"
-                class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white">
-            <div id="auth-error" class="text-tl-red text-xs font-bold mt-2 hidden"></div>
-            <button onclick="doForgot()" class="w-full bg-gradient-to-r from-tl-purple to-tl-blue text-white py-3 rounded-2xl font-black text-sm mt-4 hover:opacity-90 transition-all">
-                Send Reset Link
-            </button>
-            <div class="text-center mt-4">
-                <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-ink-500 hover:text-tl-blue">Back to login</button>
-            </div>`;
-    }
-}
-
-async function doLogin() {
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
-    const errEl = document.getElementById('auth-error');
-    errEl.classList.add('hidden');
-    try {
-        const r = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
-        const d = await r.json();
-        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
-        state.user = d.user;
-        closeAuth(); renderAuthArea(); showToast(`Welcome back, ${d.user.name || 'there'}!`, 'success');
-    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
-}
-
-async function doSignup() {
-    const name = document.getElementById('auth-name').value;
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
-    const errEl = document.getElementById('auth-error');
-    errEl.classList.add('hidden');
-    try {
-        const r = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password}) });
-        const d = await r.json();
-        if (!r.ok) { errEl.textContent = d.error; errEl.classList.remove('hidden'); return; }
-        state.user = d.user;
-        closeAuth(); renderAuthArea(); showToast(`Account created! Welcome, ${d.user.name || 'there'}!`, 'success');
-    } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
-}
-
-async function doForgot() {
-    const email = document.getElementById('auth-email').value;
-    const errEl = document.getElementById('auth-error');
-    errEl.classList.add('hidden');
-    try {
-        const r = await fetch('/api/auth/forgot-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
-        const d = await r.json();
-        if (d.success) {
-            document.getElementById('auth-flow').innerHTML = `
-                <div class="text-center py-6">
-                    <div class="w-16 h-16 bg-tl-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="ph-fill ph-check-circle text-tl-green text-4xl"></i>
-                    </div>
-                    <h3 class="font-black text-ink-900 dark:text-white text-lg mb-2">Reset Link Sent!</h3>
-                    <p class="text-xs text-ink-500 mb-4">Check your email for password reset instructions.</p>
-                    <button onclick="renderAuthFlow('login')" class="text-xs font-bold text-tl-blue hover:underline">Back to login</button>
-                </div>`;
-        }
-    } catch(e) { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
-}
-
-async function doLogout() {
-    await fetch('/api/auth/logout', { method:'POST' });
-    state.user = null; renderAuthArea(); showToast('Signed out successfully');
 }
 
 // =====================================================================
@@ -1578,7 +1432,6 @@ function toggleChat() {
 }
 
 async function sendChat() {
-    if (!state.user) { toggleChat(); openAuth('login'); return; }
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
     if (!message) return;
@@ -1654,15 +1507,6 @@ async function fetchWeather(lat, lon) {
     } catch(e) {}
 }
 
-
-function requestLoc() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        err => { document.getElementById('weather-loc').textContent = 'India'; document.getElementById('weather-box').classList.remove('opacity-0'); },
-        {enableHighAccuracy:false, timeout:8000}
-    );
-}
 
 // =====================================================================
 // THEME

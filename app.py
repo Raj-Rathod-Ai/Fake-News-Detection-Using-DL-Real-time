@@ -1,21 +1,19 @@
 """
-TruthLens v8 Production Backend
-Deep Learning (PyTorch / Deep Neural Engine) + Tavily Real-Time Intelligence + MongoDB & SQLite Dual Database
+TruthLens v9 Production Backend
+Keras Deep Learning + Tavily Real-Time Intelligence + MongoDB & SQLite Dual Database
 Features:
-- PyTorch / Deep Neural Engine for Fake News Detection (<150MB RAM limit for Render Free Tier)
-- Tavily API Integration with Token Saver & In-Memory Caching (1-hour breaking news & 100-year historical verification)
+- Keras .keras model for Fake News Detection (models/fake_real_news_detection_model.keras)
+- Tavily API Integration with Token Saver & In-Memory Caching
 - MongoDB Database Layer (pymongo) with automatic local SQLite fallback (truthlens.db)
-- Gemini API Integration for Smart History Title Generation & Grounded Previews
-- Multi-Modal AI Suite: Text (/api/ai-scan), Image (/api/detect-image), Video (/api/detect-deepfake), Voice (/api/detect-voice)
-- Real-Time Market Data Feed (SSE stream + Yahoo / Tavily fallback)
-- 100% Frontend Compatible (index.html)
+- Persistent API Cache: Last-Known-Good responses for News, Markets, Cricket, Weather
+- Gemini API Integration for Smart History Title Generation
+- Real-Time Market Data Feed (SSE stream + Yahoo Finance fallback)
+- No Authentication Required: Open public platform
 """
 
 import os
 import json
 import random
-import http.client
-import hashlib
 import uuid
 import re
 import threading
@@ -23,7 +21,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from zoneinfo import ZoneInfo
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
@@ -31,7 +29,7 @@ from dotenv import load_dotenv
 scan_executor = ThreadPoolExecutor(max_workers=6)
 
 
-from flask import (Flask, render_template, request, jsonify, session, g, Response, stream_with_context)
+from flask import (Flask, render_template, request, jsonify, g, Response, stream_with_context)
 from flask_cors import CORS
 import requests
 import sqlite3
@@ -66,20 +64,14 @@ MONGO_URI         = os.environ.get("MONGO_URI", "")
 
 IST = ZoneInfo("Asia/Kolkata")
 
-# Optional Imports (CV2 / PyMongo / Google GenAI)
-try:
-    import cv2
-    CV2_AVAILABLE = True
-except ImportError:
-    CV2_AVAILABLE = False
-
+# Optional Imports
 try:
     import pymongo
     PYMONGO_AVAILABLE = True
 except ImportError:
     PYMONGO_AVAILABLE = False
 
-# Import Deep Learning Core Engine
+# Import Deep Learning Core Engine (Keras)
 from dl_model import FakeNewsDLInferenceEngine
 dl_engine = FakeNewsDLInferenceEngine()
 
@@ -122,17 +114,8 @@ def close_connection(exception):
 def init_db():
     with app.app_context():
         db = sqlite3.connect(DB_PATH)
+        # Create tables if they don't exist (backward-compatible with old schema)
         db.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                name TEXT,
-                created_at TEXT,
-                reset_token TEXT,
-                reset_expires TEXT,
-                scan_count INTEGER DEFAULT 0
-            );
             CREATE TABLE IF NOT EXISTS scan_history (
                 id TEXT PRIMARY KEY,
                 user_id TEXT,
@@ -141,8 +124,7 @@ def init_db():
                 verdict TEXT,
                 confidence REAL,
                 scan_type TEXT DEFAULT 'text',
-                created_at TEXT,
-                FOREIGN KEY(user_id) REFERENCES users(id)
+                created_at TEXT
             );
             CREATE TABLE IF NOT EXISTS feedback (
                 id TEXT PRIMARY KEY,
@@ -159,6 +141,7 @@ def init_db():
         """)
         db.commit()
         db.close()
+
 
 _persistent_api_cache = {}
 _api_cache_lock = threading.Lock()
@@ -202,14 +185,10 @@ def get_last_api_response(cache_key: str) -> Any:
         pass
     return None
 
-def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
-
 def require_auth(f):
+    """No-op decorator: authentication removed, all endpoints are open."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user_id' not in session:
-            session['user_id'] = 'guest_user'
-            session['user_name'] = 'Guest User'
         return f(*args, **kwargs)
     return decorated
 
@@ -890,77 +869,7 @@ def broadcast_market_update(data: dict):
 def home_route():
     return render_template("index.html")
 
-@app.route("/api/auth/signup", methods=["POST"])
-def signup():
-    data = request.get_json() or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-    name = (data.get("name") or "").strip()
-    if not email or not password or len(password) < 6:
-        return jsonify({"error": "Valid email & password (min 6 chars) required"}), 400
-
-    user_id = str(uuid.uuid4())
-    pw_hash = hash_password(password)
-    created_at = datetime.now(timezone.utc).isoformat()
-
-    if mongo_db is not None:
-        if mongo_db.users.find_one({"email": email}):
-            return jsonify({"error": "Email already registered"}), 409
-        mongo_db.users.insert_one({"_id": user_id, "id": user_id, "email": email, "password_hash": pw_hash, "name": name, "created_at": created_at, "scan_count": 0})
-    else:
-        db = get_db()
-        if db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-            return jsonify({"error": "Email already registered"}), 409
-        db.execute("INSERT INTO users (id,email,password_hash,name,created_at) VALUES (?,?,?,?,?)", (user_id, email, pw_hash, name, created_at))
-        db.commit()
-
-    session['user_id'] = user_id; session['user_email'] = email; session['user_name'] = name
-    return jsonify({"success": True, "user": {"id": user_id, "email": email, "name": name, "scan_count": 0}})
-
-@app.route("/api/auth/login", methods=["POST"])
-def login():
-    data = request.get_json() or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-    pw_hash = hash_password(password)
-
-    user = None
-    if mongo_db is not None:
-        user = mongo_db.users.find_one({"email": email, "password_hash": pw_hash})
-    else:
-        db = get_db()
-        user_row = db.execute("SELECT * FROM users WHERE email=? AND password_hash=?", (email, pw_hash)).fetchone()
-        if user_row: user = dict(user_row)
-
-    if not user:
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    session['user_id'] = user['id']; session['user_email'] = user['email']
-    session['user_name'] = user.get('name') or email.split('@')[0]
-    return jsonify({"success": True, "user": {"id": user['id'], "email": user['email'], "name": session['user_name'], "scan_count": user.get('scan_count', 0)}})
-
-@app.route("/api/auth/logout", methods=["POST"])
-def logout():
-    session.clear()
-    return jsonify({"success": True})
-
-@app.route("/api/auth/me")
-def me():
-    if 'user_id' not in session: return jsonify({"user": None})
-    user = None
-    if mongo_db is not None:
-        user = mongo_db.users.find_one({"id": session['user_id']})
-    else:
-        db = get_db()
-        row = db.execute("SELECT * FROM users WHERE id=?", (session['user_id'],)).fetchone()
-        if row: user = dict(row)
-
-    if not user: session.clear(); return jsonify({"user": None})
-    return jsonify({"user": {"id": user['id'], "email": user['email'], "name": user.get('name'), "scan_count": user.get('scan_count', 0)}})
-
-@app.route("/api/auth/forgot-password", methods=["POST"])
-def forgot_password():
-    return jsonify({"success": True, "message": "If account exists, reset instructions sent"})
+# Auth endpoints removed — TruthLens is now an open platform (no login required)
 
 def fetch_real_time_web_search(prompt: str) -> str:
     """Fetch AI web search results from real-time-web-search.p.rapidapi.com."""
@@ -1367,24 +1276,21 @@ def ai_scan():
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
 
-    # Record to Scan History & Increment User Scan Count
+    # Record to Shared Scan History (open platform, no user scoping)
     try:
         title = generate_gemini_title(text)
         scan_id = str(uuid.uuid4())
         now_iso = datetime.now(timezone.utc).isoformat()
-        uid = session.get('user_id', 'guest_user')
         if mongo_db is not None:
             mongo_db.scan_history.insert_one({
-                "_id": scan_id, "id": scan_id, "user_id": uid,
+                "_id": scan_id, "id": scan_id,
                 "text_input": text[:500], "title": title, "verdict": result['verdict'],
                 "confidence": result['confidence'], "scan_type": "text", "created_at": now_iso
             })
-            mongo_db.users.update_one({"id": uid}, {"$inc": {"scan_count": 1}})
         else:
             db = get_db()
-            db.execute("INSERT INTO scan_history (id,user_id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?,?)",
-                       (scan_id, uid, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
-            db.execute("UPDATE users SET scan_count=scan_count+1 WHERE id=?", (uid,))
+            db.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
+                       (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
             db.commit()
     except Exception as e:
         print(f"[Scan History] Recording error: {e}")
@@ -1394,16 +1300,16 @@ def ai_scan():
 
 
 @app.route("/api/scan-history")
-@require_auth
 def scan_history():
+    """Returns the last 20 shared scan history records (open public feed)."""
     history = []
     if mongo_db is not None:
-        cursor = mongo_db.scan_history.find({"user_id": session['user_id']}).sort("created_at", -1).limit(20)
+        cursor = mongo_db.scan_history.find({}).sort("created_at", -1).limit(20)
         history = list(cursor)
         for h in history: h['_id'] = str(h['_id'])
     else:
         db = get_db()
-        rows = db.execute("SELECT * FROM scan_history WHERE user_id=? ORDER BY created_at DESC LIMIT 20", (session['user_id'],)).fetchall()
+        rows = db.execute("SELECT * FROM scan_history ORDER BY created_at DESC LIMIT 20").fetchall()
         history = [dict(r) for r in rows]
 
     return jsonify({"history": history})
@@ -1632,10 +1538,10 @@ def api_feedback():
     fb_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
     if mongo_db is not None:
-        mongo_db.feedback.insert_one({"_id": fb_id, "user_id": session.get('user_id'), "message": message, "rating": data.get("rating", 5), "created_at": now_iso})
+        mongo_db.feedback.insert_one({"_id": fb_id, "message": message, "rating": data.get("rating", 5), "created_at": now_iso})
     else:
         db = get_db()
-        db.execute("INSERT INTO feedback (id,user_id,message,rating,created_at) VALUES (?,?,?,?,?)", (fb_id, session.get('user_id'), message, data.get("rating", 5), now_iso))
+        db.execute("INSERT INTO feedback (id,message,rating,created_at) VALUES (?,?,?,?)", (fb_id, message, data.get("rating", 5), now_iso))
         db.commit()
     return jsonify({"success": True})
 
