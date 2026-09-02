@@ -1183,11 +1183,19 @@ def ai_scan():
             if now_ts - entry["ts"] < 1800:
                 return jsonify(entry["data"])
 
-    # 1. Fast Factual Grounding Verification via Mistral AI
+    # 1. Live Web Grounding Search via Tavily API
+    tavily_verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
+    if TAVILY_API_KEY:
+        try:
+            tavily_verification = search_tavily_live_news(text)
+        except Exception as e:
+            print(f"[AI Scan] Tavily search error: {e}")
+
+    # 2. Fast Factual Grounding Verification via Mistral AI with Tavily Context
     llm_res = None
     if os.environ.get("MISTRAL_API_KEY"):
         try:
-            llm_res = llm_fact_check(text)
+            llm_res = llm_fact_check(text, web_sources=tavily_verification.get("matching_articles", []))
         except Exception as e:
             print(f"[AI Scan] LLM Fact Check error: {e}")
 
@@ -1210,11 +1218,13 @@ def ai_scan():
             "real_signals": llm_res.get("real_signals", ["Corroborated by verified reporting" if not is_fake else ""]),
             "signal_score": round((real_p - fake_p) * 100, 1),
             "explanation": llm_res.get("explanation") or f"AI Factual Grounding: {conf}% Confidence {llm_res.get('verdict')}.",
-            "model": "Keras Neural Network + AI Factual Grounding"
+            "verification": tavily_verification,
+            "model": "Keras Neural Network + Tavily Search + Mistral AI"
         }
     else:
-        # 2. Pure Keras Deep Learning Model Evaluation
+        # 3. Pure Keras Deep Learning Model Evaluation
         result = predict_fake(text)
+        result["verification"] = tavily_verification
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
