@@ -1243,19 +1243,35 @@ def ai_scan():
                 return jsonify(entry["data"])
 
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 1: Check Model (Neural DL Model & Heuristic Signals)
+    # STEP 1: Launch Mistral AI & Tavily Search concurrently in background (t=0)
+    # ─────────────────────────────────────────────────────────────────────────
+    fut_mistral = None
+    if MISTRAL_API_KEY:
+        try:
+            fut_mistral = scan_executor.submit(mistral_direct_check, text)
+        except Exception:
+            fut_mistral = None
+
+    fut_tavily = None
+    if TAVILY_API_KEY:
+        try:
+            fut_tavily = scan_executor.submit(search_tavily_live_news, text)
+        except Exception:
+            fut_tavily = None
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 2: Run Local Deep Learning Model (fast, synchronous)
     # ─────────────────────────────────────────────────────────────────────────
     model_res = predict_fake(text)
     model_is_fake = bool(model_res.get("is_fake", False))
 
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 2: Mistral AI + Tavily in parallel (max 8s total to fit Netlify 26s)
+    # STEP 3: Collect Mistral AI Result (already finished or finishing)
     # ─────────────────────────────────────────────────────────────────────────
     mistral_res = None
-    if MISTRAL_API_KEY:
+    if fut_mistral:
         try:
-            fut_mistral = scan_executor.submit(mistral_direct_check, text)
-            mistral_res = fut_mistral.result(timeout=3.0)  # tight 3s timeout
+            mistral_res = fut_mistral.result(timeout=4.0)
         except Exception:
             mistral_res = None
 
@@ -1266,20 +1282,24 @@ def ai_scan():
         elif "verdict" in mistral_res:
             mistral_is_fake = (str(mistral_res["verdict"]).upper() == "FAKE")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # STEP 3: If both Model and Mistral agree -> Return Consensus Preview!
-    # ─────────────────────────────────────────────────────────────────────────
-    if mistral_res is not None and (model_is_fake == mistral_is_fake):
-        final_verdict = "FAKE" if model_is_fake else "REAL"
-        final_conf = float(mistral_res.get("confidence") or model_res.get("confidence") or 96.0)
-
-        # Quick Tavily search for citation links (max 4s)
-        verification = {"sources_found": 0, "matching_articles": []}
+    # Collect Tavily search result (has been running concurrently)
+    verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
+    if fut_tavily:
         try:
-            fut_tav = scan_executor.submit(search_tavily_live_news, text)
-            verification = fut_tav.result(timeout=4.0)
+            tav_res = fut_tavily.result(timeout=4.0)
+            if isinstance(tav_res, dict):
+                verification = tav_res
         except Exception:
             pass
+    articles = verification.get("matching_articles", [])
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 4: Decision Tree (Consensus vs Live Grounding)
+    # ─────────────────────────────────────────────────────────────────────────
+    if mistral_res is not None and (model_is_fake == mistral_is_fake):
+        # Consensus: both Model and Mistral agree!
+        final_verdict = "FAKE" if model_is_fake else "REAL"
+        final_conf = float(mistral_res.get("confidence") or model_res.get("confidence") or 96.0)
 
         result = {
             "verdict": final_verdict,
@@ -1295,19 +1315,7 @@ def ai_scan():
             "verification": verification
         }
     else:
-        # ─────────────────────────────────────────────────────────────────────
-        # STEP 4: Otherwise (Disagreement or Uncertain) -> Go to Tavily Live Search!
-        # ─────────────────────────────────────────────────────────────────────
-        # Run Tavily search via executor with strict timeout (prevents 5s block)
-        verification = {"sources_found": 0, "matching_articles": [], "verification_status": "unverified"}
-        try:
-            fut_tav2 = scan_executor.submit(search_tavily_live_news, text)
-            verification = fut_tav2.result(timeout=4.0)
-        except Exception:
-            pass
-        articles = verification.get("matching_articles", [])
-
-        # Ground claim with live articles via Mistral
+        # Disagreement or Mistral unavailable -> Ground with Tavily Live Articles
         grounded_res = None
         if articles and MISTRAL_API_KEY:
             try:
@@ -1360,10 +1368,11 @@ def ai_scan():
                     "confidence": result['confidence'], "scan_type": "text", "created_at": now_iso
                 })
             else:
-                db = get_db()
-                db.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
-                           (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
-                db.commit()
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
+                             (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
+                conn.commit()
+                conn.close()
         except Exception as e:
             print(f"[Scan History] Recording error: {e}")
 

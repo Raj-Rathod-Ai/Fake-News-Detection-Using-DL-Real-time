@@ -143,6 +143,13 @@ class FakeNewsDLInferenceEngine:
         if not self.use_keras or not tokenizer_loaded:
             print("[INFO] Using Heuristic Fallback Engine.")
             self.use_keras = False
+        else:
+            try:
+                # Pre-warm Keras graph to eliminate first-request compilation latency
+                self.predict("prewarm deep learning inference graph")
+                print("[OK] Keras inference engine warmed up.")
+            except Exception as e:
+                print(f"[WARN] Warmup notice: {e}")
 
     def _preprocess(self, text: str) -> np.ndarray:
         """Tokenize and pad text for Keras model input."""

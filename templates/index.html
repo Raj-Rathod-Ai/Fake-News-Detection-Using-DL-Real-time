@@ -1384,7 +1384,7 @@ async function runTextScan() {
     renderScanAnimation(result, 'Text Claim Real-Time Verification Active', 'Analyzing text sequence & cross-checking live news databases...');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 22000); // 22s fits Netlify 26s limit
+    const timeout = setTimeout(() => controller.abort(), 45000); // Generous 45s buffer for Render cold instances
 
     try {
         const r = await fetch('/api/ai-scan', {
