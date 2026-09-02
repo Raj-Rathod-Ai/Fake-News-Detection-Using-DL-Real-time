@@ -515,12 +515,19 @@
     setTimeout(function() {
         var pl = document.getElementById('preloader');
         if (!pl) return;
-        pl.style.transition = 'opacity 0.4s ease';
+        pl.style.transition = 'opacity 0.35s ease';
         pl.style.opacity = '0';
-        setTimeout(function() { if (pl.parentNode) pl.remove(); }, 400);
-    }, 450);
+        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 360);
+    }, 400);
 })();
 
+// Fail-safe preloader remover (guaranteed UI visibility)
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const pl = document.getElementById('preloader');
+        if (pl && pl.parentNode) pl.remove();
+    }, 500);
+});
 
 // =====================================================================
 // STATE
@@ -553,9 +560,8 @@ const TABS = [
 // =====================================================================
 // INIT
 // =====================================================================
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
-    await checkAuth();
     renderNavTabs();
     renderAuthArea();
     nav('home');
@@ -563,15 +569,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     fetchMarkets();
     fetchCricket();
     connectMarketSSE();
-    setInterval(fetchCricket, 60000);
-    // Polling fallback every 10s if SSE fails
-    setInterval(() => { if (!_sseConnected) fetchMarkets(); }, 10000);
-    // Preloader handled by cinematic animation block above
+    checkAuth();
+    setInterval(fetchCricket, 30000);
+    setInterval(() => { if (!_sseConnected) fetchMarkets(); }, 15000);
 
     // Char counter
-    document.getElementById('scan-text-input').addEventListener('input', function () {
-        document.getElementById('char-count').textContent = `${this.value.length} / 5000 characters`;
-    });
+    const scanInput = document.getElementById('scan-text-input');
+    if (scanInput) {
+        scanInput.addEventListener('input', function () {
+            const cc = document.getElementById('char-count');
+            if (cc) cc.textContent = `${this.value.length} / 5000 characters`;
+        });
+    }
 });
 
 // =====================================================================
@@ -580,9 +589,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkAuth() {
     try {
         const r = await fetch('/api/auth/me');
-        const d = await r.json();
-        state.user = d.user;
-    } catch (e) { state.user = null; }
+        if (r.ok) {
+            const d = await r.json();
+            if (d && d.user) state.user = d.user;
+        }
+    } catch (e) {}
 }
 
 function renderAuthArea() {
