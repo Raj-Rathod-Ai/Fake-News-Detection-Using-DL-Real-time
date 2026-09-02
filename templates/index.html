@@ -501,24 +501,24 @@
 
     // Progress bar animation
     var pct = 0;
-    var statusSteps = ['Initializing AI Engine...','Loading Signal Engine...','Fetching Market Data...','Calibrating Models...','Connecting News Feed...','Ready.'];
+    var statusSteps = ['Initializing AI Engine...','Loading Keras Neural Model...','Connecting Live Feeds...','Ready.'];
     var stepIdx = 0;
     var intv = setInterval(function() {
-        pct += Math.random() * 3 + 1;
+        pct += Math.random() * 12 + 8;
         if (pct >= 100) { pct = 100; clearInterval(intv); }
         if (bar) bar.style.width = pct + '%';
         var si = Math.min(Math.floor(pct / (100/statusSteps.length)), statusSteps.length-1);
         if (si !== stepIdx && status) { stepIdx = si; status.textContent = statusSteps[si]; }
-    }, 55);
+    }, 25);
 
-    // Dismiss preloader
+    // Fast & smooth preloader dismiss
     setTimeout(function() {
         var pl = document.getElementById('preloader');
         if (!pl) return;
-        pl.style.transition = 'opacity 0.9s ease';
+        pl.style.transition = 'opacity 0.4s ease';
         pl.style.opacity = '0';
-        setTimeout(function() { if (pl.parentNode) pl.remove(); }, 950);
-    }, 2000);
+        setTimeout(function() { if (pl.parentNode) pl.remove(); }, 400);
+    }, 450);
 })();
 
 
