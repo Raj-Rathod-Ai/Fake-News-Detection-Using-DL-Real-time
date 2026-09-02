@@ -7,13 +7,6 @@
   PYTHON_VERSION = "3.11"
 
 [[redirects]]
-  # Proxy all API requests to the Render backend service
-  from = "/api/*"
-  to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
   # Single-page app fallback
   from = "/*"
   to = "/index.html"
@@ -23,6 +16,6 @@
   for = "/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
-    X-Frame-Options = "DENY"
+    X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
