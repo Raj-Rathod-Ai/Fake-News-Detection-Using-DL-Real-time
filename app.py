@@ -1471,14 +1471,15 @@ def api_weather():
     lon = request.args.get("lon", "")
     city_param = request.args.get("city", "")
 
-    # Default to Delhi if no coords or city provided
+    # Default to Delhi if nothing provided
     if not lat and not lon and not city_param:
         lat, lon = "28.6139", "77.2090"
-    elif city_param and not lat:
-        # City name provided — use WeatherAPI directly with city name (skip geocode)
+
+    # ── Path A: City name provided (from IP lookup) → WeatherAPI direct ──
+    if city_param and not lat:
         if WEATHER_API_KEY:
             try:
-                r = requests.get(WEATHER_BASE_URL, params={"key": WEATHER_API_KEY, "q": city_param}, timeout=4)
+                r = requests.get(WEATHER_BASE_URL, params={"key": WEATHER_API_KEY, "q": city_param}, timeout=5)
                 if r.status_code == 200:
                     res_data = r.json()
                     save_last_api_response("weather", res_data)
@@ -1487,7 +1488,19 @@ def api_weather():
                 pass
         lat, lon = "28.6139", "77.2090"
 
-    # Reverse Geocode via OpenStreetMap Nominatim for exact city & state
+    # ── Path B: Coordinates provided → WeatherAPI with lat,lon (most accurate city name) ──
+    # WeatherAPI.com resolves lat/lon to the exact city itself — DO NOT override with Nominatim
+    if WEATHER_API_KEY and lat and lon:
+        try:
+            r = requests.get(WEATHER_BASE_URL, params={"key": WEATHER_API_KEY, "q": f"{lat},{lon}"}, timeout=5)
+            if r.status_code == 200:
+                res_data = r.json()
+                save_last_api_response("weather", res_data)
+                return jsonify(res_data)
+        except Exception as e:
+            print(f"[WeatherAPI lat/lon] Error: {e}")
+
+    # ── Path C: RapidAPI OpenWeather fallback (needs separate city name lookup) ──
     loc_name = city_param or "India"
     region_name = ""
     if lat and lon:
@@ -1500,63 +1513,47 @@ def api_weather():
             )
             if geo_res.status_code == 200:
                 addr = geo_res.json().get("address", {})
-                city = addr.get("city") or addr.get("town") or addr.get("state_district") or addr.get("county") or city_param or "Local Region"
-                state = addr.get("state") or addr.get("country") or ""
+                # Priority: specific locality first, then broader areas
+                city = (addr.get("city") or addr.get("town") or addr.get("village") or
+                        addr.get("suburb") or addr.get("municipality") or
+                        addr.get("county") or city_param or "Local Region")
+                state = addr.get("state") or ""
                 loc_name = city
                 region_name = state
-        except Exception as e:
-            print(f"[Reverse Geocode] Exception: {e}")
-
-
-    # 1. Try Open-Weather13 RapidAPI first
-    rapid_key = os.environ.get("WEATHER_RAPIDAPI_KEY", os.environ.get("RAPIDAPI_KEY", os.environ.get("CRICBUZZ_KEY", "")))
-    headers = {
-        "x-rapidapi-key": rapid_key,
-        "x-rapidapi-host": "open-weather13.p.rapidapi.com",
-        "Content-Type": "application/json"
-    }
-    try:
-        url = f"https://open-weather13.p.rapidapi.com/fivedaysforcast?latitude={lat}&longitude={lon}&lang=EN"
-        r = requests.get(url, headers=headers, timeout=4)
-        if r.status_code == 200:
-            data = r.json()
-            first_entry = (data.get("list") or [{}])[0]
-            temp_k = first_entry.get("main", {}).get("temp", 301.15)
-            temp_c = round(temp_k - 273.15, 1) if temp_k > 200 else temp_k
-            cond_text = (first_entry.get("weather") or [{}])[0].get("main", "Clear")
-
-            w_res = {
-                "current": {"temp_c": temp_c, "condition": {"text": cond_text}},
-                "location": {"name": loc_name, "region": region_name}
-            }
-            save_last_api_response("weather", w_res)
-            return jsonify(w_res)
-    except Exception as e:
-        print(f"[OpenWeather13 RapidAPI] Error: {e}")
-
-    # 2. Try WeatherAPI
-    if WEATHER_API_KEY:
-        try:
-            r = requests.get(WEATHER_BASE_URL, params={"key": WEATHER_API_KEY, "q": f"{lat},{lon}"}, timeout=4)
-            if r.status_code == 200:
-                res_data = r.json()
-                if loc_name != "India":
-                    res_data["location"]["name"] = loc_name
-                    res_data["location"]["region"] = region_name
-                save_last_api_response("weather", res_data)
-                return jsonify(res_data)
         except Exception:
             pass
 
-    # 3. Last Known Good Live Weather from Persistent Cache
+    rapid_key = os.environ.get("WEATHER_RAPIDAPI_KEY", os.environ.get("RAPIDAPI_KEY", os.environ.get("CRICBUZZ_KEY", "")))
+    if rapid_key:
+        try:
+            url = f"https://open-weather13.p.rapidapi.com/fivedaysforcast?latitude={lat}&longitude={lon}&lang=EN"
+            r = requests.get(url, headers={"x-rapidapi-key": rapid_key, "x-rapidapi-host": "open-weather13.p.rapidapi.com"}, timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                first_entry = (data.get("list") or [{}])[0]
+                temp_k = first_entry.get("main", {}).get("temp", 301.15)
+                temp_c = round(temp_k - 273.15, 1) if temp_k > 200 else temp_k
+                cond_text = (first_entry.get("weather") or [{}])[0].get("main", "Clear")
+                w_res = {
+                    "current": {"temp_c": temp_c, "condition": {"text": cond_text}},
+                    "location": {"name": loc_name, "region": region_name}
+                }
+                save_last_api_response("weather", w_res)
+                return jsonify(w_res)
+        except Exception as e:
+            print(f"[OpenWeather13 RapidAPI] Error: {e}")
+
+    # ── Path D: Last Known Good Cache ──
     last_weather = get_last_api_response("weather")
     if last_weather:
         return jsonify(last_weather)
 
     return jsonify({
-        "current": {"temp_c": 28, "condition": {"text": "Sunny"}},
-        "location": {"name": loc_name, "region": region_name or "NCR"}
+        "current": {"temp_c": 30, "condition": {"text": "Sunny"}},
+        "location": {"name": loc_name, "region": region_name or "India"}
     })
+
+
 
 
 
