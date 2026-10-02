@@ -566,8 +566,8 @@ YAHOO_SYMBOLS = {
     "ICICIBANK.NS":   {"symbol":"ICICI BANK","cat":"stock","sym":"₹","decimals":2},
     "SBIN.NS":        {"symbol":"SBI","cat":"stock","sym":"₹","decimals":2},
     "INR=X":    {"symbol":"USD/INR","cat":"forex","sym":"₹","decimals":4},
-    "GC=F":  {"symbol":"GOLD SPOT","cat":"commodity","sym":"$","decimals":2,"unit":"/oz"},
-    "SI=F":  {"symbol":"SILVER SPOT","cat":"commodity","sym":"$","decimals":4,"unit":"/oz"},
+    "GC=F":  {"symbol":"GOLD SPOT","cat":"global","sym":"$","decimals":2,"unit":"/oz"},
+    "SI=F":  {"symbol":"SILVER SPOT","cat":"global","sym":"$","decimals":2,"unit":"/oz"},
     "BTC-USD": {"symbol":"BTC","cat":"crypto","sym":"$","decimals":0},
     "ETH-USD": {"symbol":"ETH","cat":"crypto","sym":"$","decimals":2},
 }
@@ -577,8 +577,8 @@ FALLBACK_PRICES = {
     "^BSESN": 76570.0, "^NSEI": 23910.0, "^NSEBANK": 51400.0, "NIFMDCP100.NS": 57800.0,
     "RELIANCE.NS": 2980.0, "TCS.NS": 4180.0, "HDFCBANK.NS": 1680.0, "INFY.NS": 1880.0,
     "WIPRO.NS": 545.0, "ITC.NS": 495.0, "BAJFINANCE.NS": 7350.0, "MARUTI.NS": 12450.0,
-    "LT.NS": 3720.0, "ICICIBANK.NS": 1240.0, "SBIN.NS": 845.0, "INR=X": 95.00,
-    "GC=F": 4416.0, "SI=F": 65.50, "BTC-USD": 77100.0, "ETH-USD": 3550.0
+    "LT.NS": 3720.0, "ICICIBANK.NS": 1240.0, "SBIN.NS": 845.0, "INR=X": 96.30,
+    "GC=F": 4171.40, "SI=F": 60.83, "BTC-USD": 77100.0, "ETH-USD": 3550.0
 }
 
 
@@ -679,20 +679,70 @@ def refresh_markets():
         if "unit" in meta: entry["unit"] = meta["unit"]
         items.append(entry)
 
-    # Derived Indian 24K Gold & Silver Prices calibrated to September 2026 domestic market rates
-    # 24 Karat Gold: ~Rs 1,52,020 / 10g
-    # Fine Silver (999): ~Rs 2,35,930 / kg
-    if gold_usd > 3000:
-        gold_mcx = round(152020.0 + ((gold_usd - 4416.0) * 35.0), 0)
-    else:
-        gold_mcx = round((gold_usd * usd_inr / 31.1034768) * 10 * 1.08, 0)
-    if gold_mcx < 100000: gold_mcx = 152020.0
+    # Dynamic Precious Metals (India 24K Gold, 22K Gold, 999 Silver)
+    # Derived from live Spot Gold/Silver USD and USD/INR exchange rate
+    tax_multiplier = 1.15
+    gold_24k_10g = round((gold_usd * usd_inr / 31.1034768) * 10 * tax_multiplier, 0)
+    gold_22k_10g = round(gold_24k_10g * 0.916, 0)
+    silver_999_1kg = round((silver_usd * usd_inr / 31.1034768) * 1000 * tax_multiplier, 0)
 
-    if silver_usd > 50:
-        silver_mcx = round(235930.0 + ((silver_usd - 65.5) * 350.0), 0)
-    else:
-        silver_mcx = round((silver_usd * usd_inr / 31.1034768) * 1000 * 1.08, 0)
-    if silver_mcx < 150000: silver_mcx = 235930.0
+    gold_change_pct = round(((gold_usd - 4202.3) / 4202.3) * 100, 2) if gold_usd else 0.0
+    silver_change_pct = round(((silver_usd - 61.175) / 61.175) * 100, 2) if silver_usd else 0.0
+
+    gold_up = gold_change_pct >= 0
+    silver_up = silver_change_pct >= 0
+
+    precious_metals = [
+        {
+            "symbol": "GOLD 24K",
+            "price": gold_24k_10g,
+            "price_str": f"₹{int(gold_24k_10g):,}",
+            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+            "arrow": '▲' if gold_up else '▼',
+            "up": gold_up,
+            "cat": "metal",
+            "sym": "₹",
+            "unit": "/10g",
+            "live": True
+        },
+        {
+            "symbol": "GOLD 22K",
+            "price": gold_22k_10g,
+            "price_str": f"₹{int(gold_22k_10g):,}",
+            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+            "arrow": '▲' if gold_up else '▼',
+            "up": gold_up,
+            "cat": "metal",
+            "sym": "₹",
+            "unit": "/10g",
+            "live": True
+        },
+        {
+            "symbol": "SILVER 999",
+            "price": silver_999_1kg,
+            "price_str": f"₹{int(silver_999_1kg):,}",
+            "change": f"{'+' if silver_up else ''}{silver_change_pct:.2f}%",
+            "arrow": '▲' if silver_up else '▼',
+            "up": silver_up,
+            "cat": "metal",
+            "sym": "₹",
+            "unit": "/1kg",
+            "live": True
+        },
+        {
+            "symbol": "GOLD SPOT",
+            "price": gold_usd,
+            "price_str": f"${gold_usd:,.2f}",
+            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+            "arrow": '▲' if gold_up else '▼',
+            "up": gold_up,
+            "cat": "metal",
+            "sym": "$",
+            "unit": "/oz",
+            "live": True
+        }
+    ]
+    items.extend(precious_metals)
 
     dynamic_fuel = [
         {"symbol": "PETROL", "price": round(94.72 + (usd_inr - 83.0) * 0.05, 2), "price_str": f"₹{round(94.72 + (usd_inr - 83.0) * 0.05, 2):.2f}", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
@@ -749,8 +799,9 @@ def get_cached_markets() -> dict:
         {"symbol": "NIFTY 50", "price": 23914.45, "price_str": "23,914.45", "change": "-0.69%", "up": False, "cat": "index", "sym": "₹", "unit": "", "live": True},
         {"symbol": "SENSEX", "price": 76570.35, "price_str": "76,570.35", "change": "-0.50%", "up": False, "cat": "index", "sym": "₹", "unit": "", "live": True},
         {"symbol": "BANK NIFTY", "price": 51400.0, "price_str": "51,400.00", "change": "+0.32%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "GOLD MCX", "price": 152020.0, "price_str": "₹1,52,020", "change": "+0.45%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
-        {"symbol": "SILVER MCX", "price": 235930.0, "price_str": "₹2,35,930", "change": "+0.35%", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True}
+        {"symbol": "GOLD 24K", "price": 148520.0, "price_str": "₹1,48,520", "change": "+0.45%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
+        {"symbol": "GOLD 22K", "price": 136045.0, "price_str": "₹1,36,045", "change": "+0.45%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
+        {"symbol": "SILVER 999", "price": 216630.0, "price_str": "₹2,16,630", "change": "+0.35%", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True}
     ]
     status = get_market_status()
     default_data = {

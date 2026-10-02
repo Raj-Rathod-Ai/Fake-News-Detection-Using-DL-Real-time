@@ -860,12 +860,15 @@ function renderLeftSidebar() {
         </div>
         <!-- Gold & Silver -->
         <div class="sidebar-card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/10 p-4">
-            <h4 class="text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400 mb-3">Precious Metals</h4>
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400">Precious Metals</h4>
+                <button onclick="openMarket()" class="text-[9px] font-black text-yellow-800 dark:text-yellow-300 hover:underline">View All</button>
+            </div>
             <div class="space-y-3">
-                ${state.markets.filter(m=>m.cat==='metal').slice(0,3).map(m=>`
+                ${state.markets.filter(m=>m.cat==='metal').slice(0,4).map(m=>`
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-base">${m.symbol.includes('GOLD') ? '🥇' : m.symbol.includes('SILVER') ? '🥈' : '⚫'}</span>
+                            <span class="text-base">${m.symbol.includes('24K') ? '🥇' : m.symbol.includes('22K') ? '🪙' : m.symbol.includes('SILVER') ? '🥈' : '✨'}</span>
                             <div>
                                 <p class="text-xs font-black text-ink-900 dark:text-white">${m.symbol}</p>
                                 <p class="text-[9px] text-ink-500">${m.unit || ''}</p>
