@@ -1327,26 +1327,26 @@ function renderScanAnimation(container, title, subtitle) {
                     <i class="ph-bold ph-spinner text-xl"></i>
                 </div>
                 <div>
-                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Multi-Source Parallel Verification Active'}</h4>
-                    <p class="text-xs text-ink-500">${subtitle || 'Cross-checking with PyTorch DL, Tavily Live Search & LLM Engine...'}</p>
+                    <h4 class="text-sm font-black text-ink-900 dark:text-white">${title || 'Deep Learning Neural Verification Active'}</h4>
+                    <p class="text-xs text-ink-500">${subtitle || 'Executing Deep Learning BiLSTM-Attention Neural Core & Real-Time Intelligence...'}</p>
                 </div>
             </div>
             <div class="space-y-2.5 font-mono text-xs">
                 <div id="anim-step-1" class="flex items-center gap-2 text-tl-purple font-bold transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div>
-                    <span>[1/4] Inspecting Neural Sequence Patterns & Feature Layers...</span>
+                    <span>[1/4] Tokenizing & Embedding Sequence via BiLSTM Neural Network...</span>
                 </div>
                 <div id="anim-step-2" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>
+                    <span>[2/4] Computing Multi-Head Self-Attention & Semantic Tensor...</span>
                 </div>
                 <div id="anim-step-3" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>
+                    <span>[3/4] Cross-Verifying Real-Time Grounding & Global Knowledge...</span>
                 </div>
                 <div id="anim-step-4" class="flex items-center gap-2 text-ink-500 opacity-50 transition-all">
                     <div class="w-4 h-4 rounded-full border-2 border-ink-500 shrink-0"></div>
-                    <span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>
+                    <span>[4/4] Synthesizing Deep Learning Confidence Matrix...</span>
                 </div>
             </div>
         </div>`;
@@ -1356,9 +1356,9 @@ function renderScanAnimation(container, title, subtitle) {
         const s2 = document.getElementById('anim-step-2');
         if (s1 && s2) {
             s1.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/4] Neural Sequence & Pattern Analysis Verified</span>`;
+            s1.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[1/4] BiLSTM Neural Sequence Embedding Verified</span>`;
             s2.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/4] Analyzing Forensic Signals & Political Knowledge DB...</span>`;
+            s2.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[2/4] Computing Multi-Head Self-Attention & Semantic Tensor...</span>`;
         }
     }, 150);
 
@@ -1367,9 +1367,9 @@ function renderScanAnimation(container, title, subtitle) {
         const s3 = document.getElementById('anim-step-3');
         if (s2 && s3) {
             s2.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/4] Forensic Signal Analysis Complete</span>`;
+            s2.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[2/4] Self-Attention & Semantic Tensor Complete</span>`;
             s3.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/4] Cross-Verifying Real-Time Live Web Sources (Tavily)...</span>`;
+            s3.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[3/4] Cross-Verifying Real-Time Grounding & Global Knowledge...</span>`;
         }
     }, 300);
 
@@ -1378,9 +1378,9 @@ function renderScanAnimation(container, title, subtitle) {
         const s4 = document.getElementById('anim-step-4');
         if (s3 && s4) {
             s3.className = 'flex items-center gap-2 text-tl-green font-bold';
-            s3.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[3/4] Live Web Sources Cross-Verification Complete</span>`;
+            s3.innerHTML = `<i class="ph-fill ph-check-circle text-tl-green text-sm shrink-0"></i><span>[3/4] Real-Time Grounding Verification Complete</span>`;
             s4.className = 'flex items-center gap-2 text-tl-purple font-bold';
-            s4.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[4/4] Synthesizing Multi-Source Ensemble Verdict...</span>`;
+            s4.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-tl-purple border-t-transparent animate-spin shrink-0"></div><span>[4/4] Synthesizing Deep Learning Confidence Matrix...</span>`;
         }
     }, 450);
 }
@@ -1511,11 +1511,12 @@ function renderScanResult(container, d) {
     let verHtml = '';
     if (ver.sources_found > 0) {
         const vstatus = ver.verification_status || '';
-        const vcolor = vstatus === 'verified_multiple_sources' ? '#34a853' : vstatus === 'partially_verified' ? '#f59e0b' : '#9aa0a6';
+        const vcolor = vstatus === 'debunked_by_sources' ? '#ea4335' : vstatus === 'verified_multiple_sources' ? '#34a853' : vstatus === 'partially_verified' ? '#f59e0b' : '#9aa0a6';
+        const vstatusLabel = vstatus === 'debunked_by_sources' ? '⚠ Refuted / Debunked by Live Sources' : vstatus === 'verified_multiple_sources' ? '✓ Authoritatively Corroborated' : '🔍 Cross-Verification Sources';
         verHtml = `
         <div class="mt-4 p-4 rounded-xl border" style="border-color:${vcolor}30;background:${vcolor}08">
             <p class="text-[10px] font-black uppercase tracking-widest mb-2" style="color:${vcolor}">
-                🔍 Cross-Verification: ${ver.sources_found} source(s) found
+                ${vstatusLabel} (${ver.sources_found} found)
             </p>
             ${(ver.matching_articles || []).map(a => `
                 <div class="flex items-start gap-2 mb-2">

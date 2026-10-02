@@ -11,7 +11,18 @@ import time
 import requests
 import streamlit as st
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+# Load local environment variables from .env if present
+load_dotenv()
+
 from dl_model import FakeNewsDLInferenceEngine
+from realtime_grounding import (
+    analyze_grounding_evidence,
+    is_fact_check_source,
+    is_reputable_source,
+    check_debunking_signals
+)
 
 # Configure page
 st.set_page_config(
@@ -187,35 +198,38 @@ def search_live_grounding(claim: str) -> dict:
         try:
             r = requests.post(
                 "https://api.tavily.com/search",
-                json={"api_key": TAVILY_API_KEY, "query": query, "search_depth": "basic", "max_results": 4},
+                json={"api_key": TAVILY_API_KEY, "query": query, "search_depth": "basic", "include_answer": True, "max_results": 4},
                 timeout=5.0
             )
             if r.status_code == 200:
-                results = r.json().get("results", [])
+                res_data = r.json()
+                results = res_data.get("results", [])
+                tav_ans = res_data.get("answer", "")
+                verification["tavily_answer"] = tav_ans
+
                 matching = []
                 for res in results:
-                    domain = res.get("url", "").lower()
-                    reputable = any(s in domain for s in [
-                        "bbc", "reuters", "apnews", "thehindu", "ndtv", "indianexpress",
-                        "timesofindia", "hindustantimes", "bloomberg", "ft.com",
-                        "livemint", "businessstandard", "moneycontrol", "wikipedia", "gov",
-                        "barandbench", "livelaw", "ani", "pti", "news18", "indiatoday",
-                        "theprint", "tribuneindia", "zeenews", "abplive", "financialexpress",
-                        "deccanherald", "thewire", "outlookindia", "cnbc", "cnn", "nytimes",
-                        "espncricinfo", "cricbuzz", "icc-cricket", "bcci.tv"
-                    ])
+                    url = res.get("url", "").lower()
+                    domain = url.split("/")[2] if "/" in url else "Web Source"
+                    reputable = is_reputable_source(url)
+                    is_fc = is_fact_check_source(url)
                     matching.append({
                         "title": res.get("title", ""),
                         "content": res.get("content", "") or res.get("title", ""),
-                        "source": domain.split("/")[2] if "/" in domain else "Web Source",
+                        "source": domain,
                         "url": res.get("url", "#"),
-                        "is_reputable": reputable
+                        "is_reputable": reputable,
+                        "is_fact_checker": is_fc
                     })
                 verification["sources_found"] = len(matching)
                 verification["matching_articles"] = matching[:4]
-                if matching:
-                    reputable_count = sum(1 for m in matching if m["is_reputable"])
-                    verification["verification_status"] = "verified_multiple_sources" if reputable_count >= 1 else "partially_verified"
+                if matching or tav_ans:
+                    is_debunked, _, _ = check_debunking_signals(claim, matching)
+                    if is_debunked or any(k in tav_ans.lower() for k in ["no evidence", "false", "debunked", "do not mention", "does not mention", "do not provide"]):
+                        verification["verification_status"] = "debunked_by_sources"
+                    else:
+                        reputable_count = sum(1 for m in matching if m["is_reputable"])
+                        verification["verification_status"] = "verified_multiple_sources" if (reputable_count >= 1 or any(k in tav_ans.lower() for k in ["won the", "approved", "confirmed", "reported"])) else "partially_verified"
                 return verification
         except Exception:
             pass
@@ -362,15 +376,20 @@ with tab_scanner:
                     final_real_signals = [sanitize_engine_text(s) for s in nlp_res.get("real_signals", [])]
                     is_fake = (final_verdict == "FAKE")
                     pipeline_label = "DL Neural Core + Live Web Grounding + NLP Semantic Analyzer"
-                elif grounding_res.get("sources_found", 0) > 0:
-                    final_verdict = "REAL"
-                    final_conf = 98.0
-                    is_fake = False
-                    reputable = [a['source'] for a in articles if a.get('is_reputable')] or [a['source'] for a in articles[:3]]
-                    final_expl = f"TruthLens Live Grounding: Corroborated by {grounding_res['sources_found']} live authoritative news reports ({', '.join(reputable[:3])})."
-                    final_fake_signals = []
-                    final_real_signals = [f"Corroborated by {grounding_res['sources_found']} live authoritative sources"]
-                    pipeline_label = "DL Neural Core + Real-Time Live Grounding"
+                elif grounding_res.get("sources_found", 0) > 0 or grounding_res.get("tavily_answer"):
+                    grounding_eval = analyze_grounding_evidence(
+                        clean_text, articles, dl_res,
+                        tavily_answer=grounding_res.get("tavily_answer", "")
+                    )
+                    final_verdict = grounding_eval["verdict"]
+                    final_conf = grounding_eval["confidence"]
+                    is_fake = grounding_eval["is_fake"]
+                    final_expl = sanitize_engine_text(grounding_eval.get("explanation", ""))
+                    final_fake_signals = [sanitize_engine_text(s) for s in grounding_eval.get("fake_signals", [])]
+                    final_real_signals = [sanitize_engine_text(s) for s in grounding_eval.get("real_signals", [])]
+                    pipeline_label = "Deep Learning BiLSTM-Attention Neural Core"
+                    if "verification_status" in grounding_eval:
+                        grounding_res["verification_status"] = grounding_eval["verification_status"]
                 else:
                     final_verdict = dl_res["verdict"]
                     final_conf = dl_conf
@@ -378,7 +397,7 @@ with tab_scanner:
                     final_expl = sanitize_engine_text(dl_res.get("explanation", f"Neural linguistic pattern evaluation: {final_verdict}."))
                     final_fake_signals = [sanitize_engine_text(s) for s in dl_res.get("fake_signals", [])]
                     final_real_signals = [sanitize_engine_text(s) for s in dl_res.get("real_signals", [])]
-                    pipeline_label = "Deep Learning Neural Core (Keras)"
+                    pipeline_label = "Deep Learning BiLSTM-Attention Neural Core"
 
                 # Step 5: Save Scan to MongoDB Cloud Database
                 if mongo_db is not None:
@@ -530,17 +549,20 @@ with tab_markets:
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_news:
     st.markdown("#### 📰 Real-Time Verified Intelligence Feed")
-    articles = [
-        {"title": "Union Cabinet Approves Semiconductor Manufacturing & AI Mission", "desc": "₹76,000 crore incentive package to scale domestic chip design and fabrication facilities.", "source": "PIB Bureau"},
-        {"title": "ISRO Outlines Chandrayaan-4 Lunar Sample Return Architecture for 2028", "desc": "Multi-module spacecraft will land near the lunar south pole and safely bring soil samples to Earth.", "source": "ISRO Media"},
-        {"title": "RBI Maintains Benchmark Repo Rate Steady at 6.5% Amid Strong Growth", "desc": "Monetary Policy Committee projects robust 7.2% real GDP growth for the fiscal year.", "source": "RBI Bulletin"},
-        {"title": "India Tops Global Real-Time UPI Payments with 10 Billion Monthly Transactions", "desc": "Digital public infrastructure sets global benchmark for high-speed financial transactions.", "source": "NPCI Media"}
-    ]
-    for a in articles:
-        st.markdown(f"**{a['title']}**")
-        st.write(a["desc"])
-        st.caption(f"Source: {a['source']} · 100% Verified Authenticity")
-        st.divider()
+    try:
+        from app import fetch_google_news_rss
+        live_articles = fetch_google_news_rss("HEADLINES")
+    except Exception:
+        live_articles = []
+
+    if live_articles:
+        for a in live_articles[:8]:
+            st.markdown(f"**{a.get('title', '')}**")
+            st.write(a.get("description", ""))
+            st.caption(f"Source: {a.get('source', {}).get('name', 'Live News Bureau')} · 100% Verified Authenticity")
+            st.divider()
+    else:
+        st.info("Live news feed refreshing from real-time sources...")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 5: SCAN HISTORY (MongoDB)

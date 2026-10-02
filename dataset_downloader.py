@@ -182,8 +182,6 @@ def build_real_benchmark_dataset(sample_mode: bool = False, max_rows: int = 1500
 
     return out_csv
 
-    return out_csv
-
 
 if __name__ == "__main__":
     sample = '--sample' in sys.argv

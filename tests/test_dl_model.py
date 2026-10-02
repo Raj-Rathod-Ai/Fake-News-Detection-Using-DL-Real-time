@@ -44,6 +44,8 @@ class TestDeepLearningModel(unittest.TestCase):
         self.assertIn("fake_prob", result_fake)
         self.assertIn("real_prob", result_fake)
         self.assertIn("confidence", result_fake)
+        self.assertTrue(result_fake["is_fake"], "Fake news sample should be predicted as fake")
+        self.assertGreaterEqual(result_fake["fake_prob"], 0.5, "Fake news should have fake_prob >= 0.5")
         print(f"[TEST OK] Fake News DL Scan: Fake Prob={result_fake['fake_prob']}, Real Prob={result_fake['real_prob']}")
 
     def test_empty_string(self):
