@@ -412,7 +412,7 @@
                 </div>
                 <div>
                     <h3 class="font-black text-ink-900 dark:text-white">Indian Markets & Commodities</h3>
-                    <div class="flex items-center gap-2 flex-wrap"><p class="text-xs text-ink-500">Real-time · Yahoo Finance · SSE push</p><div id="market-status-badge-modal"></div></div>
+                    <div class="flex items-center gap-2 flex-wrap"><p class="text-xs text-ink-500">Real-time · Yahoo Finance · SSE push</p><div id="market-status-badge"></div></div>
                 </div>
             </div>
             <button onclick="closeMarket()" class="text-ink-500 hover:text-ink-900 dark:hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
@@ -754,15 +754,19 @@ function renderCard(a, i) {
     const saved = state.bookmarks.find(b => b.url === a.url);
     const delay = Math.min(i * 0.06, 0.4);
     const encoded = encodeURIComponent(JSON.stringify({title:a.title,url:a.url,urlToImage:a.urlToImage,source:a.source?.name}));
+    const safeTitle = escapeHtml(a.title || '');
+    const safeDesc = escapeHtml(a.description || '');
+    const safeSource = escapeHtml(a.source?.name || 'News Bureau');
+    const safeUrl = encodeURI(a.url || '#');
     return `
         <div class="news-card bg-white dark:bg-paper-800 fade-up" style="animation-delay:${delay}s">
             <div class="relative aspect-[16/9] overflow-hidden bg-paper-100 dark:bg-paper-900">
-                <img src="${a.urlToImage}" alt="${a.title}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                <img src="${a.urlToImage}" alt="${safeTitle}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                      onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600'">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
                 <div class="absolute top-3 left-3 flex gap-2">
                     <span class="bg-white/95 dark:bg-paper-900/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg text-ink-700 dark:text-ink-100">
-                        ${a.source?.name || 'News Bureau'}
+                        ${safeSource}
                     </span>
                 </div>
                 <div class="absolute top-3 right-3">
@@ -777,10 +781,10 @@ function renderCard(a, i) {
             </div>
             <div class="p-4">
                 <h3 class="font-black text-ink-900 dark:text-white text-sm leading-snug mb-2 line-clamp-3 hover:text-tl-purple cursor-pointer transition-colors"
-                    onclick="window.open('${a.url}','_blank')">${a.title}</h3>
-                <p class="text-xs text-ink-500 leading-relaxed line-clamp-2 mb-4">${a.description || ''}</p>
+                    onclick="window.open('${safeUrl}','_blank')">${safeTitle}</h3>
+                <p class="text-xs text-ink-500 leading-relaxed line-clamp-2 mb-4">${safeDesc}</p>
                 <div class="flex items-center gap-2 justify-between">
-                    <button onclick="window.open('${a.url}','_blank')"
+                    <button onclick="window.open('${safeUrl}','_blank')"
                         class="flex-1 bg-ink-900 dark:bg-white text-white dark:text-ink-900 py-2 rounded-xl text-xs font-black hover:bg-tl-purple hover:dark:bg-tl-purple hover:dark:text-white transition-all text-center">
                         Read Full Story
                     </button>
@@ -1618,7 +1622,7 @@ async function loadScanHistory() {
                     <i class="ph-fill ${h.verdict==='REAL' ? 'ph-check-circle text-tl-green' : 'ph-warning-circle text-tl-red'} text-lg"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${h.text_input || 'Scan item'}</p>
+                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${escapeHtml(h.text_input || 'Scan item')}</p>
                     <div class="flex items-center gap-2 mt-0.5">
                         <span class="text-[9px] font-black ${h.verdict==='REAL' ? 'text-tl-green' : 'text-tl-red'}">${h.verdict}</span>
                         <span class="text-[9px] text-ink-500">${h.confidence}% confidence</span>
@@ -1681,14 +1685,14 @@ function addChatMessage(role, text) {
             </div>`;
     } else if (role === 'user') {
         el.className = 'flex gap-2 justify-end';
-        el.innerHTML = `<div class="bg-gradient-to-br from-tl-purple to-tl-blue text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[80%] shadow-sm">${text}</div>`;
+        el.innerHTML = `<div class="bg-gradient-to-br from-tl-purple to-tl-blue text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[80%] shadow-sm">${escapeHtml(text)}</div>`;
     } else {
         el.className = 'flex gap-2';
         el.innerHTML = `
             <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
                 <i class="ph-fill ph-sparkle text-white text-xs"></i>
             </div>
-            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${text}</div>`;
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
     }
     container.appendChild(el);
     container.scrollTop = container.scrollHeight;
@@ -1750,6 +1754,16 @@ async function submitFeedback() {
 // =====================================================================
 // UTILS
 // =====================================================================
+function escapeHtml(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function showToast(msg, type='neutral') {
     const container = document.getElementById('toast-container');
     const t = document.createElement('div');
@@ -1795,8 +1809,5 @@ function renderPrice(m) {
     } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
 }
 </script>
-</body>
-</html>
-
 </body>
 </html>
