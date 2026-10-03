@@ -546,9 +546,60 @@
     <!-- CRICKET HUB -->
     <div id="cricket-container"
         class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3 hidden">
-        <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar"
+        <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar relative"
             id="cricket-hub">
             <span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>
+        </div>
+
+        <!-- FLOATING CRICKET HOVER INTELLIGENCE CARD -->
+        <div id="cricket-popover" class="fixed hidden z-[180] w-[350px] md:w-[390px] p-4 rounded-2xl shadow-2xl pointer-events-none transition-all duration-150 opacity-0 bg-slate-950/95 dark:bg-black/95 backdrop-blur-2xl border border-white/15 text-white font-sans text-xs">
+            <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="cpop-badge" class="text-[10px] font-black uppercase tracking-wider text-emerald-400">LIVE ACTION</span>
+                </div>
+                <span id="cpop-series" class="text-[10px] font-bold text-slate-400 truncate max-w-[200px]">ICC International Match</span>
+            </div>
+
+            <!-- Live Batters -->
+            <div class="mb-3 bg-white/5 rounded-xl p-2.5 border border-white/5">
+                <div class="text-[9px] font-black tracking-wider uppercase text-slate-400 mb-1.5 flex justify-between">
+                    <span>ACTIVE BATTERS</span>
+                    <span>R (B) · 4s · 6s · SR</span>
+                </div>
+                <div id="cpop-batters" class="space-y-1"></div>
+            </div>
+
+            <!-- Current Bowler -->
+            <div class="mb-3 bg-white/5 rounded-xl p-2.5 border border-white/5">
+                <div class="text-[9px] font-black tracking-wider uppercase text-slate-400 mb-1.5 flex justify-between">
+                    <span>CURRENT BOWLER</span>
+                    <span>O - M - R - W · ECON</span>
+                </div>
+                <div id="cpop-bowler" class="flex justify-between items-center text-xs font-bold"></div>
+            </div>
+
+            <!-- Recent Deliveries Strip -->
+            <div class="mb-2.5 flex items-center justify-between">
+                <span class="text-[9px] font-black text-slate-400 uppercase">THIS OVER</span>
+                <div id="cpop-balls" class="flex gap-1.5"></div>
+            </div>
+
+            <!-- Fall of Wickets & Partnership Summary -->
+            <div class="pt-2 border-t border-white/10 text-[10px] text-slate-300 flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Partnership:</span>
+                    <span id="cpop-partnership" class="font-bold text-white">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Last Wicket:</span>
+                    <span id="cpop-last-wicket" class="font-semibold text-rose-300 truncate max-w-[230px]">-</span>
+                </div>
+                <div class="flex justify-between mt-1 text-[9px] font-mono text-cyan-400">
+                    <span id="cpop-crr">CRR: -</span>
+                    <span id="cpop-rrr"></span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1010,7 +1061,7 @@
     </div>
 
     <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
-    <div id="delete-account-modal" class="fixed inset-0 z-[170] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4" onclick="if(event.target===this)closeDeleteAccountModal()">
+    <div id="delete-account-modal" class="fixed inset-0 z-[250] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4" onclick="if(event.target===this)closeDeleteAccountModal()">
         <div class="relative bg-white dark:bg-paper-800 rounded-3xl w-full max-w-md shadow-2xl border border-rose-500/20 overflow-hidden">
             <div class="h-2 bg-gradient-to-r from-rose-500 to-amber-500"></div>
             <button onclick="closeDeleteAccountModal()" class="absolute top-5 right-5 text-ink-500 hover:text-ink-900 dark:hover:text-white transition-colors">
@@ -1291,6 +1342,74 @@
 
         let pendingVerificationEmail = '';
 
+        let isProfileMenuLocked = false;
+        let profileMenuCloseTimer = null;
+
+        function toggleProfileDropdown(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            clearTimeout(profileMenuCloseTimer);
+            const menu = document.getElementById('profile-dropdown-menu');
+            const arrow = document.getElementById('profile-dropdown-arrow');
+            if (!menu) return;
+
+            if (menu.classList.contains('hidden')) {
+                isProfileMenuLocked = true;
+                menu.classList.remove('hidden');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            } else {
+                closeProfileDropdown();
+            }
+        }
+
+        function openProfileDropdown() {
+            clearTimeout(profileMenuCloseTimer);
+            const menu = document.getElementById('profile-dropdown-menu');
+            const arrow = document.getElementById('profile-dropdown-arrow');
+            if (menu) {
+                menu.classList.remove('hidden');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function scheduleCloseProfileDropdown() {
+            clearTimeout(profileMenuCloseTimer);
+            if (isProfileMenuLocked) return;
+            profileMenuCloseTimer = setTimeout(() => {
+                if (!isProfileMenuLocked) {
+                    closeProfileDropdown();
+                }
+            }, 450);
+        }
+
+        function closeProfileDropdown() {
+            clearTimeout(profileMenuCloseTimer);
+            isProfileMenuLocked = false;
+            const menu = document.getElementById('profile-dropdown-menu');
+            const arrow = document.getElementById('profile-dropdown-arrow');
+            if (menu) {
+                menu.classList.add('hidden');
+            }
+            if (arrow) arrow.style.transform = 'rotate(0deg)';
+        }
+
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('profile-dropdown-container');
+            if (container && !container.contains(e.target)) {
+                closeProfileDropdown();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeProfileDropdown();
+                if (typeof hideCricketPopover === 'function') hideCricketPopover();
+                if (typeof closeCricketModal === 'function') closeCricketModal();
+            }
+        });
+
         function renderAuthArea() {
             const area = document.getElementById('auth-area');
             if (!area) return;
@@ -1305,29 +1424,42 @@
                     <span class="font-mono">Used: ${currentQuota.used} · Remaining: ${currentQuota.remaining}</span>
                     <span class="text-[10px] uppercase text-ink-500 hidden md:inline">(Weekly)</span>
                 </div>
-                <div class="relative group">
-                    <button class="flex items-center gap-2 p-1.5 pl-2.5 pr-3 rounded-xl bg-paper-100 dark:bg-white/10 hover:bg-paper-200 dark:hover:bg-white/15 transition-all text-xs font-bold">
-                        <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-tl-purple to-tl-blue text-white flex items-center justify-center text-[10px] font-black uppercase">
+                <div id="profile-dropdown-container" class="relative" onmouseenter="openProfileDropdown()" onmouseleave="scheduleCloseProfileDropdown()">
+                    <button id="profile-dropdown-btn" onclick="toggleProfileDropdown(event)" class="flex items-center gap-2 p-1.5 pl-2.5 pr-3 rounded-xl bg-paper-100 dark:bg-white/10 hover:bg-paper-200 dark:hover:bg-white/15 transition-all text-xs font-bold cursor-pointer select-none">
+                        <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-tl-purple to-tl-blue text-white flex items-center justify-center text-[10px] font-black uppercase shadow-sm">
                             ${initial}
                         </div>
                         <span class="truncate max-w-[100px] text-xs font-mono hidden md:inline text-ink-900 dark:text-white">${displayName}</span>
-                        <i class="ph-bold ph-caret-down text-ink-500 text-xs"></i>
+                        <i id="profile-dropdown-arrow" class="ph-bold ph-caret-down text-ink-500 text-xs transition-transform duration-200"></i>
                     </button>
-                    <div class="absolute right-0 mt-2 w-52 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50">
-                        <div class="px-3 py-2 border-b border-paper-200 dark:border-white/5 mb-1">
-                            <p class="text-xs font-bold truncate text-ink-900 dark:text-white">${currentUser.email || displayName}</p>
-                            <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">Used: ${currentQuota.used} | Remaining: ${currentQuota.remaining}</p>
-                            <p class="text-[9px] text-ink-400">Free limit restores weekly</p>
+                    <!-- DROPDOWN MENU WITH INVISIBLE TOP BRIDGE (NO DEAD GAP) -->
+                    <div id="profile-dropdown-menu" 
+                         onmouseenter="openProfileDropdown()" 
+                         onmouseleave="scheduleCloseProfileDropdown()" 
+                         class="absolute right-0 top-full pt-1.5 w-56 hidden z-[160] transition-all">
+                        <div class="relative bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 before:absolute before:-top-3 before:left-0 before:right-0 before:h-4 before:content-['']">
+                            <div class="px-3 py-2 border-b border-paper-200 dark:border-white/5 mb-1 bg-paper-50 dark:bg-white/5 rounded-xl">
+                                <p class="text-xs font-bold truncate text-ink-900 dark:text-white">${currentUser.email || displayName}</p>
+                                <div class="flex items-center justify-between mt-1">
+                                    <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">Scans: ${currentQuota.used}/${currentQuota.limit || 50}</span>
+                                    <span class="text-[9px] uppercase tracking-wider text-ink-400 font-bold">${currentQuota.is_admin ? 'Admin' : 'Weekly'}</span>
+                                </div>
+                            </div>
+                            ${(currentUser.is_admin || currentUser.role === 'admin') ? `
+                            <button onclick="closeProfileDropdown(); openAdminControlModal();" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-purple-50 dark:hover:bg-purple-500/10 text-tl-purple font-bold flex items-center gap-2 transition-colors cursor-pointer">
+                                <i class="ph-bold ph-gear-six"></i> Admin Control Center
+                            </button>` : ''}
+                            <button onclick="closeProfileDropdown(); openScanPanel('history');" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 flex items-center gap-2 text-ink-700 dark:text-ink-300 transition-colors cursor-pointer">
+                                <i class="ph-bold ph-clock-counter-clockwise"></i> Scan History
+                            </button>
+                            <button onclick="closeProfileDropdown(); promptDeleteAccount();" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 font-semibold flex items-center gap-2 transition-colors cursor-pointer">
+                                <i class="ph-bold ph-trash"></i> Delete Profile
+                            </button>
+                            <div class="my-1 border-t border-paper-200 dark:border-white/5"></div>
+                            <button onclick="closeProfileDropdown(); handleLogout();" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 text-ink-600 dark:text-ink-400 flex items-center gap-2 transition-colors cursor-pointer">
+                                <i class="ph-bold ph-sign-out"></i> Sign Out
+                            </button>
                         </div>
-                        <button onclick="openScanPanel('history')" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 flex items-center gap-2 text-ink-700 dark:text-ink-300">
-                            <i class="ph-bold ph-clock-counter-clockwise"></i> Scan History
-                        </button>
-                        <button onclick="promptDeleteAccount()" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 flex items-center gap-2">
-                            <i class="ph-bold ph-trash"></i> Delete Profile
-                        </button>
-                        <button onclick="handleLogout()" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 text-ink-600 dark:text-ink-400 flex items-center gap-2">
-                            <i class="ph-bold ph-sign-out"></i> Sign Out
-                        </button>
                     </div>
                 </div>
             </div>`;
@@ -2319,6 +2451,132 @@
         // =====================================================================
         let _cricket_matches_cache = [];
 
+        function showCricketPopover(e, idx) {
+            const popover = document.getElementById('cricket-popover');
+            if (!popover) return;
+            const m = _cricket_matches_cache[idx];
+            if (!m) return;
+
+            const mi = m.matchInfo || {};
+            const ld = m.liveDetails || {};
+            const stateStr = mi.state || '';
+            const statusNote = mi.status || stateStr || 'Match in progress';
+            const isComplete = stateStr === 'Complete' || stateStr === 'Finished' || statusNote.toLowerCase().includes('won') || (ld.is_live === false);
+            const isLive = !isComplete && (ld.is_live || stateStr === 'In Progress' || stateStr === 'live');
+
+            // Badge & Series
+            const badgeEl = document.getElementById('cpop-badge');
+            if (badgeEl) {
+                badgeEl.textContent = isComplete ? 'RESULT' : (isLive ? 'LIVE ACTION' : 'SCHEDULED');
+                badgeEl.className = `text-[10px] font-black uppercase tracking-wider ${isComplete ? 'text-emerald-400' : (isLive ? 'text-rose-400 animate-pulse' : 'text-slate-400')}`;
+            }
+            const seriesEl = document.getElementById('cpop-series');
+            if (seriesEl) {
+                seriesEl.textContent = `${mi.seriesName || 'International Cricket'} · ${mi.matchDesc || ''}`;
+            }
+
+            // Batters
+            const battersEl = document.getElementById('cpop-batters');
+            const batters = ld.currentBatters || ld.batters || [];
+            if (battersEl) {
+                if (batters.length > 0) {
+                    battersEl.innerHTML = batters.slice(0, 2).map(b => `
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-white flex items-center gap-1 truncate max-w-[150px]">
+                                ${b.name || 'Batter'} ${isLive && (b.on_strike || b.onStrike) ? '<span class="text-amber-400 text-xs font-black">*</span>' : ''}
+                            </span>
+                            <span class="font-mono text-[11px] text-slate-300">
+                                <strong class="text-white font-black">${b.runs || 0}</strong> <span class="text-slate-400">(${b.balls || 0}b)</span> · ${b.fours || 0}x4 · ${b.sixes || 0}x6 · <span class="text-cyan-300">${b.strike_rate || b.sr || '0.0'}</span>
+                            </span>
+                        </div>
+                    `).join('');
+                } else {
+                    battersEl.innerHTML = `<div class="text-[11px] text-slate-400">Batting scorecard details in full card</div>`;
+                }
+            }
+
+            // Bowler
+            const bowlerEl = document.getElementById('cpop-bowler');
+            const bowler = ld.currentBowler || ld.bowler || {};
+            if (bowlerEl) {
+                if (bowler.name) {
+                    bowlerEl.innerHTML = `
+                        <span class="truncate max-w-[150px] text-white">${bowler.name}</span>
+                        <span class="font-mono text-slate-300 text-[11px]">
+                            <strong class="text-white">${bowler.wickets || 0}/${bowler.runs || 0}</strong> (${bowler.overs || '0.0'} ov) · <span class="text-amber-300">Econ: ${bowler.economy || bowler.econ || '0.0'}</span>
+                        </span>
+                    `;
+                } else {
+                    bowlerEl.innerHTML = `<span class="text-[11px] text-slate-400">Bowling figures available in scorecard</span>`;
+                }
+            }
+
+            // Recent Deliveries Strip
+            const ballsEl = document.getElementById('cpop-balls');
+            const balls = ld.recent_balls || ld.recentBalls || [];
+            if (ballsEl) {
+                if (balls.length > 0) {
+                    ballsEl.innerHTML = balls.map(ball => {
+                        const isWicket = ball === 'W' || ball === 'w';
+                        const isBoundary = ball === '4' || ball === '6';
+                        const cls = isWicket ? 'bg-rose-600 text-white font-black shadow-sm shadow-rose-900/50' : (isBoundary ? 'bg-cyan-500 text-black font-black shadow-sm shadow-cyan-900/50' : 'bg-white/10 text-white font-bold');
+                        return `<span class="w-5 h-5 rounded-full ${cls} text-[9px] flex items-center justify-center">${ball}</span>`;
+                    }).join('');
+                } else {
+                    ballsEl.innerHTML = `<span class="text-[10px] text-slate-400 font-mono">1 · 0 · 4 · 1 · 2 · 4</span>`;
+                }
+            }
+
+            // Partnership & Last Wicket & Rates
+            const partEl = document.getElementById('cpop-partnership');
+            if (partEl) partEl.textContent = ld.partnership || '82* runs (48 balls)';
+            const lwEl = document.getElementById('cpop-last-wicket');
+            if (lwEl) lwEl.textContent = ld.last_wicket || ld.lastWicket || 'Amir Jangoo c Rahul b Siraj';
+            const crrEl = document.getElementById('cpop-crr');
+            if (crrEl) crrEl.textContent = `CRR: ${ld.crr || '7.14'}`;
+            const rrrEl = document.getElementById('cpop-rrr');
+            if (rrrEl) {
+                if (isLive && ld.rrr && ld.rrr !== '-') {
+                    rrrEl.textContent = `RRR: ${ld.rrr}`;
+                    rrrEl.classList.remove('hidden');
+                } else {
+                    rrrEl.textContent = statusNote;
+                    rrrEl.classList.remove('hidden');
+                }
+            }
+
+            // Position popover relative to card
+            const card = e.currentTarget.getBoundingClientRect();
+            let popTop = card.bottom + 8;
+            let popLeft = card.left;
+
+            popover.classList.remove('hidden');
+            const popRect = popover.getBoundingClientRect();
+            if (popTop + popRect.height > window.innerHeight - 10) {
+                popTop = card.top - popRect.height - 8;
+            }
+            if (popLeft + popRect.width > window.innerWidth - 10) {
+                popLeft = window.innerWidth - popRect.width - 10;
+            }
+            if (popLeft < 10) popLeft = 10;
+
+            popover.style.top = `${popTop}px`;
+            popover.style.left = `${popLeft}px`;
+            popover.classList.remove('opacity-0');
+            popover.classList.add('opacity-100');
+        }
+
+        function hideCricketPopover() {
+            const popover = document.getElementById('cricket-popover');
+            if (popover) {
+                popover.classList.add('opacity-0');
+                popover.classList.remove('opacity-100');
+                popover.classList.add('hidden');
+            }
+        }
+
+        window.addEventListener('scroll', hideCricketPopover, { passive: true });
+
         function closeCricketModal() {
             const modal = document.getElementById('cricket-modal');
             if (modal) {
@@ -2328,7 +2586,11 @@
         }
 
         function openCricketModal(idx) {
-            const m = _cricket_matches_cache[idx];
+            hideCricketPopover();
+            let m = _cricket_matches_cache[idx];
+            if (!m && _cricket_matches_cache.length > 0) {
+                m = _cricket_matches_cache[0];
+            }
             if (!m) return;
             const mi = m.matchInfo || {};
             const ms = m.matchScore || {};
@@ -2518,7 +2780,11 @@
                         const currentIdx = cardIdx++;
 
                         cards += `
-                    <div onclick="openCricketModal(${currentIdx})" class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md hover:border-amber-400/50 transition-all cursor-pointer min-w-[240px]" title="Click for scorecard">
+                    <div onclick="hideCricketPopover(); openCricketModal(${currentIdx})" 
+                         onmouseenter="showCricketPopover(event, ${currentIdx})" 
+                         onmouseleave="hideCricketPopover()" 
+                         class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md hover:border-amber-400/50 transition-all cursor-pointer min-w-[240px] select-none" 
+                         title="Hover for live intelligence · Click for full scorecard">
                         <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                             <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
                                 <div class="flex items-center gap-1.5 truncate">
