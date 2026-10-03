@@ -1268,7 +1268,7 @@ def ai_scan():
     articles = verification.get("matching_articles", [])
 
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 4: Decision Tree — If live articles found, ground with full live context
+    # STEP 4: Decision Tree — Prioritize Tavily Ground Truth in Background
     # ─────────────────────────────────────────────────────────────────────────
     grounded_res = None
     if articles and (MISTRAL_API_KEY or GEMINI_API_KEY):
@@ -1278,12 +1278,30 @@ def ai_scan():
         except Exception:
             grounded_res = None
 
-    if grounded_res and isinstance(grounded_res, dict) and "verdict" in grounded_res:
+    if verification.get("sources_found", 0) > 0 or verification.get("tavily_answer"):
+        # Tavily Live Web Intelligence determines the ground-truth reality
+        grounding_analysis = analyze_grounding_evidence(
+            text, articles, model_res, compute_signals(text),
+            tavily_answer=verification.get("tavily_answer", "")
+        )
+        grounding_analysis["verification"] = verification
+        if "verification_status" in grounding_analysis:
+            verification["verification_status"] = grounding_analysis["verification_status"]
+
+        # If LLM refined the explanation with verified sources, adopt the refined explanation
+        if grounded_res and isinstance(grounded_res, dict) and grounded_res.get("explanation"):
+            grounding_analysis["explanation"] = grounded_res["explanation"]
+            if "verdict" in grounded_res:
+                grounding_analysis["verdict"] = grounded_res["verdict"]
+                grounding_analysis["is_fake"] = (grounded_res["verdict"] == "FAKE")
+                grounding_analysis["confidence"] = max(float(grounded_res.get("confidence", 95.0)), float(grounding_analysis.get("confidence", 95.0)))
+
+        result = grounding_analysis
+        result["pipeline_used"] = "tavily_grounded"
+    elif grounded_res and isinstance(grounded_res, dict) and "verdict" in grounded_res:
         result = grounded_res
         result["verification"] = verification
-        result["model"] = "Deep Learning Core + Live Web Grounding + NLP Engine"
         result["pipeline_used"] = "tavily_mistral"
-        result["engines"] = ["Deep Learning Core", "Live Web Grounding", "NLP Semantic Analyzer"]
     elif mistral_res is not None and isinstance(mistral_res, dict) and "verdict" in mistral_res:
         # Mistral direct evaluation
         final_verdict = str(mistral_res.get("verdict", "REAL" if not model_is_fake else "FAKE")).upper()
@@ -1296,26 +1314,22 @@ def ai_scan():
             "fake_signals": mistral_res.get("fake_signals") or model_res.get("fake_signals") or (["⚠ Misinformation markers detected"] if final_verdict == "FAKE" else []),
             "real_signals": mistral_res.get("real_signals") or model_res.get("real_signals") or (["✓ Verified factual consistency across Deep Learning Core and NLP analyzer"] if final_verdict == "REAL" else []),
             "explanation": mistral_res.get("explanation") or model_res.get("explanation") or f"TruthLens Neural Analysis: Evaluated as {final_verdict}.",
-            "model": "Deep Learning Neural Core + NLP Semantic Analysis",
             "pipeline_used": "model_mistral",
-            "engines": ["Deep Learning Core", "NLP Semantic Analyzer", "Live Web Grounding"],
             "verification": verification
         }
-    elif verification.get("sources_found", 0) > 0 or verification.get("tavily_answer"):
-        grounding_analysis = analyze_grounding_evidence(
-            text, articles, model_res, compute_signals(text),
-            tavily_answer=verification.get("tavily_answer", "")
-        )
-        grounding_analysis["verification"] = verification
-        if "verification_status" in grounding_analysis:
-            verification["verification_status"] = grounding_analysis["verification_status"]
-        result = grounding_analysis
     else:
         result = model_res
         result["verification"] = verification
-        result["model"] = "Deep Learning BiLSTM-Attention Neural Core"
         result["pipeline_used"] = "model_only"
-        result["engines"] = ["Deep Learning Neural Core", "Bidirectional LSTM Layer", "Attention Mechanism", "Semantic Tensor Analyzer"]
+
+    # Always ensure full Deep Learning & NLP metrics are attached for frontend visualization
+    if "neural_metrics" not in result or not result["neural_metrics"]:
+        result["neural_metrics"] = model_res.get("neural_metrics", {})
+    if "nlp_metrics" not in result or not result["nlp_metrics"]:
+        result["nlp_metrics"] = model_res.get("nlp_metrics", {})
+    result["model"] = "Deep Learning BiLSTM-Attention Neural Core"
+    result["architecture"] = "Conv1D + BiLSTM + Multi-Head Self-Attention"
+    result["engines"] = ["Deep Learning Neural Core (BiLSTM)", "NLP Semantic & Stylometric Analyzer", "Real-Time Empirical Grounding"]
 
     # Sanitize any residual AI provider names to present as in-house DL + NLP architecture
     def sanitize_ai_text(val):
