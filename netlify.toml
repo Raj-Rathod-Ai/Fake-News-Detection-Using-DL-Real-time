@@ -11,12 +11,6 @@
   from = "/api/*"
   to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
   status = 200
-# Security Canary & DevTools Honeypot (Returns HTTP 404)
-[[redirects]]
-  from = "/fuck.html"
-  to = "https://fake-news-detection-using-ml-real-time.onrender.com/fuck.html"
-  status = 404
-  force = true
 
 [[redirects]]
   # Single-page app fallback

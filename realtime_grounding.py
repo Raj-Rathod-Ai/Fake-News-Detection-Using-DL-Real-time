@@ -155,17 +155,12 @@ def check_affirmative_corroboration(claim: str, articles: List[Dict[str, Any]]) 
             if sig_numbers and not any(n in combined_text for n in sig_numbers):
                 continue
 
-        # Check keyword overlap ratio
+        # Check keyword overlap
         matched_tokens = [tok for tok in claim_tokens if tok in combined_text]
         ratio = len(matched_tokens) / max(len(claim_tokens), 1)
 
-        # Ensure primary claim tokens (e.g. key subjects) are actually in the article
-        key_tokens = [w for w in re.findall(r'[a-z0-9]+', claim.lower()) if len(w) >= 4 and w not in COMMON_STOPWORDS]
-        if key_tokens and len(key_tokens) >= 2:
-            if not any(key_tokens[0] in combined_text for _ in [1]):
-                continue
-
-        if ratio >= 0.45 or (len(matched_tokens) >= 3 and ratio >= 0.35):
+        # Ensure at least 2 significant claim tokens or sufficient ratio match
+        if (len(matched_tokens) >= 2 and ratio >= 0.20) or len(matched_tokens) >= 3 or ratio >= 0.35:
             src_name = a.get("source") or "Authoritative Source"
             corroborating_sources.append(src_name)
 
@@ -226,9 +221,13 @@ def analyze_grounding_evidence(
             "won the", "won by", "champion", "approved the", "confirmed that",
             "reported that", "passed the", "is true", "official announcement",
             "was born on", "born in", "took place on", "inaugurated", "elected",
-            "awarded", "launched the", "achieved", "defeated"
+            "awarded", "launched the", "achieved", "defeated", "announced",
+            "kept", "holds", "decided", "stated", "held", "scores", "unveiled",
+            "rises", "falls", "hits", "reaches", "remains", "signed", "passed",
+            "meets", "hosted", "begins", "starts", "ends", "launched", "published",
+            "cleared", "appointed", "developed", "built", "tested", "established"
         ]
-        ans_is_confirmed = any(k in ans_lower for k in confirm_keywords) and not ans_is_debunked
+        ans_is_confirmed = (any(k in ans_lower for k in confirm_keywords) or (len(ans) > 40 and not ans_is_debunked)) and not ans_is_debunked
 
         if ans_is_debunked:
             neu = dict(base_neural)
@@ -359,7 +358,7 @@ def analyze_grounding_evidence(
     dl_fake_prob = dl_res.get("fake_prob", 0.5)
     dl_is_fake = dl_res.get("is_fake", dl_fake_prob > 0.5)
     
-    if dl_is_fake or len(articles) == 0:
+    if dl_is_fake:
         neu = dict(base_neural)
         neu["sequence_entropy"] = 0.22
         neu["attention_score"] = 0.70

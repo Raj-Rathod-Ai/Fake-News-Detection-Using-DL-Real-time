@@ -245,20 +245,20 @@ class FakeNewsDLInferenceEngine:
         excl = features["exclamation_count"]
 
         # Neural scoring simulation
-        if a_hits > 0 and s_hits == 0 and caps < 0.35:
-            # Strong authentic journalistic pattern (e.g., Reuters, official reports)
-            real_prob = min(0.996, 0.82 + (a_hits * 0.08))
-            fake_prob = round(1.0 - real_prob, 4)
-            real_prob = round(real_prob, 4)
-        elif s_hits > 0 or caps > 0.40 or excl >= 2:
-            # Misinformation / sensationalist anomaly
-            fake_prob = min(0.985, 0.75 + (s_hits * 0.08) + (0.1 if caps > 0.35 else 0))
+        if s_hits > 0 or excl >= 2 or (caps > 0.50 and len(text) > 15):
+            # Misinformation / sensationalist anomaly detected
+            fake_prob = min(0.985, 0.78 + (s_hits * 0.08) + (0.08 if caps > 0.50 else 0))
             real_prob = round(1.0 - fake_prob, 4)
             fake_prob = round(fake_prob, 4)
+        elif a_hits > 0:
+            # Strong authentic journalistic pattern (e.g., Reuters, official reports, institutions)
+            real_prob = min(0.996, 0.88 + (a_hits * 0.04))
+            fake_prob = round(1.0 - real_prob, 4)
+            real_prob = round(real_prob, 4)
         else:
-            # Neutral baseline sequence
-            real_prob = 0.55
-            fake_prob = 0.45
+            # Neutral journalistic sequence (standard news structure without sensational triggers)
+            real_prob = 0.82
+            fake_prob = 0.18
 
         is_fake = fake_prob > 0.50
         confidence = float(max(fake_prob, real_prob) * 100)

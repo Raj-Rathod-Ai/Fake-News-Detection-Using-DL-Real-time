@@ -36,8 +36,9 @@
 
     <style>
         *, *::before, *::after { box-sizing: border-box; }
-        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; }
-        .dark body { background:#0f0f0f; color:#e8eaed; }
+        html { scroll-behavior: smooth; }
+        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; font-family:'DM Sans',sans-serif; }
+        .dark body { background:#0a0a0f; color:#e8eaed; }
         * { transition: background-color 0.25s ease, border-color 0.25s ease; }
 
         ::-webkit-scrollbar { width:4px; height:4px; }
@@ -139,55 +140,80 @@
         .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
         .price-amt { font-size:1.02em; font-weight:800; }
 
-        /* Preloader */
+        /* ============ PRELOADER — Blur-In Brand Animation ============ */
         #preloader {
-            transition: opacity 0.5s ease, visibility 0.5s ease;
+            position: fixed; inset: 0; z-index: 9999;
+            background: #000;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            transition: opacity 0.7s ease, visibility 0.7s ease;
         }
         #preloader.preloader-hidden {
             opacity: 0 !important;
             visibility: hidden !important;
             pointer-events: none !important;
         }
-        #preloader-brand-text {
+        /* Ambient glow orbs */
+        .pl-glow-1 {
+            position: absolute; width: 400px; height: 400px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%);
+            top: 50%; left: 50%; transform: translate(-50%, -60%);
+            animation: plGlowPulse 3s ease-in-out infinite alternate;
+        }
+        .pl-glow-2 {
+            position: absolute; width: 300px; height: 300px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(26,115,232,0.25) 0%, transparent 70%);
+            top: 50%; left: 50%; transform: translate(-30%, -40%);
+            animation: plGlowPulse 3s ease-in-out 1.5s infinite alternate;
+        }
+        @keyframes plGlowPulse { from{opacity:0.5;transform:translate(-50%,-60%) scale(1)} to{opacity:1;transform:translate(-50%,-60%) scale(1.15)} }
+        /* Brand text blur-in */
+        #pl-brand-wrap {
+            position: relative; z-index: 1; text-align: center;
+            animation: plBlurIn 0.9s cubic-bezier(0.23,1,0.32,1) forwards;
+            opacity: 0;
+        }
+        @keyframes plBlurIn {
+            0%  { opacity:0; filter:blur(20px); transform:scale(0.9); }
+            60% { opacity:1; filter:blur(2px);  transform:scale(1.02); }
+            100%{ opacity:1; filter:blur(0);    transform:scale(1); }
+        }
+        #pl-title {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2.2rem, 8vw, 3.5rem);
+            font-size: clamp(2.8rem, 10vw, 5rem);
             font-weight: 900;
             letter-spacing: -0.04em;
-            background: linear-gradient(135deg, #7c3aed, #1a73e8, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: plFadeIn 0.6s ease forwards;
+            line-height: 1;
+            color: #fff;
+            text-shadow: 0 0 60px rgba(124,58,237,0.8), 0 0 120px rgba(26,115,232,0.4);
         }
-        @keyframes plFadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        #pl-track { background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; height: 3px; width: 220px; margin: 0 auto; }
-        #pl-bar2 { height: 100%; width: 0%; background: linear-gradient(90deg, #7c3aed, #1a73e8, #06b6d4); border-radius: 999px; transition: width 0.07s linear; }
+        #pl-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            margin-top: 8px;
+            margin-bottom: 28px;
+        }
+        #pl-track { width: 200px; height: 2px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; margin: 0 auto; }
+        #pl-bar3 { height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, #7c3aed, #1a73e8, #06b6d4); transition: width 0.05s linear; box-shadow: 0 0 8px rgba(124,58,237,0.8); }
+        #pl-status3 { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.3em; text-transform:uppercase; color:rgba(124,58,237,0.9); margin-top:12px; }
 
         /* DevTools Inspect Shield */
-        body.inspect-blocked > *:not(#devtools-guard) {
-            display: none !important;
-        }
-        body.inspect-blocked {
-            overflow: hidden !important;
-            background: #030712 !important;
-        }
-        body.inspect-blocked #devtools-guard {
-            display: flex !important;
-        }
+        body.inspect-blocked > *:not(#devtools-guard) { display: none !important; }
+        body.inspect-blocked { overflow: hidden !important; background: #030712 !important; }
+        body.inspect-blocked #devtools-guard { display: flex !important; }
 
         /* Mobile hamburger menu */
-        #mobile-menu-drawer {
-            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
-        }
-        #mobile-menu-drawer.menu-closed {
-            transform: translateY(-8px);
-            opacity: 0;
-            pointer-events: none;
-        }
-        #mobile-menu-drawer.menu-open {
-            transform: translateY(0);
-            opacity: 1;
-            pointer-events: all;
+        #mobile-menu-drawer { transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
+        #mobile-menu-drawer.menu-closed { transform: translateY(-8px); opacity: 0; pointer-events: none; }
+        #mobile-menu-drawer.menu-open  { transform: translateY(0); opacity: 1; pointer-events: all; }
+
+        /* Responsive fixes */
+        @media (max-width: 640px) {
+            main { padding-left: 12px; padding-right: 12px; }
+            .news-card { border-radius: 14px; }
+            footer { padding-left: 16px; padding-right: 16px; }
         }
     </style>
 </head>
@@ -197,15 +223,15 @@
 <!-- THREE.JS INTERACTIVE 3D NEURAL CANVAS (ThreeUI / WebGL background) -->
 <canvas id="three-neural-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40 dark:opacity-25 transition-opacity duration-700"></canvas>
 
-<!-- PRELOADER — Original TruthLens style -->
-<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center" style="background:#08081a;">
-    <div class="text-center px-4">
-        <div id="preloader-brand-text">TruthLens</div>
-        <p class="text-[10px] font-mono uppercase tracking-[0.35em] mt-2 mb-5" style="color:rgba(255,255,255,0.35);">AI Verified Intelligence</p>
-        <div id="pl-track">
-            <div id="pl-bar2"></div>
-        </div>
-        <p id="pl-status2" class="text-[9px] font-mono uppercase tracking-widest mt-3" style="color:rgba(124,58,237,0.8);">Initializing...</p>
+<!-- PRELOADER — Blur-In Black Background -->
+<div id="preloader">
+    <div class="pl-glow-1"></div>
+    <div class="pl-glow-2"></div>
+    <div id="pl-brand-wrap">
+        <div id="pl-title">TruthLens</div>
+        <div id="pl-sub">AI Verified Intelligence</div>
+        <div id="pl-track"><div id="pl-bar3"></div></div>
+        <div id="pl-status3">Initializing...</div>
     </div>
 </div>
 
@@ -768,33 +794,33 @@
 <script>
 
 // =====================================================================
-// ORIGINAL PRELOADER — TruthLens simple bar animation
+// PRELOADER — Blur-In Black Background Animation
 // =====================================================================
 (function() {
-    var bar = document.getElementById('pl-bar2');
-    var status = document.getElementById('pl-status2');
-    var pl = document.getElementById('preloader');
+    var bar    = document.getElementById('pl-bar3');
+    var status = document.getElementById('pl-status3');
+    var pl     = document.getElementById('preloader');
     if (!pl) return;
 
     var pct = 0;
-    var statusMsgs = ['Initializing...', 'Loading feeds...', 'Connecting AI...', 'Almost ready...', 'TruthLens Ready!'];
+    var msgs = ['Initializing...', 'Loading feeds...', 'Connecting AI...', 'Almost ready...', 'TruthLens Ready!'];
 
     var intv = setInterval(function() {
-        pct += Math.random() * 12 + 6;
+        pct += Math.random() * 14 + 7;
         if (pct >= 100) { pct = 100; clearInterval(intv); }
         if (bar) bar.style.width = pct + '%';
-        var si = Math.min(Math.floor((pct / 100) * statusMsgs.length), statusMsgs.length - 1);
-        if (status) status.textContent = statusMsgs[si];
-    }, 40);
+        var si = Math.min(Math.floor((pct / 100) * msgs.length), msgs.length - 1);
+        if (status) status.textContent = msgs[si];
+    }, 38);
 
     function dismissPreloader() {
         if (!pl || pl.classList.contains('preloader-hidden')) return;
         pl.classList.add('preloader-hidden');
-        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 600);
+        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 800);
     }
 
-    setTimeout(dismissPreloader, 1600);
-    window.addEventListener('load', function() { setTimeout(dismissPreloader, 400); });
+    setTimeout(dismissPreloader, 1800);
+    window.addEventListener('load', function() { setTimeout(dismissPreloader, 500); });
 })();
 
 // =====================================================================
@@ -2557,6 +2583,13 @@ async function runTextScan() {
     const token = localStorage.getItem('tl_auth_token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    let guestId = localStorage.getItem('tl_guest_id');
+    if (!guestId) {
+        guestId = 'gid_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now().toString(36);
+        localStorage.setItem('tl_guest_id', guestId);
+    }
+    headers['X-Guest-ID'] = guestId;
+
     try {
         const r = await fetch('/api/ai-scan', {
             method: 'POST',
@@ -2570,9 +2603,9 @@ async function runTextScan() {
             let errMsg = 'Analysis failed.';
             try { 
                 const ed = await r.json(); 
-                errMsg = ed.error || errMsg;
-                if (r.status === 403 && ed.quota_exceeded) {
-                    showToast('Scan limit reached. Expand your allowance to 50 scans free!', 'error');
+                errMsg = ed.message || ed.error || errMsg;
+                if (r.status === 403) {
+                    showToast(errMsg, 'error');
                     openAuthModal('signup');
                 }
             } catch(e) {}
