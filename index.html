@@ -148,6 +148,18 @@
             visibility: hidden !important;
             pointer-events: none !important;
         }
+
+        /* DevTools Inspect Shield */
+        body.inspect-blocked > *:not(#devtools-guard) {
+            display: none !important;
+        }
+        body.inspect-blocked {
+            overflow: hidden !important;
+            background: #030712 !important;
+        }
+        body.inspect-blocked #devtools-guard {
+            display: flex !important;
+        }
     </style>
 </head>
 
@@ -608,6 +620,70 @@
     </div>
 </div>
 
+<!-- CRICKET FULL SCORECARD & LIVE INTEL MODAL -->
+<div id="cricket-scorecard-modal" class="fixed inset-0 z-[170] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div class="relative bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10 p-6">
+        <button onclick="closeCricketModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+            <i class="ph-bold ph-x text-xl"></i>
+        </button>
+        <div id="cricket-modal-body"></div>
+    </div>
+</div>
+
+<!-- PLATFORM ADMIN CONTROL CENTER MODAL -->
+<div id="admin-control-modal" class="fixed inset-0 z-[165] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div class="relative bg-slate-950 text-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border border-amber-500/30 p-6 font-sans">
+        <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors">
+            <i class="ph-bold ph-x text-xl"></i>
+        </button>
+        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-2xl">
+                👑
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    TruthLens Admin Control Center
+                    <span class="text-[10px] font-mono uppercase bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">Unlimited Quota</span>
+                </h3>
+                <p class="text-xs text-slate-400">Platform oversight, user scan quota resets, cache purging, and system metrics.</p>
+            </div>
+        </div>
+
+        <div id="admin-modal-content" class="space-y-6">
+            <div class="flex items-center justify-center py-10">
+                <div class="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DEVTOOLS ANTI-INSPECT 404 SCREEN -->
+<div id="devtools-guard" class="fixed inset-0 z-[999999] bg-[#030712] text-slate-400 font-mono flex items-center justify-center p-6 hidden">
+    <div class="max-w-md w-full text-center space-y-5">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-3xl font-black shadow-lg shadow-rose-500/10">
+            404
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight mb-2">404 - Resource Not Found</h1>
+            <p class="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
+                The requested URL / was not found on this server. Inspect mode detected; diagnostic traces routed to canary honeypot.
+            </p>
+        </div>
+        <div class="p-3.5 bg-black/60 border border-white/10 rounded-2xl text-[11px] text-rose-400 font-mono flex items-center justify-between">
+            <span class="truncate">GET /fuck.html</span>
+            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold shrink-0">404 Not Found</span>
+        </div>
+        <div class="text-[11px] text-slate-500">
+            Close Developer Tools to restore verified intelligence feed.
+        </div>
+        <div>
+            <button onclick="window._closeDevToolsGuard()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all">
+                Close & Return
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 
 // =====================================================================
@@ -930,15 +1006,47 @@ function renderAuthArea() {
 
     const q = state.quota || { limit: 5, remaining: 5, used: 0, is_authenticated: false };
     const isAuth = !!state.currentUser && q.is_authenticated;
-    const isExhausted = q.remaining <= 0;
+    const isAdmin = isAuth && (state.currentUser.role === 'admin' || state.currentUser.is_admin || q.unlimited || q.limit >= 999999);
+    const isExhausted = !isAdmin && q.remaining <= 0;
 
     let pillHtml = '';
-    if (isAuth) {
+    if (isAdmin) {
+        pillHtml = `
+            <div id="quota-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-black transition-all shadow-sm">
+                <span class="text-sm">👑</span>
+                <span class="font-mono text-xs tracking-wider">UNLIMITED</span>
+                <span class="text-[9px] uppercase tracking-wider text-amber-300 font-bold hidden sm:inline">Admin</span>
+            </div>
+            <div class="relative group">
+                <button class="flex items-center gap-2 p-1 pl-2.5 pr-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all text-xs font-bold text-amber-300">
+                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center text-[10px] font-black uppercase shadow-sm">
+                        👑
+                    </div>
+                    <span class="truncate max-w-[110px] text-xs font-mono hidden md:inline">${state.currentUser.email ? state.currentUser.email.split('@')[0] : 'Admin'}</span>
+                    <i class="ph-bold ph-caret-down text-amber-400 text-xs"></i>
+                </button>
+                <div class="absolute right-0 mt-2 w-56 bg-slate-900 border border-amber-500/30 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50 animate-in fade-in duration-150 text-white">
+                    <div class="px-3 py-2 border-b border-white/10 mb-1">
+                        <p class="text-[9px] text-amber-400 font-black uppercase tracking-wider flex items-center gap-1">
+                            👑 Platform Administrator
+                        </p>
+                        <p class="text-xs font-bold text-white truncate mt-0.5">${state.currentUser.email}</p>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">Quota: Unlimited Scans</p>
+                    </div>
+                    <button onclick="openAdminModal()" class="w-full text-left px-3 py-2 text-xs font-bold text-amber-400 hover:bg-amber-500/15 rounded-xl transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-sliders text-sm"></i> Admin Control Center
+                    </button>
+                    <button onclick="handleLogout()" class="w-full text-left px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-sign-out text-sm"></i> Sign Out
+                    </button>
+                </div>
+            </div>`;
+    } else if (isAuth) {
         pillHtml = `
             <div id="quota-pill" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-tl-purple text-xs font-bold transition-all shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span class="font-mono text-sm">${q.remaining}/${q.limit}</span>
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Scans</span>
+                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Daily</span>
             </div>
             <div class="relative group">
                 <button class="flex items-center gap-2 p-1 pl-2.5 pr-3 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 transition-all text-xs font-bold text-slate-800 dark:text-white">
@@ -948,12 +1056,13 @@ function renderAuthArea() {
                     <span class="truncate max-w-[110px] text-xs font-mono hidden md:inline">${state.currentUser.email.split('@')[0]}</span>
                     <i class="ph-bold ph-caret-down text-slate-400 text-xs"></i>
                 </button>
-                <div class="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50 animate-in fade-in duration-150">
+                <div class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50 animate-in fade-in duration-150">
                     <div class="px-3 py-2 border-b border-slate-100 dark:border-white/5 mb-1">
                         <p class="text-[9px] text-emerald-400 font-black uppercase tracking-wider flex items-center gap-1">
-                            <i class="ph-fill ph-check-circle"></i> Verified Researcher (50 Scans)
+                            <i class="ph-fill ph-check-circle"></i> Verified Researcher (50/Day)
                         </p>
                         <p class="text-xs font-bold text-slate-900 dark:text-white truncate mt-0.5">${state.currentUser.email}</p>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">Resets every 24 hours</p>
                     </div>
                     <button onclick="handleLogout()" class="w-full text-left px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-2">
                         <i class="ph-bold ph-sign-out text-sm"></i> Sign Out
@@ -962,15 +1071,15 @@ function renderAuthArea() {
             </div>`;
     } else {
         pillHtml = `
-            <div id="quota-pill" onclick="openAuthModal('signup')" title="Free Guest Scans. Click to unlock 50 scans!"
+            <div id="quota-pill" onclick="openAuthModal('signup')" title="Free Guest Scans (Resets every 24h). Click to unlock 50 daily scans!"
                  class="flex items-center gap-2 px-3 py-1.5 rounded-xl ${isExhausted ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 animate-pulse' : 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'} border text-xs font-bold cursor-pointer hover:border-tl-purple hover:text-tl-purple transition-all shadow-sm">
                 <span class="w-2 h-2 rounded-full ${isExhausted ? 'bg-rose-500' : 'bg-amber-400'}"></span>
                 <span class="font-mono text-sm">${q.remaining}/${q.limit}</span>
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Guest</span>
+                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Guest (24h)</span>
             </div>
             <button onclick="openAuthModal('login')" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
                 <i class="ph-fill ph-user-circle text-base"></i>
-                <span>Sign In <span class="hidden md:inline font-mono text-[10px] opacity-80">(50 Free)</span></span>
+                <span>Sign In <span class="hidden md:inline font-mono text-[10px] opacity-80">(50/Day)</span></span>
             </button>`;
     }
 
@@ -1759,7 +1868,7 @@ function showCricketPopover(e, idx) {
     const d = m.liveDetails || {};
 
     const series = d.series || mi.seriesName || 'ICC International Match';
-    const isLive = d.isLive || mi.state === 'In Progress' || mi.state === 'Stumps';
+    const isLive = d.isLive || d.is_live || mi.state === 'In Progress' || mi.state === 'Stumps';
 
     // Badge & Series
     const badge = document.getElementById('cpop-badge');
@@ -1770,35 +1879,44 @@ function showCricketPopover(e, idx) {
 
     document.getElementById('cpop-series').textContent = series;
 
-    // Batters
+    // Batters (Who made runs)
     const battersContainer = document.getElementById('cpop-batters');
-    const batters = d.currentBatters || [];
+    const batters = d.currentBatters || d.batters || [];
     if (batters.length > 0) {
-        battersContainer.innerHTML = batters.map(b => `
-            <div class="flex items-center justify-between text-xs py-0.5">
-                <span class="font-bold flex items-center gap-1.5 ${b.onStrike ? 'text-emerald-300' : 'text-slate-300'}">
-                    ${b.onStrike ? '<span class="text-emerald-400 font-mono font-black text-sm leading-none">*</span>' : '<span class="opacity-0 font-mono">*</span>'}
-                    ${escapeHtml(b.name)}
-                </span>
-                <span class="font-mono text-slate-200 text-[11px]">
-                    <strong class="text-white text-xs">${b.runs}</strong> (${b.balls}) • ${b.fours}×4 • ${b.sixes}×6 • <span class="text-slate-400 text-[10px]">${b.sr}</span>
-                </span>
-            </div>
-        `).join('');
+        battersContainer.innerHTML = batters.map(b => {
+            const onStrike = (b.onStrike !== undefined ? b.onStrike : b.on_strike);
+            const srVal = b.sr !== undefined ? b.sr : (b.strike_rate || '0.0');
+            return `
+                <div class="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg ${onStrike ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}">
+                    <span class="font-bold flex items-center gap-1.5 ${onStrike ? 'text-emerald-300' : 'text-slate-200'}">
+                        ${onStrike ? '<span class="text-emerald-400 font-mono font-black text-sm leading-none animate-pulse">*</span>' : '<span class="opacity-0 font-mono text-sm leading-none">*</span>'}
+                        ${escapeHtml(b.name)}
+                    </span>
+                    <span class="font-mono text-slate-200 text-[11px]">
+                        <strong class="text-white text-xs">${b.runs}</strong> (${b.balls}) • ${b.fours || 0}×4 • ${b.sixes || 0}×6 • <span class="text-emerald-400 text-[10px] font-semibold">${srVal} SR</span>
+                    </span>
+                </div>
+            `;
+        }).join('');
     } else {
         battersContainer.innerHTML = `<span class="text-slate-400 text-[11px] italic">Innings intermission or lineup refreshing...</span>`;
     }
 
-    // Current Bowler
+    // Current Bowler (Who took wickets)
     const bowlerContainer = document.getElementById('cpop-bowler');
-    const bowler = d.currentBowler;
+    const bowler = d.currentBowler || d.bowler;
     if (bowler && bowler.name) {
+        const econVal = bowler.econ !== undefined ? bowler.econ : (bowler.economy || '0.0');
         bowlerContainer.innerHTML = `
-            <span class="text-slate-200 font-bold">${escapeHtml(bowler.name)}</span>
-            <span class="font-mono text-slate-300 text-[11px]">
-                ${bowler.overs} ov · ${bowler.maidens}m · ${bowler.runs}r · <strong class="text-rose-400">${bowler.wickets}w</strong>
-                <span class="text-slate-400 text-[10px] ml-1">(${bowler.econ} econ)</span>
-            </span>
+            <div class="flex items-center justify-between w-full py-0.5">
+                <span class="text-slate-200 font-bold flex items-center gap-1">
+                    <span class="text-rose-400">🎯</span> ${escapeHtml(bowler.name)}
+                </span>
+                <span class="font-mono text-slate-300 text-[11px]">
+                    ${bowler.overs} ov · ${bowler.maidens || 0}m · ${bowler.runs}r · <strong class="text-rose-400 text-xs">${bowler.wickets}w</strong>
+                    <span class="text-slate-400 text-[10px] ml-1">(${econVal} econ)</span>
+                </span>
+            </div>
         `;
     } else {
         bowlerContainer.innerHTML = `<span class="text-slate-400 text-[11px] italic">Bowler rotation underway</span>`;
@@ -1806,10 +1924,10 @@ function showCricketPopover(e, idx) {
 
     // Recent Deliveries (Over balls)
     const ballsContainer = document.getElementById('cpop-balls');
-    const balls = d.recentBalls || ['0', '1', '2'];
+    const balls = d.recentBalls || d.recent_balls || ['0', '1', '2'];
     ballsContainer.innerHTML = balls.map(b => {
         let pillClass = 'bg-white/10 text-slate-300 border-white/10';
-        if (b === 'W') pillClass = 'bg-rose-500 text-white font-black border-rose-400 shadow-sm shadow-rose-500/50';
+        if (b === 'W') pillClass = 'bg-rose-500 text-white font-black border-rose-400 shadow-sm shadow-rose-500/50 animate-bounce';
         else if (b === '4') pillClass = 'bg-purple-600 text-white font-black border-purple-400 shadow-sm shadow-purple-500/50';
         else if (b === '6') pillClass = 'bg-emerald-500 text-white font-black border-emerald-300 shadow-sm shadow-emerald-500/50';
         else if (b === '•' || b === '0') pillClass = 'bg-white/5 text-slate-500 border-white/5';
@@ -1820,12 +1938,12 @@ function showCricketPopover(e, idx) {
 
     // Partnership, Last Wicket & Rates
     document.getElementById('cpop-partnership').textContent = d.partnership || '-';
-    document.getElementById('cpop-last-wicket').textContent = d.lastWicket || '-';
+    document.getElementById('cpop-last-wicket').textContent = d.lastWicket || d.last_wicket || '-';
     document.getElementById('cpop-crr').textContent = `CRR: ${d.crr || '7.5'}`;
     document.getElementById('cpop-rrr').textContent = d.rrr ? `RRR: ${d.rrr}` : '';
 
-    positionCricketPopover(e);
     pop.classList.remove('hidden');
+    positionCricketPopover(e);
     requestAnimationFrame(() => {
         pop.style.opacity = '1';
         pop.style.transform = 'translateY(0) scale(1)';
@@ -1834,7 +1952,7 @@ function showCricketPopover(e, idx) {
 
 function positionCricketPopover(e) {
     const pop = document.getElementById('cricket-popover');
-    if (!pop || pop.classList.contains('hidden')) return;
+    if (!pop) return;
 
     const target = e.currentTarget || e.target.closest('.cricket-card-item');
     if (!target) return;
@@ -1896,33 +2014,56 @@ function renderCricketCards(d) {
                 const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
                 const statusNote = mi.status || stateStr;
 
+                // Micro player-bowler indicators directly on the card
+                const ld = m.liveDetails || {};
+                const cardBatters = ld.currentBatters || ld.batters || [];
+                const cardBowler = ld.currentBowler || ld.bowler || {};
+                let batBrief = '';
+                if (cardBatters.length > 0) {
+                    const onStrike = cardBatters.find(b => (b.onStrike !== undefined ? b.onStrike : b.on_strike)) || cardBatters[0];
+                    batBrief = `${onStrike.name.split(' ').pop()} ${onStrike.runs}* (${onStrike.balls})`;
+                }
+                let bowlBrief = '';
+                if (cardBowler && cardBowler.name) {
+                    bowlBrief = `${cardBowler.name.split(' ').pop()} ${cardBowler.wickets}/${cardBowler.runs}`;
+                }
+
                 cards += `
-                    <div class="cricket-card-item flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-lg hover:border-tl-purple/50 transition-all cursor-pointer min-w-[250px] relative group"
+                    <div class="cricket-card-item flex flex-col justify-between shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-xl hover:border-tl-purple/60 transition-all cursor-pointer min-w-[270px] relative group"
+                         onclick="openCricketScorecardModal(${currentIdx})"
                          onmouseenter="showCricketPopover(event, ${currentIdx})"
                          onmouseleave="hideCricketPopover()"
                          onmousemove="positionCricketPopover(event)">
-                        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
-                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                <div class="flex items-center gap-1.5 truncate">
-                                    <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
-                                    <span class="truncate">${t1}</span>
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
+                                        <span class="truncate">${t1}</span>
+                                    </div>
+                                    <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
                                 </div>
-                                <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
+                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
+                                        <span class="truncate">${t2}</span>
+                                    </div>
+                                    <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                <div class="flex items-center gap-1.5 truncate">
-                                    <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
-                                    <span class="truncate">${t2}</span>
+                            <div class="ml-2 text-right shrink-0 max-w-[105px]">
+                                <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red flex items-center justify-end gap-1' : 'text-ink-500'}">
+                                    ${isLive ? '<span class="w-1.5 h-1.5 rounded-full bg-tl-red animate-pulse"></span>' : ''}
+                                    ${badgeText}
                                 </div>
-                                <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
+                                <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
                             </div>
                         </div>
-                        <div class="ml-2 text-right shrink-0 max-w-[105px]">
-                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red flex items-center justify-end gap-1' : 'text-ink-500'}">
-                                ${isLive ? '<span class="w-1.5 h-1.5 rounded-full bg-tl-red animate-pulse"></span>' : ''}
-                                ${badgeText}
-                            </div>
-                            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
+
+                        <!-- Micro player stats on card: who made runs & who took wicket -->
+                        <div class="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] font-mono">
+                            <span class="truncate max-w-[135px] font-bold text-slate-700 dark:text-cyan-300" title="Active Batter: ${batBrief}">🏏 ${batBrief || 'Batting Lineup'}</span>
+                            <span class="truncate max-w-[110px] text-right font-black text-rose-600 dark:text-rose-400" title="Current Bowler: ${bowlBrief}">🎯 ${bowlBrief || 'Bowling Figures'}</span>
                         </div>
                     </div>`;
             }
@@ -2801,6 +2942,447 @@ function renderPrice(m) {
         return `<span class="currency">${curSym}</span><span class="price-amt">${amt}</span>`;
     } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
 }
+
+// ==========================================
+// CRICKET FULL SCORECARD & LIVE INTEL MODAL
+// ==========================================
+function openCricketScorecardModal(idx) {
+    const m = (window.liveCricketMatches && window.liveCricketMatches[idx]) || null;
+    const body = document.getElementById('cricket-modal-body');
+    const modal = document.getElementById('cricket-scorecard-modal');
+    if (!modal || !body) return;
+
+    if (!m) {
+        body.innerHTML = `<div class="text-center py-8 text-slate-400">Match data unavailable</div>`;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        return;
+    }
+
+    const mi = m.matchInfo || {};
+    const ms = m.matchScore || {};
+    const t1 = mi.team1 ? (mi.team1.teamName || mi.team1.name) : 'Team 1';
+    const t2 = mi.team2 ? (mi.team2.teamName || mi.team2.name) : 'Team 2';
+    const s1 = ms.team1Score ? `${ms.team1Score.inngs1?.runs || ms.team1Score.runs || 0}/${ms.team1Score.inngs1?.wickets || ms.team1Score.wickets || 0} (${ms.team1Score.inngs1?.overs || ms.team1Score.overs || 0})` : '';
+    const s2 = ms.team2Score ? `${ms.team2Score.inngs1?.runs || ms.team2Score.runs || 0}/${ms.team2Score.inngs1?.wickets || ms.team2Score.wickets || 0} (${ms.team2Score.inngs1?.overs || ms.team2Score.overs || 0})` : '';
+    const isLive = mi.state === 'In Progress' || mi.state === 'live' || (mi.status && mi.status.toLowerCase().includes('opt to'));
+    const ld = m.liveDetails || {};
+    const batters = ld.currentBatters || ld.batters || [];
+    const bowler = ld.currentBowler || ld.bowler || {};
+    const recentBalls = ld.recentBalls || ld.recent_balls || ['0', '1', '2'];
+    const lastWicket = ld.lastWicket || ld.last_wicket || '-';
+    const partnership = ld.partnership || '-';
+    const crr = ld.crr || '7.45';
+    const rrr = ld.rrr ? `• RRR: ${ld.rrr}` : '';
+
+    let battersHtml = batters.length > 0 ? batters.map(b => {
+        const onStrike = (b.onStrike !== undefined ? b.onStrike : b.on_strike);
+        return `
+            <tr class="border-b border-slate-100 dark:border-white/5 ${onStrike ? 'bg-purple-500/10 dark:bg-purple-900/20 font-bold' : ''}">
+                <td class="py-2.5 px-3 flex items-center gap-1.5 text-slate-800 dark:text-white">
+                    ${onStrike ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>' : ''}
+                    <span>${b.name}</span>
+                    ${onStrike ? '<span class="text-[10px] text-emerald-500 font-mono font-black">*</span>' : ''}
+                </td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">${b.runs}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.balls}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.fours || 0}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.sixes || 0}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-tl-blue">${b.strikeRate || b.sr || '100.0'}</td>
+            </tr>`;
+    }).join('') : `<tr><td colspan="6" class="text-center py-4 text-xs text-slate-400">Batting details updating from live feed...</td></tr>`;
+
+    let bowlerHtml = bowler && bowler.name ? `
+        <tr class="border-b border-slate-100 dark:border-white/5">
+            <td class="py-2.5 px-3 font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                ${bowler.name}
+            </td>
+            <td class="py-2.5 px-3 text-right font-mono">${bowler.overs || '0.0'}</td>
+            <td class="py-2.5 px-3 text-right font-mono">${bowler.maidens || 0}</td>
+            <td class="py-2.5 px-3 text-right font-mono">${bowler.runs || 0}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-black text-rose-500">${bowler.wickets || 0}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-500">${bowler.economy || bowler.econ || '0.0'}</td>
+        </tr>` : `<tr><td colspan="6" class="text-center py-4 text-xs text-slate-400">Bowling figures updating...</td></tr>`;
+
+    let ballsHtml = recentBalls.map(b => {
+        let pillClass = 'bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10';
+        if (b === 'W' || b === 'w') pillClass = 'bg-rose-500 text-white font-black border-rose-300';
+        else if (b === '4') pillClass = 'bg-blue-500 text-white font-black border-blue-300';
+        else if (b === '6') pillClass = 'bg-emerald-500 text-white font-black border-emerald-300';
+        return `<span class="w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-mono font-bold ${pillClass}">${b}</span>`;
+    }).join('');
+
+    body.innerHTML = `
+        <div class="space-y-6">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-white/10">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isLive ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/10 text-slate-500'}">
+                            ${isLive ? '🔴 LIVE BALL-BY-BALL' : (mi.state || 'MATCH SCORECARD')}
+                        </span>
+                        <span class="text-xs text-slate-500 font-bold">${mi.seriesName || 'ICC Championship'}</span>
+                    </div>
+                    <h3 class="text-xl font-bold dark:text-white text-slate-900">${t1} vs ${t2}</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">${mi.status || 'Match in progress'}</p>
+                </div>
+            </div>
+
+            <!-- Score Summary Cards -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    <div class="text-[11px] font-bold text-slate-500 mb-1">${t1}</div>
+                    <div class="text-lg font-mono font-black text-slate-900 dark:text-white">${s1 || 'Yet to bat'}</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    <div class="text-[11px] font-bold text-slate-500 mb-1">${t2}</div>
+                    <div class="text-lg font-mono font-black text-slate-900 dark:text-white">${s2 || 'Yet to bat'}</div>
+                </div>
+            </div>
+
+            <!-- Live Batters Section -->
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
+                    <i class="ph-bold ph-baseball"></i> Active Batters (Runs & Strike Rate)
+                </h4>
+                <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 dark:bg-white/5 text-[10px] uppercase font-mono text-slate-500 border-b border-slate-200 dark:border-white/10">
+                            <tr>
+                                <th class="py-2 px-3">Batter</th>
+                                <th class="py-2 px-3 text-right">R</th>
+                                <th class="py-2 px-3 text-right">B</th>
+                                <th class="py-2 px-3 text-right">4s</th>
+                                <th class="py-2 px-3 text-right">6s</th>
+                                <th class="py-2 px-3 text-right">SR</th>
+                            </tr>
+                        </thead>
+                        <tbody>${battersHtml}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Live Bowler Section -->
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
+                    <i class="ph-bold ph-crosshair"></i> Current Bowler (Wickets & Economy)
+                </h4>
+                <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 dark:bg-white/5 text-[10px] uppercase font-mono text-slate-500 border-b border-slate-200 dark:border-white/10">
+                            <tr>
+                                <th class="py-2 px-3">Bowler</th>
+                                <th class="py-2 px-3 text-right">O</th>
+                                <th class="py-2 px-3 text-right">M</th>
+                                <th class="py-2 px-3 text-right">R</th>
+                                <th class="py-2 px-3 text-right text-rose-500">W</th>
+                                <th class="py-2 px-3 text-right">ECON</th>
+                            </tr>
+                        </thead>
+                        <tbody>${bowlerHtml}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Deliveries & Fall of Wickets -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    <div class="text-[10px] uppercase font-bold text-slate-500 mb-2">This Over Deliveries</div>
+                    <div class="flex items-center gap-2 flex-wrap">${ballsHtml}</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Fall of Wicket / Last Out</div>
+                    <div class="text-xs font-semibold text-rose-500">${lastWicket}</div>
+                    <div class="text-[11px] text-slate-500 mt-2">Partnership: <span class="font-bold text-slate-700 dark:text-white">${partnership}</span></div>
+                    <div class="text-[11px] font-mono text-cyan-500 mt-1">CRR: ${crr} ${rrr}</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeCricketModal() {
+    const modal = document.getElementById('cricket-scorecard-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+// ==========================================
+// ADMIN CONTROL CENTER
+// ==========================================
+function openAdminModal() {
+    const modal = document.getElementById('admin-control-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    fetchAdminOverview();
+}
+
+function closeAdminModal() {
+    const modal = document.getElementById('admin-control-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function fetchAdminOverview() {
+    const container = document.getElementById('admin-modal-content');
+    if (!container) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/overview`, { credentials: 'include' });
+        if (!res.ok) {
+            container.innerHTML = `<div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs">Failed to load admin metrics: Unauthorized or server error.</div>`;
+            return;
+        }
+        const data = await res.json();
+        const totalUsers = data.total_users || 0;
+        const totalScans = data.total_scans || 0;
+        const adminEmail = (currentUser && currentUser.email) || 'Administrator';
+
+        container.innerHTML = `
+            <div class="space-y-6">
+                <!-- Admin Card -->
+                <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/15 border border-amber-500/30 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs text-amber-300 font-bold uppercase tracking-wider">Super Administrator</div>
+                        <div class="text-base font-bold text-white">${adminEmail}</div>
+                        <div class="text-xs text-slate-400 mt-0.5">Quota Limit: <span class="text-amber-400 font-bold">UNLIMITED (∞)</span> • 24h Session Active</div>
+                    </div>
+                    <span class="text-3xl">👑</span>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Total Users</div>
+                        <div class="text-2xl font-black text-white font-mono">${totalUsers}</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Total AI Scans</div>
+                        <div class="text-2xl font-black text-tl-blue font-mono">${totalScans}</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Admin Scan Access</div>
+                        <div class="text-2xl font-black text-amber-400 font-mono">∞ Unlimited</div>
+                    </div>
+                </div>
+
+                <!-- Admin Action Controls -->
+                <div class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <i class="ph-bold ph-gear"></i> Platform Management Controls
+                    </h4>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input id="admin-target-user-email" type="email" placeholder="user@domain.com to reset quota"
+                               class="flex-1 px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-xs text-white outline-none focus:border-amber-400">
+                        <button onclick="adminResetUserQuota()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs uppercase tracking-wider transition-all">
+                            Reset Quota to 50
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <button onclick="adminClearCache()" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all flex items-center gap-2">
+                            <i class="ph-bold ph-trash"></i> Purge System Cache
+                        </button>
+                        <button onclick="fetchCricketScores(); fetchMarketData(); fetchAdminOverview();" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all flex items-center gap-2">
+                            <i class="ph-bold ph-arrows-clockwise"></i> Force Refresh Feeds
+                        </button>
+                    </div>
+                    <div id="admin-action-msg" class="text-xs font-mono"></div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs">Failed to connect to admin API: ${e.message}</div>`;
+    }
+}
+
+async function adminResetUserQuota() {
+    const input = document.getElementById('admin-target-user-email');
+    const msg = document.getElementById('admin-action-msg');
+    if (!input || !input.value.trim()) return;
+    const email = input.value.trim();
+    msg.textContent = 'Processing quota reset...';
+    msg.className = 'text-xs font-mono text-amber-300';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/reset-user-quota`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email })
+        });
+        const d = await res.json();
+        if (res.ok) {
+            msg.textContent = `✓ Quota for ${email} reset to 50 scans.`;
+            msg.className = 'text-xs font-mono text-emerald-400';
+            input.value = '';
+        } else {
+            msg.textContent = `✗ Failed: ${d.error || 'Server error'}`;
+            msg.className = 'text-xs font-mono text-rose-400';
+        }
+    } catch (e) {
+        msg.textContent = `✗ Error: ${e.message}`;
+        msg.className = 'text-xs font-mono text-rose-400';
+    }
+}
+
+async function adminClearCache() {
+    const msg = document.getElementById('admin-action-msg');
+    if (msg) {
+        msg.textContent = 'Purging cache...';
+        msg.className = 'text-xs font-mono text-amber-300';
+    }
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/clear-cache`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const d = await res.json();
+        if (res.ok && msg) {
+            msg.textContent = '✓ Platform cache purged successfully.';
+            msg.className = 'text-xs font-mono text-emerald-400';
+        }
+    } catch (e) {
+        if (msg) {
+            msg.textContent = `✗ Cache purge error: ${e.message}`;
+            msg.className = 'text-xs font-mono text-rose-400';
+        }
+    }
+}
+
+// ==========================================================
+// ANTI-INSPECT / DEVTOOLS PROTECTION & CANARY HONEYPOT
+// ==========================================================
+(function initAntiInspectGuard() {
+    let devToolsOpen = false;
+    let canaryFloodTimer = null;
+
+    function triggerCanaryFlood() {
+        if (canaryFloodTimer) return;
+        canaryFloodTimer = setInterval(() => {
+            if (!devToolsOpen) {
+                clearInterval(canaryFloodTimer);
+                canaryFloodTimer = null;
+                return;
+            }
+            // Trigger 404 honey-pot requests so network inspectors see /fuck.html 404
+            fetch(`/fuck.html?trace=${Math.random().toString(36).substring(2)}`, { cache: 'no-store' }).catch(() => {});
+        }, 1200);
+        // Immediate first blast
+        for (let i = 0; i < 3; i++) {
+            fetch(`/fuck.html?t=${Date.now()}_${i}`, { cache: 'no-store' }).catch(() => {});
+        }
+    }
+
+    function setDevToolsState(isOpen) {
+        if (devToolsOpen === isOpen) return;
+        devToolsOpen = isOpen;
+        const guard = document.getElementById('devtools-guard');
+
+        if (isOpen) {
+            document.body.classList.add('inspect-blocked');
+            if (guard) guard.classList.remove('hidden');
+            triggerCanaryFlood();
+        } else {
+            document.body.classList.remove('inspect-blocked');
+            if (guard) guard.classList.add('hidden');
+            if (canaryFloodTimer) {
+                clearInterval(canaryFloodTimer);
+                canaryFloodTimer = null;
+            }
+        }
+    }
+
+    window._closeDevToolsGuard = function() {
+        setDevToolsState(false);
+    };
+
+    // 1. Block Keyboard Shortcuts for DevTools & Source Inspection
+    window.addEventListener('keydown', (e) => {
+        // F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDevToolsState(true);
+            return false;
+        }
+        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (or Cmd+Alt on Mac)
+        const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+        if (isCmdOrCtrl && e.shiftKey) {
+            const k = (e.key || '').toLowerCase();
+            if (k === 'i' || k === 'j' || k === 'c') {
+                e.preventDefault();
+                e.stopPropagation();
+                setDevToolsState(true);
+                return false;
+            }
+        }
+        // Ctrl+U (View Source)
+        if (isCmdOrCtrl && (e.key === 'u' || e.key === 'U')) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDevToolsState(true);
+            return false;
+        }
+        // Ctrl+S (Save Page)
+        if (isCmdOrCtrl && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, true);
+
+    // 2. Disable Context Menu
+    window.addEventListener('contextmenu', (e) => {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        if (tag !== 'input' && tag !== 'textarea') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, true);
+
+    // 3. Real-time Window Dimension Offset Checker (Docked DevTools Detection)
+    function checkWindowDelta() {
+        const threshold = 160;
+        const widthDiff = window.outerWidth - window.innerWidth;
+        const heightDiff = window.outerHeight - window.innerHeight;
+        if (widthDiff > threshold || heightDiff > threshold) {
+            setDevToolsState(true);
+        } else {
+            // When user closes devtools, automatically restore
+            if (devToolsOpen) {
+                setDevToolsState(false);
+            }
+        }
+    }
+
+    window.addEventListener('resize', checkWindowDelta);
+    setInterval(checkWindowDelta, 1000);
+
+    // 4. Console getter check
+    setInterval(() => {
+        const start = performance.now();
+        const div = document.createElement('div');
+        Object.defineProperty(div, 'id', {
+            get: function() {
+                setDevToolsState(true);
+                return 'canary';
+            }
+        });
+        const elapsed = performance.now() - start;
+        if (elapsed > 100) {
+            setDevToolsState(true);
+        }
+    }, 2000);
+})();
 </script>
 </body>
 </html>

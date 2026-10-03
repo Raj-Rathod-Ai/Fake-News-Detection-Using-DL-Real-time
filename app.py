@@ -80,6 +80,25 @@ from itsdangerous import URLSafeTimedSerializer
 
 IST = ZoneInfo("Asia/Kolkata")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PLATFORM ADMINISTRATOR ACCOUNTS (Unlimited Access & System Controls)
+# ─────────────────────────────────────────────────────────────────────────────
+ADMIN_USERS = {
+    "kevalpiparotar4@gmail.com": {
+        "password": "keval@2006",
+        "id": "admin_keval_001",
+        "name": "Keval Piparotar",
+        "role": "admin"
+    },
+    "rathodraj1504@gmail.com": {
+        "password": "raj@2006",
+        "id": "admin_raj_002",
+        "name": "Raj Rathod",
+        "role": "admin"
+    }
+}
+ADMIN_EMAILS = set(ADMIN_USERS.keys())
+
 # Optional Imports
 try:
     import pymongo
@@ -107,6 +126,28 @@ def _connect_mongo_async():
             mongo_client = client
             mongo_db = client.get_database('truthlens_db')
             print("[OK] Connected to MongoDB Cloud Database (truthlens_db)")
+
+            # Seed / Synchronize Platform Administrators in MongoDB
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for admin_email, admin_info in ADMIN_USERS.items():
+                pw_h = generate_password_hash(admin_info["password"])
+                mongo_db.users.update_one(
+                    {"email": admin_email},
+                    {"$set": {
+                        "id": admin_info["id"],
+                        "email": admin_email,
+                        "password_hash": pw_h,
+                        "is_verified": True,
+                        "role": "admin",
+                        "is_admin": 1,
+                        "scans_used": 0,
+                        "last_reset_date": today_str,
+                        "created_at": now_iso
+                    }},
+                    upsert=True
+                )
+            print("[OK] MongoDB Admin accounts initialized with unlimited quota.")
         except Exception as e:
             print(f"[INFO] MongoDB connection info: {e}. Using local SQLite storage.")
 
@@ -162,15 +203,49 @@ def init_db():
                 verification_otp TEXT,
                 otp_expires_at TEXT,
                 scans_used INTEGER DEFAULT 0,
-                created_at TEXT
+                created_at TEXT,
+                role TEXT DEFAULT 'user',
+                is_admin INTEGER DEFAULT 0,
+                last_reset_date TEXT
             );
             CREATE TABLE IF NOT EXISTS guest_quotas (
                 guest_id TEXT PRIMARY KEY,
                 ip_address TEXT,
                 scans_used INTEGER DEFAULT 0,
-                last_scan_at TEXT
+                last_scan_at TEXT,
+                last_reset_date TEXT
             );
         """)
+
+        # Backward compatibility column migrations for existing SQLite databases
+        for col, col_type in [("role", "TEXT DEFAULT 'user'"), ("is_admin", "INTEGER DEFAULT 0"), ("last_reset_date", "TEXT")]:
+            try:
+                db.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type}")
+            except sqlite3.OperationalError:
+                pass
+
+        try:
+            db.execute("ALTER TABLE guest_quotas ADD COLUMN last_reset_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # Seed / Synchronize Platform Administrators in SQLite
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for admin_email, admin_info in ADMIN_USERS.items():
+            pw_h = generate_password_hash(admin_info["password"])
+            db.execute("""
+                INSERT INTO users (id, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date)
+                VALUES (?, ?, ?, 1, 0, ?, 'admin', 1, ?)
+                ON CONFLICT(email) DO UPDATE SET
+                    password_hash = excluded.password_hash,
+                    is_verified = 1,
+                    role = 'admin',
+                    is_admin = 1,
+                    scans_used = 0,
+                    last_reset_date = excluded.last_reset_date
+            """, (admin_info["id"], admin_email, pw_h, now_iso, today_str))
+
         db.commit()
         db.close()
 
@@ -323,7 +398,7 @@ def send_brevo_otp(to_email: str, otp_code: str) -> bool:
         return False
 
 def get_current_user():
-    """Extract authenticated user from Authorization Bearer token or cookie."""
+    """Extract authenticated user from Authorization Bearer token or cookie (24-hour lifetime)."""
     token = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -335,13 +410,30 @@ def get_current_user():
         return None
 
     try:
-        payload = auth_serializer.loads(token, max_age=86400 * 30)
+        # Token strictly expires every 24 hours (86,400 seconds)
+        payload = auth_serializer.loads(token, max_age=86400)
         user_id = payload.get("user_id")
-        if not user_id:
+        email = (payload.get("email") or "").lower()
+        if not user_id and not email:
             return None
 
+        # Check if user is one of the designated admins
+        if email in ADMIN_EMAILS:
+            admin_info = ADMIN_USERS[email]
+            return {
+                "id": admin_info["id"],
+                "email": email,
+                "name": admin_info.get("name", "Admin"),
+                "is_verified": 1,
+                "role": "admin",
+                "is_admin": 1,
+                "scans_used": 0,
+                "unlimited": True
+            }
+
         if mongo_db is not None:
-            u = mongo_db.users.find_one({"id": user_id})
+            query = {"id": user_id} if user_id else {"email": email}
+            u = mongo_db.users.find_one(query)
             if u:
                 u["_id"] = str(u.get("_id", u["id"]))
                 return u
@@ -349,7 +441,7 @@ def get_current_user():
             con = sqlite3.connect(DB_PATH)
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT id, email, password_hash, is_verified, scans_used, created_at FROM users WHERE id = ?", (user_id,))
+            cur.execute("SELECT id, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date FROM users WHERE id = ? OR email = ?", (user_id, email))
             row = cur.fetchone()
             con.close()
             if row:
@@ -360,13 +452,46 @@ def get_current_user():
 
 def get_client_identity():
     """
-    Determines if request is authenticated user (limit: 50) or guest (limit: 5).
+    Determines if request is:
+    - Admin user: unlimited scans (limit: 999999, scans_used: 0)
+    - Normal registered user: 50 scans/day, resets every 24h cycle
+    - Guest user: 5 scans/day, resets every 24h cycle
     Returns: (client_obj, is_authenticated, scans_used, limit)
     """
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     user = get_current_user()
     if user and user.get("is_verified"):
-        return user, True, int(user.get("scans_used", 0)), 50
+        email = (user.get("email") or "").lower()
+        is_admin = email in ADMIN_EMAILS or user.get("role") == "admin" or bool(user.get("is_admin"))
 
+        if is_admin:
+            user["role"] = "admin"
+            user["is_admin"] = 1
+            user["unlimited"] = True
+            return user, True, 0, 999999
+
+        # Normal verified user: 50 daily scans with 24-hour reset
+        user_last_reset = user.get("last_reset_date")
+        user_scans = int(user.get("scans_used", 0))
+
+        if user_last_reset != today_str:
+            user_scans = 0
+            user["scans_used"] = 0
+            user["last_reset_date"] = today_str
+            user_id = user.get("id")
+            if mongo_db is not None:
+                mongo_db.users.update_one({"id": user_id}, {"$set": {"scans_used": 0, "last_reset_date": today_str}})
+            else:
+                con = sqlite3.connect(DB_PATH)
+                con.execute("UPDATE users SET scans_used = 0, last_reset_date = ? WHERE id = ?", (today_str, user_id))
+                con.commit()
+                con.close()
+
+        return user, True, user_scans, 50
+
+    # Guest user: 5 daily scans with 24-hour reset
     guest_id = request.headers.get("X-Guest-ID") or request.cookies.get("truthlens_guest_id")
     if not guest_id:
         ip = request.remote_addr or "127.0.0.1"
@@ -376,26 +501,39 @@ def get_client_identity():
     if mongo_db is not None:
         g_doc = mongo_db.guest_quotas.find_one({"guest_id": guest_id})
         if g_doc:
-            scans_used = int(g_doc.get("scans_used", 0))
+            if g_doc.get("last_reset_date") != today_str:
+                scans_used = 0
+                mongo_db.guest_quotas.update_one(
+                    {"guest_id": guest_id},
+                    {"$set": {"scans_used": 0, "last_reset_date": today_str}}
+                )
+            else:
+                scans_used = int(g_doc.get("scans_used", 0))
         else:
             mongo_db.guest_quotas.insert_one({
                 "guest_id": guest_id,
                 "ip_address": request.remote_addr or "",
                 "scans_used": 0,
-                "last_scan_at": datetime.now(timezone.utc).isoformat()
+                "last_reset_date": today_str,
+                "last_scan_at": now_iso
             })
     else:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT scans_used FROM guest_quotas WHERE guest_id = ?", (guest_id,))
+        cur.execute("SELECT scans_used, last_reset_date FROM guest_quotas WHERE guest_id = ?", (guest_id,))
         row = cur.fetchone()
         if row:
-            scans_used = int(row["scans_used"])
+            if row["last_reset_date"] != today_str:
+                scans_used = 0
+                con.execute("UPDATE guest_quotas SET scans_used = 0, last_reset_date = ? WHERE guest_id = ?", (today_str, guest_id))
+                con.commit()
+            else:
+                scans_used = int(row["scans_used"])
         else:
             cur.execute(
-                "INSERT OR IGNORE INTO guest_quotas (guest_id, ip_address, scans_used, last_scan_at) VALUES (?, ?, 0, ?)",
-                (guest_id, request.remote_addr or "", datetime.now(timezone.utc).isoformat())
+                "INSERT OR IGNORE INTO guest_quotas (guest_id, ip_address, scans_used, last_reset_date, last_scan_at) VALUES (?, ?, 0, ?, ?)",
+                (guest_id, request.remote_addr or "", today_str, now_iso)
             )
             con.commit()
         con.close()
@@ -403,9 +541,12 @@ def get_client_identity():
     return {"guest_id": guest_id, "scans_used": scans_used}, False, scans_used, 5
 
 def increment_client_quota(client_obj, is_auth: bool):
-    """Increment scan count for user (limit 50) or guest (limit 5)."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    """Increment scan count for user (limit 50) or guest (limit 5). Admins have unlimited scans."""
     if is_auth:
+        email = (client_obj.get("email") or "").lower()
+        if email in ADMIN_EMAILS or client_obj.get("role") == "admin" or bool(client_obj.get("is_admin")):
+            return  # Platform administrators enjoy unlimited scans! Never increment.
+
         user_id = client_obj.get("id")
         if mongo_db is not None:
             mongo_db.users.update_one({"id": user_id}, {"$inc": {"scans_used": 1}})
@@ -415,6 +556,7 @@ def increment_client_quota(client_obj, is_auth: bool):
             con.commit()
             con.close()
     else:
+        now_iso = datetime.now(timezone.utc).isoformat()
         guest_id = client_obj.get("guest_id")
         if mongo_db is not None:
             mongo_db.guest_quotas.update_one(
@@ -441,6 +583,9 @@ def auth_signup():
     if not password or len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters long."}), 400
 
+    if email in ADMIN_EMAILS:
+        return jsonify({"error": "This administrator account is pre-registered. Please sign in directly."}), 400
+
     if mongo_db is not None:
         existing = mongo_db.users.find_one({"email": email})
     else:
@@ -460,6 +605,7 @@ def auth_signup():
     otp_code = str(random.randint(100000, 999999))
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     created_at = datetime.now(timezone.utc).isoformat()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     if mongo_db is not None:
         mongo_db.users.update_one(
@@ -467,16 +613,17 @@ def auth_signup():
             {"$set": {
                 "id": user_id, "email": email, "password_hash": pw_hash,
                 "is_verified": False, "verification_otp": otp_code,
-                "otp_expires_at": expires_at, "scans_used": 0, "created_at": created_at
+                "otp_expires_at": expires_at, "scans_used": 0,
+                "last_reset_date": today_str, "role": "user", "is_admin": 0, "created_at": created_at
             }},
             upsert=True
         )
     else:
         con = sqlite3.connect(DB_PATH)
         con.execute(
-            """INSERT OR REPLACE INTO users (id, email, password_hash, is_verified, verification_otp, otp_expires_at, scans_used, created_at)
-               VALUES (?, ?, ?, 0, ?, ?, 0, ?)""",
-            (user_id, email, pw_hash, otp_code, expires_at, created_at)
+            """INSERT OR REPLACE INTO users (id, email, password_hash, is_verified, verification_otp, otp_expires_at, scans_used, last_reset_date, role, is_admin, created_at)
+               VALUES (?, ?, ?, 0, ?, ?, 0, ?, 'user', 0, ?)""",
+            (user_id, email, pw_hash, otp_code, expires_at, today_str, created_at)
         )
         con.commit()
         con.close()
@@ -524,13 +671,16 @@ def auth_verify_otp():
         con.commit()
         con.close()
 
-    token = auth_serializer.dumps({"user_id": user_id, "email": email})
+    token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "user"})
     scans_used = int(user.get("scans_used", 0))
     quota_info = {
         "limit": 50,
         "remaining": max(0, 50 - scans_used),
         "used": scans_used,
-        "is_authenticated": True
+        "is_authenticated": True,
+        "role": "user",
+        "is_admin": False,
+        "unlimited": False
     }
     resp = jsonify({
         "success": True,
@@ -541,10 +691,14 @@ def auth_verify_otp():
             "email": email,
             "scans_used": scans_used,
             "limit": 50,
-            "remaining": max(0, 50 - scans_used)
+            "remaining": max(0, 50 - scans_used),
+            "role": "user",
+            "is_admin": False,
+            "unlimited": False
         }
     })
-    resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+    # Reset / expire cookie on strict 24-hour cycle
+    resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
     return resp
 
 @app.route("/api/auth/login", methods=["POST"])
@@ -554,6 +708,40 @@ def auth_login():
     password = (data.get("password") or "").strip()
     if not email or not password:
         return jsonify({"error": "Email and password are required."}), 400
+
+    # Dedicated Fast-Path for Administrators
+    if email in ADMIN_EMAILS:
+        admin_info = ADMIN_USERS[email]
+        if password == admin_info["password"]:
+            user_id = admin_info["id"]
+            token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin"})
+            quota_info = {
+                "limit": 999999,
+                "remaining": 999999,
+                "used": 0,
+                "is_authenticated": True,
+                "role": "admin",
+                "is_admin": True,
+                "unlimited": True
+            }
+            resp = jsonify({
+                "success": True,
+                "token": token,
+                "quota": quota_info,
+                "user": {
+                    "id": user_id,
+                    "email": email,
+                    "name": admin_info.get("name", "Admin"),
+                    "scans_used": 0,
+                    "limit": 999999,
+                    "remaining": 999999,
+                    "role": "admin",
+                    "is_admin": True,
+                    "unlimited": True
+                }
+            })
+            resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
+            return resp
 
     user = None
     if mongo_db is not None:
@@ -589,13 +777,18 @@ def auth_login():
         }), 403
 
     user_id = user["id"]
-    token = auth_serializer.dumps({"user_id": user_id, "email": email})
+    is_admin = email in ADMIN_EMAILS or user.get("role") == "admin" or bool(user.get("is_admin"))
+    token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin" if is_admin else "user"})
     scans_used = int(user.get("scans_used", 0))
+    limit = 999999 if is_admin else 50
     quota_info = {
-        "limit": 50,
-        "remaining": max(0, 50 - scans_used),
-        "used": scans_used,
-        "is_authenticated": True
+        "limit": limit,
+        "remaining": limit if is_admin else max(0, limit - scans_used),
+        "used": 0 if is_admin else scans_used,
+        "is_authenticated": True,
+        "role": "admin" if is_admin else "user",
+        "is_admin": is_admin,
+        "unlimited": is_admin
     }
     resp = jsonify({
         "success": True,
@@ -604,12 +797,16 @@ def auth_login():
         "user": {
             "id": user_id,
             "email": email,
-            "scans_used": scans_used,
-            "limit": 50,
-            "remaining": max(0, 50 - scans_used)
+            "scans_used": 0 if is_admin else scans_used,
+            "limit": limit,
+            "remaining": limit if is_admin else max(0, limit - scans_used),
+            "role": "admin" if is_admin else "user",
+            "is_admin": is_admin,
+            "unlimited": is_admin
         }
     })
-    resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+    # Reset / expire cookie on strict 24-hour cycle
+    resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
     return resp
 
 @app.route("/api/auth/logout", methods=["POST"])
@@ -621,13 +818,153 @@ def auth_logout():
 @app.route("/api/auth/me")
 def auth_me():
     client_obj, is_auth, scans_used, limit = get_client_identity()
+    email = client_obj.get("email") if is_auth else None
+    is_admin = bool(is_auth and (email in ADMIN_EMAILS or client_obj.get("role") == "admin" or client_obj.get("is_admin")))
     return jsonify({
         "is_authenticated": is_auth,
-        "email": client_obj.get("email") if is_auth else None,
-        "scans_used": scans_used,
-        "limit": limit,
-        "remaining": max(0, limit - scans_used)
+        "email": email,
+        "role": "admin" if is_admin else ("user" if is_auth else "guest"),
+        "is_admin": is_admin,
+        "scans_used": 0 if is_admin else scans_used,
+        "limit": 999999 if is_admin else limit,
+        "remaining": 999999 if is_admin else max(0, limit - scans_used),
+        "unlimited": is_admin
     })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PLATFORM ADMIN MANAGEMENT ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route("/api/admin/overview")
+def admin_overview():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Admin authentication required"}), 401
+    email = (user.get("email") or "").lower()
+    if email not in ADMIN_EMAILS and user.get("role") != "admin":
+        return jsonify({"error": "Unauthorized. Admin privileges required."}), 403
+
+    users_list = []
+    total_scans = 0
+    guest_count = 0
+    if mongo_db is not None:
+        for u in mongo_db.users.find({}, {"password_hash": 0, "verification_otp": 0}).limit(100):
+            users_list.append({
+                "id": u.get("id"),
+                "email": u.get("email"),
+                "role": u.get("role", "user"),
+                "scans_used": u.get("scans_used", 0),
+                "is_verified": bool(u.get("is_verified")),
+                "last_reset_date": u.get("last_reset_date"),
+                "created_at": u.get("created_at")
+            })
+            total_scans += int(u.get("scans_used", 0))
+        guest_count = mongo_db.guest_quotas.count_documents({})
+    else:
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT id, email, role, scans_used, is_verified, last_reset_date, created_at FROM users LIMIT 100")
+        for row in cur.fetchall():
+            d = dict(row)
+            users_list.append(d)
+            total_scans += int(d.get("scans_used", 0))
+        cur.execute("SELECT COUNT(*) FROM guest_quotas")
+        guest_count = cur.fetchone()[0]
+        con.close()
+
+    return jsonify({
+        "success": True,
+        "admin": email,
+        "total_users": len(users_list),
+        "total_scans": total_scans,
+        "stats": {
+            "total_registered_users": len(users_list),
+            "total_guests_tracked": guest_count,
+            "total_user_scans": total_scans,
+            "database_engine": "MongoDB Cloud" if mongo_db is not None else "SQLite Local",
+            "server_time_utc": datetime.now(timezone.utc).isoformat(),
+            "daily_reset_cycle": "Active 24-Hour Cycle (00:00 UTC)",
+            "admin_accounts": list(ADMIN_EMAILS)
+        },
+        "users": users_list
+    })
+
+@app.route("/api/admin/reset-user-quota", methods=["POST"])
+def admin_reset_quota():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Admin authentication required"}), 401
+    email = (user.get("email") or "").lower()
+    if email not in ADMIN_EMAILS and user.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json() or {}
+    target_email = (data.get("email") or "").strip().lower()
+    if not target_email:
+        return jsonify({"error": "Target email is required"}), 400
+
+    if mongo_db is not None:
+        mongo_db.users.update_one({"email": target_email}, {"$set": {"scans_used": 0}})
+    else:
+        con = sqlite3.connect(DB_PATH)
+        con.execute("UPDATE users SET scans_used = 0 WHERE email = ?", (target_email,))
+        con.commit()
+        con.close()
+
+    return jsonify({"success": True, "message": f"Daily quota reset to 0 for {target_email}."})
+
+@app.route("/api/admin/clear-cache", methods=["POST"])
+def admin_clear_cache():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Admin authentication required"}), 401
+    email = (user.get("email") or "").lower()
+    if email not in ADMIN_EMAILS and user.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    global _persistent_api_cache, _cricket_cache
+    with _api_cache_lock:
+        _persistent_api_cache.clear()
+    with _cricket_lock:
+        _cricket_cache = {"data": {"typeMatches": []}, "ts": 0}
+
+    return jsonify({"success": True, "message": "All API and cricket live caches cleared successfully."})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY CANARY & HONEYPOT NETWORK MASKING ROUTE (/fuck.html)
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route("/fuck.html", methods=["GET", "POST", "HEAD"])
+def fuck_html():
+    """
+    Security canary & honeypot route. Returns HTTP 404 with custom error headers.
+    Floods inspect-mode network monitors while obscuring real APIs.
+    """
+    html_404 = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>404 Not Found</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #0a0a0a; color: #888; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .box { text-align: center; max-width: 480px; padding: 32px; border: 1px solid #222; border-radius: 12px; background: #111; }
+        h1 { color: #f43f5e; font-size: 24px; margin-bottom: 8px; }
+        p { font-size: 13px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>404 Not Found</h1>
+        <p>The requested resource /fuck.html was not found on this server.</p>
+        <p>Security canary triggered.</p>
+        <p style="color:#555; font-size:11px;">Protected Security Boundary • TruthLens AI Shield</p>
+    </div>
+</body>
+</html>"""
+    resp = Response(html_404, status=404, mimetype="text/html")
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    return resp
 
 @app.route("/api/auth/sync-history", methods=["POST"])
 def auth_sync_history():
@@ -1676,23 +2013,24 @@ def ai_scan():
     if not text or len(text) < 5:
         return jsonify({"error": "Text too short for analysis"}), 400
 
-    # Quota Enforcement: Guests get 5 scans; verified logged-in accounts get 50 scans
+    # Quota Enforcement: Guests get 5 scans; verified logged-in accounts get 50 scans; Admins get unlimited
     client_obj, is_auth, scans_used, scan_limit = get_client_identity()
-    if scans_used >= scan_limit:
+    is_admin = bool(is_auth and (client_obj.get("role") == "admin" or client_obj.get("email") in ADMIN_EMAILS or client_obj.get("is_admin")))
+    if not is_admin and scans_used >= scan_limit:
         if not is_auth:
             return jsonify({
                 "error": "Guest quota exhausted",
                 "requires_login": True,
                 "limit": 5,
                 "scans_used": scans_used,
-                "message": "You have completed your 5 complimentary guest scans. Create a verified account in 30 seconds to unlock 50 neural deep-checks!"
+                "message": "You have completed your 5 daily guest scans (resets every 24 hours). Create a verified account in 30 seconds to unlock 50 daily neural deep-checks!"
             }), 403
         else:
             return jsonify({
                 "error": "Account quota exhausted",
                 "limit": 50,
                 "scans_used": scans_used,
-                "message": "You have reached your limit of 50 verified scans for this account."
+                "message": "You have reached your daily limit of 50 verified scans. Your quota automatically resets every 24 hours."
             }), 403
 
     cache_key = text.lower()
@@ -1837,13 +2175,25 @@ def ai_scan():
 
     result = sanitize_ai_text(result)
 
-    increment_client_quota(client_obj, is_auth)
-    result["quota"] = {
-        "limit": scan_limit,
-        "scans_used": scans_used + 1,
-        "remaining": max(0, scan_limit - (scans_used + 1)),
-        "is_authenticated": is_auth
-    }
+    if is_admin:
+        result["quota"] = {
+            "limit": 999999,
+            "scans_used": 0,
+            "remaining": 999999,
+            "is_authenticated": True,
+            "role": "admin",
+            "is_admin": True,
+            "unlimited": True
+        }
+    else:
+        increment_client_quota(client_obj, is_auth)
+        result["quota"] = {
+            "limit": scan_limit,
+            "scans_used": scans_used + 1,
+            "remaining": max(0, scan_limit - (scans_used + 1)),
+            "is_authenticated": is_auth,
+            "unlimited": False
+        }
 
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
@@ -1979,6 +2329,23 @@ def enrich_cricket_match(m):
     if not isinstance(m, dict):
         return m
     if "liveDetails" in m and m["liveDetails"]:
+        ld = m["liveDetails"]
+        if "currentBatters" not in ld and "batters" in ld:
+            ld["currentBatters"] = ld["batters"]
+        if "batters" not in ld and "currentBatters" in ld:
+            ld["batters"] = ld["currentBatters"]
+        if "currentBowler" not in ld and "bowler" in ld:
+            ld["currentBowler"] = ld["bowler"]
+        if "bowler" not in ld and "currentBowler" in ld:
+            ld["bowler"] = ld["currentBowler"]
+        if "recentBalls" not in ld and "recent_balls" in ld:
+            ld["recentBalls"] = ld["recent_balls"]
+        if "recent_balls" not in ld and "recentBalls" in ld:
+            ld["recent_balls"] = ld["recentBalls"]
+        if "lastWicket" not in ld and "last_wicket" in ld:
+            ld["lastWicket"] = ld["last_wicket"]
+        if "last_wicket" not in ld and "lastWicket" in ld:
+            ld["last_wicket"] = ld["lastWicket"]
         return m
 
     mi = m.get("matchInfo", {})
@@ -2014,39 +2381,58 @@ def enrich_cricket_match(m):
     ]
     recent_balls = recent_options[mid % len(recent_options)]
 
+    b1_sr = round((b1_runs / max(1, b1_balls)) * 100, 1)
+    b2_sr = round((b2_runs / max(1, b2_balls)) * 100, 1)
+    bw_econ = round(bw_runs / max(1.0, float(bw_overs.split('.')[0]) + 0.1), 2)
+    last_wkt_str = f"{pool[3]} c Keeper b {pool[2]} 28 (19b, 3x4, 1x6) — {b1_runs + b2_runs + 36}/3 ({int(bw_overs.split('.')[0]) + 8}.2 ov)"
+
+    batters_list = [
+        {
+            "name": pool[0],
+            "runs": b1_runs,
+            "balls": b1_balls,
+            "fours": max(1, b1_runs // 10),
+            "sixes": max(0, b1_runs // 22),
+            "strike_rate": b1_sr,
+            "sr": b1_sr,
+            "on_strike": True,
+            "onStrike": True
+        },
+        {
+            "name": pool[1],
+            "runs": b2_runs,
+            "balls": b2_balls,
+            "fours": max(0, b2_runs // 12),
+            "sixes": max(0, b2_runs // 28),
+            "strike_rate": b2_sr,
+            "sr": b2_sr,
+            "on_strike": False,
+            "onStrike": False
+        }
+    ]
+
+    bowler_dict = {
+        "name": pool[2],
+        "overs": bw_overs,
+        "maidens": 0 if bw_runs > 20 else 1,
+        "runs": bw_runs,
+        "wickets": bw_wkts,
+        "economy": bw_econ,
+        "econ": bw_econ
+    }
+
     m["liveDetails"] = {
         "is_live": is_live,
-        "batters": [
-            {
-                "name": pool[0],
-                "runs": b1_runs,
-                "balls": b1_balls,
-                "fours": max(1, b1_runs // 10),
-                "sixes": max(0, b1_runs // 22),
-                "strike_rate": round((b1_runs / max(1, b1_balls)) * 100, 1),
-                "on_strike": True
-            },
-            {
-                "name": pool[1],
-                "runs": b2_runs,
-                "balls": b2_balls,
-                "fours": max(0, b2_runs // 12),
-                "sixes": max(0, b2_runs // 28),
-                "strike_rate": round((b2_runs / max(1, b2_balls)) * 100, 1),
-                "on_strike": False
-            }
-        ],
-        "bowler": {
-            "name": pool[2],
-            "overs": bw_overs,
-            "maidens": 0 if bw_runs > 20 else 1,
-            "runs": bw_runs,
-            "wickets": bw_wkts,
-            "economy": round(bw_runs / max(1.0, float(bw_overs.split('.')[0]) + 0.1), 2)
-        },
+        "isLive": is_live,
+        "batters": batters_list,
+        "currentBatters": batters_list,
+        "bowler": bowler_dict,
+        "currentBowler": bowler_dict,
         "recent_balls": recent_balls,
+        "recentBalls": recent_balls,
         "partnership": f"{b1_runs + b2_runs} runs ({b1_balls + b2_balls} balls)",
-        "last_wicket": f"{pool[3]} c Keeper b {pool[2]} 28 (19b, 3x4, 1x6) — {b1_runs + b2_runs + 36}/3 ({int(bw_overs.split('.')[0]) + 8}.2 ov)",
+        "last_wicket": last_wkt_str,
+        "lastWicket": last_wkt_str,
         "crr": f"{round(7.1 + (mid % 25) / 10.0, 2)}",
         "rrr": f"{round(8.2 + (mid % 30) / 10.0, 2)}" if is_live else None,
         "toss": f"{t1} won the toss & elected to bat",
@@ -2081,14 +2467,22 @@ def get_marquee_fallback_matches():
                                     },
                                     "liveDetails": {
                                         "is_live": True,
+                                        "isLive": True,
                                         "batters": [
-                                            {"name": "Virat Kohli", "runs": 86, "balls": 74, "fours": 7, "sixes": 2, "strike_rate": 116.2, "on_strike": True},
-                                            {"name": "KL Rahul", "runs": 44, "balls": 38, "fours": 4, "sixes": 1, "strike_rate": 115.8, "on_strike": False}
+                                            {"name": "Virat Kohli", "runs": 86, "balls": 74, "fours": 7, "sixes": 2, "strike_rate": 116.2, "sr": 116.2, "on_strike": True, "onStrike": True},
+                                            {"name": "KL Rahul", "runs": 44, "balls": 38, "fours": 4, "sixes": 1, "strike_rate": 115.8, "sr": 115.8, "on_strike": False, "onStrike": False}
                                         ],
-                                        "bowler": {"name": "Pat Cummins", "overs": "8.4", "maidens": 0, "runs": 54, "wickets": 2, "economy": 6.23},
+                                        "currentBatters": [
+                                            {"name": "Virat Kohli", "runs": 86, "balls": 74, "fours": 7, "sixes": 2, "strike_rate": 116.2, "sr": 116.2, "on_strike": True, "onStrike": True},
+                                            {"name": "KL Rahul", "runs": 44, "balls": 38, "fours": 4, "sixes": 1, "strike_rate": 115.8, "sr": 115.8, "on_strike": False, "onStrike": False}
+                                        ],
+                                        "bowler": {"name": "Pat Cummins", "overs": "8.4", "maidens": 0, "runs": 54, "wickets": 2, "economy": 6.23, "econ": 6.23},
+                                        "currentBowler": {"name": "Pat Cummins", "overs": "8.4", "maidens": 0, "runs": 54, "wickets": 2, "economy": 6.23, "econ": 6.23},
                                         "recent_balls": ["1", "4", "0", "1", "2", "6"],
+                                        "recentBalls": ["1", "4", "0", "1", "2", "6"],
                                         "partnership": "78 runs (64 balls)",
                                         "last_wicket": "Shubman Gill c Smith b Starc 62 (54b, 8x4) — 159/3 (29.2 ov)",
+                                        "lastWicket": "Shubman Gill c Smith b Starc 62 (54b, 8x4) — 159/3 (29.2 ov)",
                                         "crr": "5.51",
                                         "rrr": "6.85",
                                         "toss": "Australia won the toss and elected to bat",
@@ -2111,14 +2505,22 @@ def get_marquee_fallback_matches():
                                     },
                                     "liveDetails": {
                                         "is_live": True,
+                                        "isLive": True,
                                         "batters": [
-                                            {"name": "Jos Buttler", "runs": 68, "balls": 41, "fours": 6, "sixes": 4, "strike_rate": 165.8, "on_strike": True},
-                                            {"name": "Liam Livingstone", "runs": 22, "balls": 11, "fours": 1, "sixes": 2, "strike_rate": 200.0, "on_strike": False}
+                                            {"name": "Jos Buttler", "runs": 68, "balls": 41, "fours": 6, "sixes": 4, "strike_rate": 165.8, "sr": 165.8, "on_strike": True, "onStrike": True},
+                                            {"name": "Liam Livingstone", "runs": 22, "balls": 11, "fours": 1, "sixes": 2, "strike_rate": 200.0, "sr": 200.0, "on_strike": False, "onStrike": False}
                                         ],
-                                        "bowler": {"name": "Kagiso Rabada", "overs": "3.2", "maidens": 0, "runs": 34, "wickets": 2, "economy": 10.2},
+                                        "currentBatters": [
+                                            {"name": "Jos Buttler", "runs": 68, "balls": 41, "fours": 6, "sixes": 4, "strike_rate": 165.8, "sr": 165.8, "on_strike": True, "onStrike": True},
+                                            {"name": "Liam Livingstone", "runs": 22, "balls": 11, "fours": 1, "sixes": 2, "strike_rate": 200.0, "sr": 200.0, "on_strike": False, "onStrike": False}
+                                        ],
+                                        "bowler": {"name": "Kagiso Rabada", "overs": "3.2", "maidens": 0, "runs": 34, "wickets": 2, "economy": 10.2, "econ": 10.2},
+                                        "currentBowler": {"name": "Kagiso Rabada", "overs": "3.2", "maidens": 0, "runs": 34, "wickets": 2, "economy": 10.2, "econ": 10.2},
                                         "recent_balls": ["6", "1", "4", "W", "2", "1"],
+                                        "recentBalls": ["6", "1", "4", "W", "2", "1"],
                                         "partnership": "38 runs (18 balls)",
                                         "last_wicket": "Harry Brook c Markram b Rabada 34 (19b) — 127/4 (15.4 ov)",
+                                        "lastWicket": "Harry Brook c Markram b Rabada 34 (19b) — 127/4 (15.4 ov)",
                                         "crr": "9.70",
                                         "rrr": "10.66",
                                         "toss": "England won the toss and elected to bowl",
@@ -2153,14 +2555,22 @@ def get_marquee_fallback_matches():
                                     },
                                     "liveDetails": {
                                         "is_live": False,
+                                        "isLive": False,
                                         "batters": [
-                                            {"name": "Yashasvi Jaiswal", "runs": 142, "balls": 194, "fours": 16, "sixes": 3, "strike_rate": 73.2, "on_strike": False},
-                                            {"name": "Rishabh Pant", "runs": 78, "balls": 84, "fours": 8, "sixes": 2, "strike_rate": 92.8, "on_strike": False}
+                                            {"name": "Yashasvi Jaiswal", "runs": 142, "balls": 194, "fours": 16, "sixes": 3, "strike_rate": 73.2, "sr": 73.2, "on_strike": False, "onStrike": False},
+                                            {"name": "Rishabh Pant", "runs": 78, "balls": 84, "fours": 8, "sixes": 2, "strike_rate": 92.8, "sr": 92.8, "on_strike": False, "onStrike": False}
                                         ],
-                                        "bowler": {"name": "Jasprit Bumrah", "overs": "18.1", "maidens": 6, "runs": 42, "wickets": 5, "economy": 2.31},
+                                        "currentBatters": [
+                                            {"name": "Yashasvi Jaiswal", "runs": 142, "balls": 194, "fours": 16, "sixes": 3, "strike_rate": 73.2, "sr": 73.2, "on_strike": False, "onStrike": False},
+                                            {"name": "Rishabh Pant", "runs": 78, "balls": 84, "fours": 8, "sixes": 2, "strike_rate": 92.8, "sr": 92.8, "on_strike": False, "onStrike": False}
+                                        ],
+                                        "bowler": {"name": "Jasprit Bumrah", "overs": "18.1", "maidens": 6, "runs": 42, "wickets": 5, "economy": 2.31, "econ": 2.31},
+                                        "currentBowler": {"name": "Jasprit Bumrah", "overs": "18.1", "maidens": 6, "runs": 42, "wickets": 5, "economy": 2.31, "econ": 2.31},
                                         "recent_balls": ["0", "0", "W", "0", "0", "W"],
+                                        "recentBalls": ["0", "0", "W", "0", "0", "W"],
                                         "partnership": "Match Completed",
                                         "last_wicket": "Josh Hazlewood b Bumrah 4 (12b) — 173/10 (54.1 ov)",
+                                        "lastWicket": "Josh Hazlewood b Bumrah 4 (12b) — 173/10 (54.1 ov)",
                                         "crr": "3.19",
                                         "rrr": None,
                                         "toss": "India won the toss and elected to bat",

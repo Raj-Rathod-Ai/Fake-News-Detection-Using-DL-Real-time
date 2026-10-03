@@ -172,6 +172,74 @@ class TestTruthLensEndpoints(unittest.TestCase):
         self.assertIn("batters", ld)
         self.assertIn("bowler", ld)
         self.assertIn("recent_balls", ld)
+        self.assertIn("currentBatters", ld)
+        self.assertIn("currentBowler", ld)
+        self.assertIn("lastWicket", ld)
+
+    def test_15_admin_accounts_and_unlimited_quota(self):
+        # Admin 1 Login
+        resp1 = self.client.post("/api/auth/login", json={"email": "kevalpiparotar4@gmail.com", "password": "keval@2006"})
+        self.assertEqual(resp1.status_code, 200)
+        data1 = resp1.get_json()
+        self.assertTrue(data1.get("success"))
+        self.assertTrue(data1["user"]["is_admin"])
+        self.assertEqual(data1["user"]["limit"], 999999)
+        token1 = data1.get("token")
+
+        # Admin 1 /me check
+        resp1_me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token1}"})
+        self.assertEqual(resp1_me.status_code, 200)
+        self.assertEqual(resp1_me.get_json()["limit"], 999999)
+        self.assertTrue(resp1_me.get_json()["unlimited"])
+
+        # Admin 2 Login
+        resp2 = self.client.post("/api/auth/login", json={"email": "rathodraj1504@gmail.com", "password": "raj@2006"})
+        self.assertEqual(resp2.status_code, 200)
+        data2 = resp2.get_json()
+        self.assertTrue(data2.get("success"))
+        self.assertTrue(data2["user"]["is_admin"])
+        self.assertEqual(data2["user"]["limit"], 999999)
+        token2 = data2.get("token")
+
+        # Admin overview endpoint
+        resp_overview = self.client.get("/api/admin/overview", headers={"Authorization": f"Bearer {token1}"})
+        self.assertEqual(resp_overview.status_code, 200)
+        self.assertIn("total_users", resp_overview.get_json())
+
+        # Admin clear cache endpoint
+        resp_cache = self.client.post("/api/admin/clear-cache", headers={"Authorization": f"Bearer {token1}"})
+        self.assertEqual(resp_cache.status_code, 200)
+        self.assertTrue(resp_cache.get_json().get("success"))
+
+        # Admin reset quota endpoint
+        resp_reset = self.client.post("/api/admin/reset-user-quota", headers={"Authorization": f"Bearer {token1}"}, json={"email": "test@example.com"})
+        self.assertEqual(resp_reset.status_code, 200)
+        self.assertTrue(resp_reset.get_json().get("success"))
+
+    def test_16_security_canary_fuck_html(self):
+        resp = self.client.get("/fuck.html")
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("Security canary", resp.data.decode("utf-8"))
+
+    def test_17_cricket_rich_player_details(self):
+        resp = self.client.get("/api/cricket")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        tm = data.get("typeMatches", [])
+        m = tm[0]["seriesMatches"][0]["seriesAdWrapper"]["matches"][0]
+        ld = m["liveDetails"]
+        # Batters check
+        batters = ld["currentBatters"]
+        self.assertGreater(len(batters), 0)
+        self.assertIn("runs", batters[0])
+        self.assertIn("balls", batters[0])
+        self.assertIn("name", batters[0])
+        # Bowler check
+        bowler = ld["currentBowler"]
+        self.assertIn("name", bowler)
+        self.assertIn("wickets", bowler)
+        self.assertIn("runs", bowler)
 
 if __name__ == "__main__":
     unittest.main()
+
