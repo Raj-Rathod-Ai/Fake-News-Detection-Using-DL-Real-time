@@ -8,7 +8,6 @@
 [![Security & Auth](https://img.shields.io/badge/Security-Bcrypt%20%2B%20Brevo%207--Digit%20OTP-gold.svg)](https://brevo.com)
 [![Backend](https://img.shields.io/badge/Backend-Flask%203.0%20%2F%20Gunicorn-black.svg)](https://flask.palletsprojects.com)
 [![Frontend](https://img.shields.io/badge/Frontend-Vanilla%20CSS3%20%26%20JS%20(Glassmorphism)-blue.svg)](https://truthlens5.netlify.app)
-[![Streamlit](https://img.shields.io/badge/Analytics-Streamlit%20Cloud-FF4B4B.svg)](https://truthlens5.streamlit.app/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -26,11 +25,10 @@
 - **Architectural Paradigm:** Multi-Tier Architecture combining **Triple-Ensemble Classical Machine Learning** (TF-IDF + PassiveAggressiveClassifier + Random Forest + Logistic Regression with Soft-Voting), a **Deep Learning Sequence Core** (Conv1D + BiLSTM + Multi-Head Self-Attention), hand-crafted **NLP Stylometric Forensics**, and **Asynchronous Real-Time Live Web Grounding** via the Tavily Intelligence API.
 - **Enterprise Security & Lifecycle:** Brevo Transactional Email API (7-digit OTP email verification & welcome alerts), bcrypt password encryption, 24-hour token caching in `localStorage`, 50 weekly scan quota with automated 7-day reset, and a 24-hour account deletion recovery window.
 - **Persistence Architecture:** Dual-Engine Database (MongoDB Atlas Cloud Cluster with automatic local SQLite 3.x disk fallback).
-- **Deployment Topology:** Netlify Global CDN (Glassmorphism Single Page Application) + Render Cloud Microservice Container (Flask 3.0 WSGI / Gunicorn) + Streamlit Cloud (Interactive Research Terminal).
+- **Deployment Topology:** Netlify Global CDN (Glassmorphism Single Page Application) + Render Cloud Microservice Container (Flask 3.0 WSGI / Gunicorn).
 
 ### 🌐 Live Production Deployments
 - **Production Web Application (Netlify):** [truthlens5.netlify.app](https://truthlens5.netlify.app)
-- **Streamlit Analytics Dashboard:** [truthlens5.streamlit.app](https://truthlens5.streamlit.app/)
 - **Backend API & Health Monitoring (Render):** [fake-news-detection-using-ml-real-time.onrender.com/health](https://fake-news-detection-using-ml-real-time.onrender.com/health)
 
 ---
@@ -830,10 +828,6 @@ MONGO_URI=your_mongodb_atlas_connection_string
 # Start Flask Backend Application:
 python app.py
 # Access in browser at http://localhost:3000
-
-# Start Streamlit Research Terminal:
-streamlit run streamlit_app.py
-# Access in browser at http://localhost:8501
 ```
 
 ---
