@@ -79,23 +79,20 @@ MONGO_URI         = os.environ.get("MONGO_URI", "")
 IST = ZoneInfo("Asia/Kolkata")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PLATFORM ADMINISTRATOR ACCOUNTS (Unlimited Access & System Controls)
+# PLATFORM ADMINISTRATOR CONFIGURATION (Environment & Database-Driven)
 # ─────────────────────────────────────────────────────────────────────────────
-ADMIN_USERS = {
-    "kevalpiparotar4@gmail.com": {
-        "password": "keval@2006",
-        "id": "admin_keval_001",
-        "name": "Keval Piparotar",
-        "role": "admin"
-    },
-    "rathodraj1504@gmail.com": {
-        "password": "raj@2006",
-        "id": "admin_raj_002",
-        "name": "Raj Rathod",
-        "role": "admin"
-    }
-}
-ADMIN_EMAILS = set(ADMIN_USERS.keys())
+# Admin privileges are loaded dynamically from the database (role = 'admin')
+# and optionally augmented by ADMIN_EMAILS environment variable. No hardcoded credentials.
+ADMIN_EMAILS = set(filter(None, [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",")]))
+
+def is_admin_user(user: dict) -> bool:
+    """Check if user has platform administrator role from database or environment."""
+    if not user:
+        return False
+    if user.get("role") == "admin" or user.get("is_admin") in [1, True, "1"]:
+        return True
+    email = (user.get("email") or "").lower().strip()
+    return bool(email and email in ADMIN_EMAILS)
 
 # Optional Imports
 try:
@@ -329,21 +326,9 @@ def init_db():
                 except Exception:
                     pass
 
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        now_iso = datetime.now(timezone.utc).isoformat()
-        for admin_email, admin_info in ADMIN_USERS.items():
-            pw_h = generate_password_hash(admin_info["password"])
-            db.execute("""
-                INSERT INTO users (id, name, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date)
-                VALUES (?, ?, ?, ?, 1, 0, ?, 'admin', 1, ?)
-                ON CONFLICT(email) DO UPDATE SET
-                    password_hash = excluded.password_hash,
-                    is_verified = 1,
-                    role = 'admin',
-                    is_admin = 1,
-                    scans_used = 0,
-                    last_reset_date = excluded.last_reset_date
-            """, (admin_info["id"], admin_info["name"], admin_email, pw_h, now_iso, today_str))
+        # Mark any users configured in ADMIN_EMAILS environment variable as admin
+        for admin_email in ADMIN_EMAILS:
+            db.execute("UPDATE users SET role = 'admin', is_admin = 1 WHERE LOWER(email) = ?", (admin_email,))
 
         db.commit()
         db.close()
@@ -516,6 +501,81 @@ def send_brevo_welcome_email(to_email: str, user_name: str = "") -> bool:
     threading.Thread(target=send_brevo_email, args=(to_email, name_display, subject, html), daemon=True).start()
     return True
 
+def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str = "") -> bool:
+    name_display = user_name or to_email.split('@')[0]
+    subject = f"TruthLens: {otp_code} is your 7-Digit Password Reset Code"
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 30px 15px;">
+        <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+            <div style="height: 6px; background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6);"></div>
+            <div style="padding: 35px 30px; text-align: center;">
+                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.3); margin-bottom: 20px;">
+                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #f472b6;">TRUTHLENS AI</span>
+                </div>
+                <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Reset Your Password</h1>
+                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
+                    Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
+                    We received a request to reset your TruthLens account password. Use the 7-digit verification code below to set a new password:
+                </p>
+                <div style="background-color: #0f172a; border: 2px dashed #ec4899; border-radius: 16px; padding: 20px; margin: 25px 0;">
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #f472b6;">{otp_code}</span>
+                </div>
+                <p style="font-size: 12px; color: #64748b; margin: 20px 0 0 0;">
+                    ⏱️ This reset code expires in <strong>15 minutes</strong>.<br>
+                    If you did not request a password reset, you can safely ignore this email. Your current password remains secure.
+                </p>
+            </div>
+            <div style="background-color: #0f172a; padding: 15px 30px; text-align: center; border-top: 1px solid #334155;">
+                <p style="font-size: 11px; color: #64748b; margin: 0;">&copy; 2026 TruthLens — Multi-Source AI Fact Verification Platform</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    threading.Thread(target=send_brevo_email, args=(to_email, name_display, subject, html), daemon=True).start()
+    return True
+
+def send_brevo_password_changed_email(to_email: str, user_name: str = "") -> bool:
+    name_display = user_name or to_email.split('@')[0]
+    subject = "Security Notice: Your TruthLens Password Was Changed"
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 30px 15px;">
+        <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+            <div style="height: 6px; background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);"></div>
+            <div style="padding: 35px 30px; text-align: center;">
+                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 20px;">
+                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #34d399;">TRUTHLENS AI</span>
+                </div>
+                <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Password Changed Successfully</h1>
+                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
+                    Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
+                    Your TruthLens password has been updated successfully. You can now use your new password to sign in across all your devices.
+                </p>
+                <div style="margin: 20px 0 25px 0;">
+                    <a href="https://truthlens5.netlify.app" target="_blank" style="display: inline-block; padding: 15px 36px; background: linear-gradient(135deg, #10b981, #3b82f6); color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; letter-spacing: 1px; border-radius: 12px; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);">
+                        SIGN IN NOW &rarr;
+                    </a>
+                </div>
+                <p style="font-size: 12px; color: #64748b; margin: 20px 0 0 0;">
+                    ⚠️ If you did NOT initiate this password change, please contact platform support immediately.
+                </p>
+            </div>
+            <div style="background-color: #0f172a; padding: 15px 30px; text-align: center; border-top: 1px solid #334155;">
+                <p style="font-size: 11px; color: #64748b; margin: 0;">&copy; 2026 TruthLens — Multi-Source AI Fact Verification Platform</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    threading.Thread(target=send_brevo_email, args=(to_email, name_display, subject, html), daemon=True).start()
+    return True
+
 def hash_password_bcrypt(password: str) -> str:
     """Hash password using industry-standard bcrypt with 12 salt rounds."""
     salt = bcrypt.gensalt(rounds=12)
@@ -602,32 +662,21 @@ def get_current_user():
         return None
 
     try:
-        # Access token is valid for 24h; allow 7-day grace for seamless next-day refresh
-        payload = auth_serializer.loads(token, max_age=86400 * 7)
+        # Access token is valid for 1 day (86400 seconds)
+        payload = auth_serializer.loads(token, max_age=86400)
         user_id = payload.get("user_id")
         email = (payload.get("email") or "").lower()
-        if email in ADMIN_EMAILS:
-            admin_info = ADMIN_USERS[email]
-            return {
-                "id": admin_info["id"],
-                "email": email,
-                "name": admin_info.get("name", "Admin"),
-                "is_verified": 1,
-                "role": "admin",
-                "is_admin": 1,
-                "scans_used": 0,
-                "unlimited": True
-            }
 
         if not user_id and not email:
             return None
         
         u = sync_and_get_user(user_id or email)
         if u:
-            if (u.get("email") or "").lower() in ADMIN_EMAILS:
+            if is_admin_user(u):
                 u["role"] = "admin"
                 u["is_admin"] = 1
                 u["unlimited"] = True
+                u["limit"] = 999999
             return u
         return None
     except Exception:
@@ -642,8 +691,7 @@ def get_client_identity():
     """
     user = get_current_user()
     if user:
-        email = (user.get("email") or "").lower()
-        is_admin = (user.get("role") == "admin") or (email in ADMIN_EMAILS) or user.get("unlimited")
+        is_admin = is_admin_user(user)
         limit = 999999 if is_admin else 50
         if is_admin:
             return user, True, 0, limit
@@ -792,39 +840,6 @@ def auth_signup():
     if not password or len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters long."}), 400
 
-    if email in ADMIN_EMAILS:
-        admin_info = ADMIN_USERS[email]
-        user_id = admin_info["id"]
-        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin"})
-        resp = jsonify({
-            "success": True,
-            "message": "Welcome Administrator! Signed in successfully.",
-            "token": token,
-            "expires_in": 86400,
-            "quota": {
-                "limit": 999999,
-                "remaining": 999999,
-                "used": 0,
-                "is_authenticated": True,
-                "role": "admin",
-                "is_admin": True,
-                "unlimited": True
-            },
-            "user": {
-                "id": user_id,
-                "email": email,
-                "name": admin_info.get("name", "Admin"),
-                "role": "admin",
-                "is_admin": True,
-                "unlimited": True,
-                "limit": 999999,
-                "scans_used": 0,
-                "remaining": 999999
-            }
-        })
-        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
-        return resp
-
     hashed_pw = hash_password_bcrypt(password)
     otp_code = f"{random.randint(1000000, 9999999)}"
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -952,7 +967,9 @@ def auth_verify_otp():
         send_brevo_welcome_email(email, user_name)
 
         role = user.get("role", "user")
-        is_admin = (role == "admin") or (email in ADMIN_EMAILS)
+        is_admin = is_admin_user(user) or (role == "admin") or (email in ADMIN_EMAILS)
+        if is_admin:
+            role = "admin"
         limit = 999999 if is_admin else 50
         token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
         quota_info = {
@@ -1040,43 +1057,6 @@ def auth_login():
     password = (data.get("password") or "").strip()
     if not email or not password:
         return jsonify({"error": "Email and password are required."}), 400
-
-    # Dedicated Fast-Path for Administrators
-    if email in ADMIN_EMAILS:
-        admin_info = ADMIN_USERS[email]
-        if password == admin_info["password"]:
-            user_id = admin_info["id"]
-            token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin"})
-            resp = jsonify({
-                "success": True,
-                "token": token,
-                "expires_in": 86400,
-                "quota": {
-                    "limit": 999999,
-                    "remaining": 999999,
-                    "used": 0,
-                    "scans_used": 0,
-                    "is_authenticated": True,
-                    "role": "admin",
-                    "is_admin": True,
-                    "unlimited": True,
-                    "quota_cycle": "unlimited"
-                },
-                "user": {
-                    "id": user_id,
-                    "email": email,
-                    "name": admin_info.get("name", "Admin"),
-                    "role": "admin",
-                    "is_admin": True,
-                    "unlimited": True,
-                    "limit": 999999,
-                    "scans_used": 0,
-                    "used": 0,
-                    "remaining": 999999
-                }
-            })
-            resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
-            return resp
 
     try:
         con = sqlite3.connect(DB_PATH)
@@ -1168,12 +1148,12 @@ def auth_login():
                 pass
 
         user_id = user["id"]
-        role = user.get("role", "user")
-        is_admin = (role == "admin") or (email in ADMIN_EMAILS)
+        is_admin = is_admin_user(user) or (user.get("role") == "admin") or (email in ADMIN_EMAILS)
+        role = "admin" if is_admin else user.get("role", "user")
         limit = 999999 if is_admin else 50
         
         # Check weekly quota reset
-        scans_used = check_and_reset_weekly_user(cur, user)
+        scans_used = 0 if is_admin else check_and_reset_weekly_user(cur, user)
         con.commit()
         con.close()
 
@@ -1211,7 +1191,7 @@ def auth_login():
                 "role": role,
                 "is_admin": is_admin,
                 "unlimited": is_admin,
-                "quota_cycle": "weekly"
+                "quota_cycle": "unlimited" if is_admin else "weekly"
             },
             "user": {
                 "id": user_id,
@@ -1230,6 +1210,166 @@ def auth_login():
         return resp
     except Exception as e:
         return jsonify({"error": f"Login failed: {e}"}), 500
+
+
+@app.route("/api/auth/forgot-password", methods=["POST"])
+def auth_forgot_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "Email address is required."}), 400
+
+    otp_code = f"{random.randint(1000000, 9999999)}"
+    expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+
+    try:
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        user = sync_and_get_user(email, con)
+        if not user:
+            con.close()
+            return jsonify({"error": "No account found with this email address. Please check your spelling or sign up."}), 404
+
+        user_id = user["id"]
+        user_name = user.get("name") or email.split('@')[0]
+        cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user_id))
+        con.commit()
+        con.close()
+
+        mdb = get_mongo_db()
+        if mdb is not None:
+            try:
+                mdb.users.update_one({"id": user_id}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+            except Exception:
+                pass
+
+        send_brevo_password_reset_email(email, otp_code, user_name)
+        return jsonify({
+            "success": True,
+            "message": "A 7-digit password reset code has been sent to your email.",
+            "email": email,
+            "dev_otp": otp_code
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to send password reset code: {e}"}), 500
+
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+def auth_reset_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    otp_input = str(data.get("otp") or "").strip()
+    new_password = str(data.get("new_password") or "").strip()
+
+    if not email or not otp_input or not new_password:
+        return jsonify({"error": "Email, verification code, and new password are all required."}), 400
+
+    if len(otp_input) != 7 or not otp_input.isdigit():
+        return jsonify({"error": "Verification code must be exactly 7 digits."}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long."}), 400
+
+    try:
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        user = sync_and_get_user(email, con)
+
+        if not user:
+            con.close()
+            return jsonify({"error": "No account found with this email address."}), 404
+
+        stored_otp = str(user.get("otp_code") or "").strip()
+        otp_expires_at = user.get("otp_expires_at")
+
+        if not stored_otp or stored_otp != otp_input:
+            con.close()
+            return jsonify({"error": "Invalid verification code. Please check your email and try again."}), 400
+
+        now_utc = datetime.now(timezone.utc)
+        if otp_expires_at:
+            try:
+                exp_dt = datetime.fromisoformat(str(otp_expires_at).replace("Z", "+00:00"))
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if now_utc > exp_dt:
+                    con.close()
+                    return jsonify({"error": "Verification code has expired. Please request a new code."}), 400
+            except Exception:
+                pass
+
+        user_id = user["id"]
+        user_name = user.get("name") or email.split('@')[0]
+        # Hash new password securely with bcrypt
+        new_pw_hash = hash_password_bcrypt(new_password)
+
+        cur.execute(
+            "UPDATE users SET password_hash = ?, salt = '', otp_code = NULL, otp_expires_at = NULL, is_verified = 1 WHERE id = ?",
+            (new_pw_hash, user_id)
+        )
+        con.commit()
+        con.close()
+
+        mdb = get_mongo_db()
+        if mdb is not None:
+            try:
+                mdb.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "password_hash": new_pw_hash,
+                        "salt": "",
+                        "otp_code": None,
+                        "otp_expires_at": None,
+                        "is_verified": 1
+                    }}
+                )
+            except Exception:
+                pass
+
+        # Send security confirmation email
+        send_brevo_password_changed_email(email, user_name)
+
+        # Issue 1-day (86,400s) token for direct login
+        is_admin = is_admin_user(user) or (user.get("role") == "admin") or (email in ADMIN_EMAILS)
+        role = "admin" if is_admin else user.get("role", "user")
+        limit = 999999 if is_admin else 50
+        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
+
+        resp = jsonify({
+            "success": True,
+            "message": "Password changed successfully! You are now signed in.",
+            "token": token,
+            "expires_in": 86400,
+            "quota": {
+                "limit": limit,
+                "remaining": limit,
+                "used": 0,
+                "scans_used": 0,
+                "is_authenticated": True,
+                "role": role,
+                "is_admin": is_admin,
+                "unlimited": is_admin,
+                "quota_cycle": "unlimited" if is_admin else "weekly"
+            },
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": user_name,
+                "limit": limit,
+                "scans_used": 0,
+                "used": 0,
+                "remaining": limit,
+                "role": role,
+                "is_admin": is_admin,
+                "unlimited": is_admin
+            }
+        })
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
+        return resp
+    except Exception as e:
+        return jsonify({"error": f"Failed to reset password: {e}"}), 500
 
 
 @app.route("/api/auth/delete-profile", methods=["POST"])

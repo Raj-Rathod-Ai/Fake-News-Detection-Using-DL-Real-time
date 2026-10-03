@@ -374,6 +374,64 @@ class TestTruthLensEndpoints(unittest.TestCase):
         self.assertEqual(data["quota"]["limit"], 50)
         self.assertIsNotNone(data.get("token"))
 
+    def test_23_forgot_and_reset_password_flow(self):
+        email = f"reset_test_{uuid.uuid4().hex[:8]}@truthlens.ai"
+        init_pass = "initial_pass_123"
+        new_pass = "updated_pass_456"
+
+        # 1. Sign up and verify account
+        r_sign = self.client.post("/api/auth/signup", json={"email": email, "password": init_pass, "name": "Reset Tester"})
+        self.assertEqual(r_sign.status_code, 200)
+        otp = r_sign.get_json().get("dev_otp")
+        r_ver = self.client.post("/api/auth/verify-otp", json={"email": email, "otp": otp})
+        self.assertEqual(r_ver.status_code, 200)
+
+        # 2. Trigger forgot password
+        r_forgot = self.client.post("/api/auth/forgot-password", json={"email": email})
+        self.assertEqual(r_forgot.status_code, 200)
+        f_data = r_forgot.get_json()
+        self.assertTrue(f_data.get("success"))
+        reset_otp = f_data.get("dev_otp")
+        self.assertEqual(len(str(reset_otp)), 7)
+
+        # 3. Test invalid OTP rejection
+        r_bad_otp = self.client.post("/api/auth/reset-password", json={"email": email, "otp": "0000000", "new_password": new_pass})
+        self.assertEqual(r_bad_otp.status_code, 400)
+
+        # 4. Successfully reset password
+        r_reset = self.client.post("/api/auth/reset-password", json={"email": email, "otp": reset_otp, "new_password": new_pass})
+        self.assertEqual(r_reset.status_code, 200)
+        reset_data = r_reset.get_json()
+        self.assertTrue(reset_data.get("success"))
+        self.assertIsNotNone(reset_data.get("token"))
+        self.assertEqual(reset_data["user"]["email"], email)
+
+        # 5. Old password must now fail
+        r_old_login = self.client.post("/api/auth/login", json={"email": email, "password": init_pass})
+        self.assertEqual(r_old_login.status_code, 401)
+
+        # 6. New password must succeed
+        r_new_login = self.client.post("/api/auth/login", json={"email": email, "password": new_pass})
+        self.assertEqual(r_new_login.status_code, 200)
+        self.assertTrue(r_new_login.get_json().get("success"))
+
+    def test_24_token_expiration_limit(self):
+        from app import auth_serializer
+        import time
+        # Generate an expired token (simulate > 1 day expiration by using max_age)
+        payload = {"user_id": "test_user_id", "email": "test@truthlens.ai", "role": "user"}
+        token = auth_serializer.dumps(payload)
+        
+        # Immediate /me with valid token -> passes
+        r_valid = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(r_valid.status_code, 200)
+
+        # Expired token (> 86400s) -> loads(token, max_age=86400) throws SignatureExpired -> falls back to guest mode
+        # We test this by verifying loads raises SignatureExpired with max_age=-1
+        from itsdangerous import SignatureExpired
+        with self.assertRaises(SignatureExpired):
+            auth_serializer.loads(token, max_age=-1)
+
 if __name__ == "__main__":
     unittest.main()
 

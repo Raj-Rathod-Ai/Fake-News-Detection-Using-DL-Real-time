@@ -869,10 +869,17 @@
                             class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
                     </div>
                     <div>
-                        <label
-                            class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Password</label>
-                        <input id="login-password" type="password" required placeholder="••••••••"
-                            class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500">Password</label>
+                            <button type="button" onclick="showForgotPasswordForm()" class="text-[11px] font-bold text-tl-purple hover:underline cursor-pointer">Forgot password?</button>
+                        </div>
+                        <div class="relative">
+                            <input id="login-password" type="password" required placeholder="••••••••"
+                                class="w-full px-4 py-3 pr-11 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                            <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-white p-1 text-base focus:outline-none cursor-pointer" title="Show/Hide Password">
+                                <i class="ph-bold ph-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" id="btn-login-submit"
                         class="w-full py-3.5 rounded-xl bg-tl-purple hover:bg-purple-800 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
@@ -897,13 +904,78 @@
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Password
                             (min 6 characters)</label>
-                        <input id="signup-password" type="password" required minlength="6" placeholder="••••••••"
-                            class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                        <div class="relative">
+                            <input id="signup-password" type="password" required minlength="6" placeholder="••••••••"
+                                class="w-full px-4 py-3 pr-11 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                            <button type="button" onclick="togglePasswordVisibility('signup-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-white p-1 text-base focus:outline-none cursor-pointer" title="Show/Hide Password">
+                                <i class="ph-bold ph-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" id="btn-signup-submit"
                         class="w-full py-3.5 rounded-xl bg-gradient-to-r from-tl-purple to-tl-blue hover:opacity-90 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
                         Create Free Account (50 Scans)
                     </button>
+                </form>
+
+                <!-- FORGOT PASSWORD REQUEST FORM -->
+                <form id="form-forgot" onsubmit="event.preventDefault(); submitForgotPassword();" class="space-y-4 hidden">
+                    <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
+                        <p class="text-xs text-ink-700 dark:text-ink-200">
+                            Enter your registered email address. We'll send you a 7-digit code to reset your password.
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Email Address</label>
+                        <input id="forgot-email" type="email" required placeholder="researcher@newsroom.com"
+                            class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                    </div>
+                    <button type="submit" id="btn-forgot-submit"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:opacity-90 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
+                        Send Reset Code
+                    </button>
+                    <div class="text-center pt-2 text-xs">
+                        <button type="button" onclick="switchAuthTab('login')" class="text-ink-500 hover:text-ink-900 dark:hover:text-white cursor-pointer">
+                            &larr; Back to Sign In
+                        </button>
+                    </div>
+                </form>
+
+                <!-- RESET PASSWORD VERIFY & UPDATE FORM -->
+                <form id="form-reset-password" onsubmit="event.preventDefault(); submitResetPassword();" class="space-y-4 hidden">
+                    <div class="p-3.5 rounded-2xl bg-tl-purple/10 border border-tl-purple/20 text-center">
+                        <p class="text-xs text-ink-700 dark:text-ink-200">
+                            A 7-digit reset code was sent to:
+                        </p>
+                        <p id="reset-target-email" class="text-xs font-mono font-bold text-tl-purple mt-0.5 truncate"></p>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5 text-center">7-Digit Reset Code</label>
+                        <input id="reset-otp-input" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required placeholder="1234567"
+                            class="w-full px-4 py-3 text-center font-mono font-black text-2xl tracking-[0.3em] rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white outline-none focus:border-tl-purple transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">New Password (min 6 characters)</label>
+                        <div class="relative">
+                            <input id="reset-new-password" type="password" required minlength="6" placeholder="••••••••"
+                                class="w-full px-4 py-3 pr-11 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                            <button type="button" onclick="togglePasswordVisibility('reset-new-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-white p-1 text-base focus:outline-none cursor-pointer" title="Show/Hide Password">
+                                <i class="ph-bold ph-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" id="btn-reset-submit"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-tl-blue hover:opacity-90 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
+                        Update Password & Sign In
+                    </button>
+                    <div class="flex items-center justify-between pt-2 text-xs">
+                        <button type="button" onclick="submitForgotPassword(true)" id="btn-resend-reset-otp" class="text-tl-purple hover:underline font-bold cursor-pointer">
+                            Resend Code
+                        </button>
+                        <button type="button" onclick="switchAuthTab('login')" class="text-ink-500 hover:text-ink-900 dark:hover:text-white cursor-pointer">
+                            &larr; Back to Sign In
+                        </button>
+                    </div>
                 </form>
 
                 <!-- 7-DIGIT OTP VERIFICATION FORM -->
@@ -1158,7 +1230,7 @@
                 'Content-Type': 'application/json',
                 'X-Guest-ID': getGuestId()
             };
-            const token = localStorage.getItem('tl_auth_token');
+            const token = localStorage.getItem('tl_auth_token') || localStorage.getItem('tl_token');
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
@@ -1167,16 +1239,49 @@
 
         async function checkAuthStatus() {
             try {
+                const token = localStorage.getItem('tl_auth_token') || localStorage.getItem('tl_token');
                 const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const data = await res.json();
-                    currentQuota = {
-                        limit: data.limit || 25,
-                        used: data.scans_used || 0,
-                        remaining: data.remaining !== undefined ? data.remaining : Math.max(0, (data.limit || 25) - (data.scans_used || 0)),
-                        is_authenticated: data.is_authenticated
-                    };
-                    currentUser = data.user || null;
+                    if (data.is_authenticated && data.user) {
+                        // User has active access token (<= 1 day) -> direct seamless sign in!
+                        currentUser = data.user;
+                        currentQuota = {
+                            limit: data.limit || 50,
+                            used: data.scans_used !== undefined ? data.scans_used : (data.used || 0),
+                            remaining: data.remaining !== undefined ? data.remaining : Math.max(0, (data.limit || 50) - (data.used || 0)),
+                            is_authenticated: true,
+                            quota_cycle: data.quota_cycle || 'weekly',
+                            is_admin: !!data.user.is_admin,
+                            unlimited: !!data.user.unlimited
+                        };
+                        const freshToken = data.token || data.new_token;
+                        if (freshToken) {
+                            localStorage.setItem('tl_auth_token', freshToken);
+                            localStorage.setItem('tl_token', freshToken);
+                        }
+                        renderAuthArea();
+                        return;
+                    } else {
+                        // Token expired (> 1 day limit) or invalid
+                        if (token) {
+                            localStorage.removeItem('tl_auth_token');
+                            localStorage.removeItem('tl_token');
+                        }
+                        currentUser = null;
+                        currentQuota = {
+                            limit: data.limit || 5,
+                            used: data.scans_used || data.used || 0,
+                            remaining: data.remaining !== undefined ? data.remaining : 5,
+                            is_authenticated: false
+                        };
+                        renderAuthArea();
+                    }
+                } else if (res.status === 401 || res.status === 403) {
+                    // Token expired (> 1 day limit)
+                    localStorage.removeItem('tl_auth_token');
+                    localStorage.removeItem('tl_token');
+                    currentUser = null;
                     renderAuthArea();
                 }
             } catch (e) {
@@ -1284,10 +1389,179 @@
             }
         }
 
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) icon.className = 'ph-bold ph-eye-slash text-tl-purple';
+            } else {
+                input.type = 'password';
+                if (icon) icon.className = 'ph-bold ph-eye text-ink-400 hover:text-ink-600 dark:hover:text-white';
+            }
+        }
+
+        let pendingResetEmail = '';
+
+        function showForgotPasswordForm() {
+            const formLogin = document.getElementById('form-login');
+            const formSignup = document.getElementById('form-signup');
+            const formOtp = document.getElementById('form-otp');
+            const formForgot = document.getElementById('form-forgot');
+            const formReset = document.getElementById('form-reset-password');
+            const tabsBar = document.getElementById('auth-tabs-bar');
+            const title = document.getElementById('auth-modal-title');
+            const sub = document.getElementById('auth-modal-sub');
+
+            if (formLogin) formLogin.classList.add('hidden');
+            if (formSignup) formSignup.classList.add('hidden');
+            if (formOtp) formOtp.classList.add('hidden');
+            if (formReset) formReset.classList.add('hidden');
+            if (formForgot) formForgot.classList.remove('hidden');
+            if (tabsBar) tabsBar.classList.add('hidden');
+
+            if (title) title.textContent = "Forgot Password";
+            if (sub) sub.textContent = "Enter your registered email to receive a 7-digit reset code via email.";
+
+            const loginEmail = document.getElementById('login-email');
+            const forgotEmail = document.getElementById('forgot-email');
+            if (loginEmail && forgotEmail && loginEmail.value.trim()) {
+                forgotEmail.value = loginEmail.value.trim();
+            }
+            if (forgotEmail) setTimeout(() => forgotEmail.focus(), 150);
+        }
+
+        function showResetPasswordForm(email) {
+            pendingResetEmail = email;
+            const formLogin = document.getElementById('form-login');
+            const formSignup = document.getElementById('form-signup');
+            const formOtp = document.getElementById('form-otp');
+            const formForgot = document.getElementById('form-forgot');
+            const formReset = document.getElementById('form-reset-password');
+            const tabsBar = document.getElementById('auth-tabs-bar');
+            const title = document.getElementById('auth-modal-title');
+            const sub = document.getElementById('auth-modal-sub');
+            const targetEmail = document.getElementById('reset-target-email');
+            const resetOtpInput = document.getElementById('reset-otp-input');
+
+            if (formLogin) formLogin.classList.add('hidden');
+            if (formSignup) formSignup.classList.add('hidden');
+            if (formOtp) formOtp.classList.add('hidden');
+            if (formForgot) formForgot.classList.add('hidden');
+            if (formReset) formReset.classList.remove('hidden');
+            if (tabsBar) tabsBar.classList.add('hidden');
+
+            if (targetEmail) targetEmail.textContent = email;
+            if (title) title.textContent = "Set New Password";
+            if (sub) sub.textContent = "Enter the 7-digit code sent to your email and your new password.";
+            if (resetOtpInput) {
+                resetOtpInput.value = '';
+                setTimeout(() => resetOtpInput.focus(), 150);
+            }
+        }
+
+        async function submitForgotPassword(isResend = false) {
+            const emailInput = document.getElementById('forgot-email');
+            const email = isResend ? pendingResetEmail : (emailInput ? emailInput.value.trim() : '');
+            const btn = document.getElementById(isResend ? 'btn-resend-reset-otp' : 'btn-forgot-submit');
+
+            if (!email) {
+                showToast("Please enter your registered email address.", "error");
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Sending Code...`;
+            }
+
+            try {
+                const res = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showToast(data.error || "Failed to send reset code.", "error");
+                    return;
+                }
+                showToast("A 7-digit password reset code has been sent to your email.", "success");
+                showResetPasswordForm(email);
+            } catch (e) {
+                showToast("Network error. Please try again.", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = isResend ? "Resend Code" : "Send Reset Code";
+                }
+            }
+        }
+
+        async function submitResetPassword() {
+            const otp = document.getElementById('reset-otp-input').value.trim();
+            const new_password = document.getElementById('reset-new-password').value.trim();
+            const btn = document.getElementById('btn-reset-submit');
+
+            if (!pendingResetEmail) {
+                showToast("Email address missing. Please request a new code.", "error");
+                showForgotPasswordForm();
+                return;
+            }
+            if (!otp || otp.length !== 7 || !/^\d{7}$/.test(otp)) {
+                showToast("Please enter the complete 7-digit reset code.", "warning");
+                return;
+            }
+            if (!new_password || new_password.length < 6) {
+                showToast("New password must be at least 6 characters.", "warning");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Updating Password...`;
+
+            try {
+                const res = await fetch('/api/auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: pendingResetEmail, otp, new_password })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showToast(data.error || "Failed to reset password. Please check the code.", "error");
+                    return;
+                }
+
+                if (data.token) {
+                    localStorage.setItem('tl_auth_token', data.token);
+                    localStorage.setItem('tl_token', data.token);
+                }
+                currentUser = data.user;
+                currentQuota = {
+                    limit: data.user.limit || 50,
+                    used: data.user.scans_used || 0,
+                    remaining: data.user.remaining !== undefined ? data.user.remaining : (data.user.limit || 50),
+                    is_authenticated: true,
+                    quota_cycle: data.quota ? data.quota.quota_cycle : 'weekly'
+                };
+                closeAuthModal();
+                renderAuthArea();
+                showToast("Password updated successfully! You are now signed in.", "success");
+            } catch (e) {
+                showToast("Network error. Please try again.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Update Password & Sign In";
+            }
+        }
+
         function switchAuthTab(tab) {
             const formLogin = document.getElementById('form-login');
             const formSignup = document.getElementById('form-signup');
             const formOtp = document.getElementById('form-otp');
+            const formForgot = document.getElementById('form-forgot');
+            const formReset = document.getElementById('form-reset-password');
             const tabsBar = document.getElementById('auth-tabs-bar');
             const tabLogin = document.getElementById('tab-login');
             const tabSignup = document.getElementById('tab-signup');
@@ -1296,6 +1570,8 @@
 
             if (tabsBar) tabsBar.classList.remove('hidden');
             if (formOtp) formOtp.classList.add('hidden');
+            if (formForgot) formForgot.classList.add('hidden');
+            if (formReset) formReset.classList.add('hidden');
 
             if (tab === 'login') {
                 if (formLogin) formLogin.classList.remove('hidden');
