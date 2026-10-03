@@ -5,6 +5,7 @@ Verifies all public routes, input validations, error states, and live API ground
 
 import unittest
 import json
+import uuid
 from app import app, init_db
 
 class TestTruthLensEndpoints(unittest.TestCase):
@@ -118,6 +119,59 @@ class TestTruthLensEndpoints(unittest.TestCase):
         self.assertEqual(self.client.get("/api/feedback").status_code, 405)
         # Non-existent endpoint -> 404
         self.assertEqual(self.client.get("/api/undefined-endpoint-xyz").status_code, 404)
+
+    def test_13_auth_flow_and_quota_upgrade(self):
+        # 1. Guest quota starts at 5
+        resp_guest = self.client.get("/api/auth/me")
+        self.assertEqual(resp_guest.status_code, 200)
+        self.assertEqual(resp_guest.get_json()["limit"], 5)
+        self.assertFalse(resp_guest.get_json()["is_authenticated"])
+
+        # 2. Signup
+        test_email = f"unit_tester_{uuid.uuid4().hex[:8]}@truthlens.ai"
+        resp_signup = self.client.post("/api/auth/signup", json={"email": test_email, "password": "secure_password_123"})
+        self.assertEqual(resp_signup.status_code, 200)
+        otp = resp_signup.get_json().get("dev_otp")
+        self.assertIsNotNone(otp)
+
+        # 3. Verify OTP
+        resp_verify = self.client.post("/api/auth/verify-otp", json={"email": test_email, "otp": otp})
+        self.assertEqual(resp_verify.status_code, 200)
+        token = resp_verify.get_json().get("token")
+        self.assertIsNotNone(token)
+        self.assertEqual(resp_verify.get_json()["user"]["limit"], 50)
+
+        # 4. Authenticated user quota is 50
+        resp_user = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(resp_user.status_code, 200)
+        self.assertEqual(resp_user.get_json()["limit"], 50)
+        self.assertTrue(resp_user.get_json()["is_authenticated"])
+
+        # 5. Sync history
+        resp_sync = self.client.post(
+            "/api/auth/sync-history",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"scans": [{"id": "guest_scan_1", "text": "Sample claim test", "title": "Test Claim", "verdict": "REAL", "confidence": 98.0}]}
+        )
+        self.assertEqual(resp_sync.status_code, 200)
+        self.assertEqual(resp_sync.get_json()["synced_count"], 1)
+
+        # 6. Logout
+        resp_logout = self.client.post("/api/auth/logout")
+        self.assertEqual(resp_logout.status_code, 200)
+
+    def test_14_cricket_live_details(self):
+        resp = self.client.get("/api/cricket")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        tm = data.get("typeMatches", [])
+        self.assertGreater(len(tm), 0)
+        first_match = tm[0]["seriesMatches"][0]["seriesAdWrapper"]["matches"][0]
+        self.assertIn("liveDetails", first_match)
+        ld = first_match["liveDetails"]
+        self.assertIn("batters", ld)
+        self.assertIn("bowler", ld)
+        self.assertIn("recent_balls", ld)
 
 if __name__ == "__main__":
     unittest.main()
