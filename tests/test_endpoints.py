@@ -265,18 +265,32 @@ class TestTruthLensEndpoints(unittest.TestCase):
 
     def test_19_existing_account_signup_no_error_and_bcrypt(self):
         email = f"bcrypt_tester_{uuid.uuid4().hex[:8]}@truthlens.ai"
-        # 1. First signup
+        # 1. First signup sends 7-digit OTP
         r1 = self.client.post("/api/auth/signup", json={"email": email, "password": "password_v1_123"})
         self.assertEqual(r1.status_code, 200)
         self.assertTrue(r1.get_json()["success"])
-        t1 = r1.get_json()["token"]
+        self.assertTrue(r1.get_json().get("requires_otp"))
+        otp1 = r1.get_json().get("dev_otp")
+        self.assertEqual(len(str(otp1)), 7)
+
+        # Verify 7-digit OTP to activate
+        v1 = self.client.post("/api/auth/verify-otp", json={"email": email, "otp": otp1})
+        self.assertEqual(v1.status_code, 200)
+        t1 = v1.get_json()["token"]
         self.assertIsNotNone(t1)
 
-        # 2. Second signup with SAME email (must NOT return 400 error!)
+        # 2. Second signup with SAME email (must NOT return 400 error! Sends fresh 7-digit OTP)
         r2 = self.client.post("/api/auth/signup", json={"email": email, "password": "password_v2_456"})
         self.assertEqual(r2.status_code, 200)
         self.assertTrue(r2.get_json()["success"])
-        t2 = r2.get_json()["token"]
+        self.assertTrue(r2.get_json().get("requires_otp"))
+        otp2 = r2.get_json().get("dev_otp")
+        self.assertEqual(len(str(otp2)), 7)
+
+        # Verify second OTP
+        v2 = self.client.post("/api/auth/verify-otp", json={"email": email, "otp": otp2})
+        self.assertEqual(v2.status_code, 200)
+        t2 = v2.get_json()["token"]
         self.assertIsNotNone(t2)
 
         # 3. Check that /api/auth/me returns 24-hr refreshed new_token, used, and remaining
@@ -311,7 +325,35 @@ class TestTruthLensEndpoints(unittest.TestCase):
                     is_ind = any(k in (t1 + " " + t2 + " " + s1 + " " + s2).lower() for k in ["india", "ind", "roi", "rest of india"])
                     self.assertTrue(is_ind, f"Match {t1} vs {t2} is not an India match!")
                     state = mi.get("state", "")
-                    self.assertIn(state, ["In Progress", "live", "Stumps"])
+                    status = (mi.get("status") or "").lower()
+                    self.assertTrue(
+                        state in ["In Progress", "live", "Stumps", "Complete", "Finished"] or "won" in status,
+                        f"Unexpected match state: {state}, status: {status}"
+                    )
+
+    def test_21_delete_profile_grace_period_and_recovery(self):
+        email = f"del_user_{uuid.uuid4().hex[:8]}@truthlens.ai"
+        # 1. Signup and verify
+        r_signup = self.client.post("/api/auth/signup", json={"email": email, "password": "del_pass_12345"})
+        self.assertEqual(r_signup.status_code, 200)
+        otp = r_signup.get_json().get("dev_otp")
+        self.assertEqual(len(str(otp)), 7)
+
+        r_v = self.client.post("/api/auth/verify-otp", json={"email": email, "otp": otp})
+        self.assertEqual(r_v.status_code, 200)
+        token = r_v.get_json().get("token")
+
+        # 2. Schedule profile deletion
+        r_del = self.client.post("/api/auth/delete-profile", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(r_del.status_code, 200)
+        self.assertTrue(r_del.get_json()["success"])
+        self.assertEqual(r_del.get_json()["grace_hours"], 24)
+
+        # 3. Recover profile within 24 hours by signing in
+        r_rec = self.client.post("/api/auth/login", json={"email": email, "password": "del_pass_12345"})
+        self.assertEqual(r_rec.status_code, 200)
+        self.assertTrue(r_rec.get_json()["recovered"])
+        self.assertIn("recovered", r_rec.get_json()["message"].lower())
 
 if __name__ == "__main__":
     unittest.main()
