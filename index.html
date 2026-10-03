@@ -139,15 +139,29 @@
         .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
         .price-amt { font-size:1.02em; font-weight:800; }
 
-        /* Cinematic Preloader Smooth Transition */
+        /* Preloader */
         #preloader {
-            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s ease;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
         }
         #preloader.preloader-hidden {
             opacity: 0 !important;
             visibility: hidden !important;
             pointer-events: none !important;
         }
+        #preloader-brand-text {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.2rem, 8vw, 3.5rem);
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #7c3aed, #1a73e8, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: plFadeIn 0.6s ease forwards;
+        }
+        @keyframes plFadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        #pl-track { background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; height: 3px; width: 220px; margin: 0 auto; }
+        #pl-bar2 { height: 100%; width: 0%; background: linear-gradient(90deg, #7c3aed, #1a73e8, #06b6d4); border-radius: 999px; transition: width 0.07s linear; }
 
         /* DevTools Inspect Shield */
         body.inspect-blocked > *:not(#devtools-guard) {
@@ -160,6 +174,21 @@
         body.inspect-blocked #devtools-guard {
             display: flex !important;
         }
+
+        /* Mobile hamburger menu */
+        #mobile-menu-drawer {
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+        }
+        #mobile-menu-drawer.menu-closed {
+            transform: translateY(-8px);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #mobile-menu-drawer.menu-open {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: all;
+        }
     </style>
 </head>
 
@@ -168,37 +197,15 @@
 <!-- THREE.JS INTERACTIVE 3D NEURAL CANVAS (ThreeUI / WebGL background) -->
 <canvas id="three-neural-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40 dark:opacity-25 transition-opacity duration-700"></canvas>
 
-<!-- CINEMATIC PRELOADER (TruthLens brand style) -->
-<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#05070f] text-white">
-    <!-- Ambient glowing radial backdrop -->
-    <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(168,85,247,0.22),rgba(255,255,255,0))]"></div>
-    <div class="relative z-10 text-center px-4 max-w-md w-full">
-        <!-- Brand Emblem / Animated Neural Aperture -->
-        <div class="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
-            <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 opacity-30 blur-xl animate-pulse"></div>
-            <div class="relative w-16 h-16 rounded-2xl bg-white/10 dark:bg-white/5 border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-2xl">
-                <i class="ph-fill ph-shield-check text-3xl text-purple-400"></i>
-            </div>
-            <!-- Spinning orbital ring -->
-            <div class="absolute -inset-1.5 rounded-full border-2 border-dashed border-purple-500/40 animate-spin" style="animation-duration: 8s;"></div>
+<!-- PRELOADER — Original TruthLens style -->
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center" style="background:#08081a;">
+    <div class="text-center px-4">
+        <div id="preloader-brand-text">TruthLens</div>
+        <p class="text-[10px] font-mono uppercase tracking-[0.35em] mt-2 mb-5" style="color:rgba(255,255,255,0.35);">AI Verified Intelligence</p>
+        <div id="pl-track">
+            <div id="pl-bar2"></div>
         </div>
-
-        <!-- Typography Brand Name with shimmer gradient -->
-        <div id="preloader-brand" class="text-4xl sm:text-5xl font-serif font-black tracking-tight text-white mb-2">
-            <span class="bg-gradient-to-r from-purple-400 via-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">TruthLens</span>
-        </div>
-        <p class="text-[11px] font-mono uppercase tracking-[0.3em] text-slate-400 mb-6">AI Verified Intelligence</p>
-
-        <!-- Dynamic Holographic Progress Track -->
-        <div class="w-64 sm:w-80 h-1.5 bg-white/10 rounded-full overflow-hidden mx-auto relative mb-3">
-            <div id="pl-bar" class="h-full w-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 rounded-full transition-all duration-75 shadow-lg shadow-purple-500/50"></div>
-        </div>
-
-        <!-- Status indicator & Numeric Percentage -->
-        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 max-w-xs mx-auto px-1">
-            <span id="pl-status" class="truncate uppercase text-purple-300">INITIALIZING NEURAL CORE...</span>
-            <span id="pl-pct" class="font-bold text-white shrink-0">0%</span>
-        </div>
+        <p id="pl-status2" class="text-[9px] font-mono uppercase tracking-widest mt-3" style="color:rgba(124,58,237,0.8);">Initializing...</p>
     </div>
 </div>
 
@@ -243,10 +250,22 @@
         </div>
     </div>
 
-    <!-- NAV TABS -->
-    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2">
-        <div class="max-w-[1680px] mx-auto px-4 md:px-6">
-            <nav class="flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 justify-center" id="nav-tabs"></nav>
+    <!-- NAV TABS (desktop: visible; mobile: behind hamburger) -->
+    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2 relative">
+        <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center">
+            <!-- Desktop nav -->
+            <nav class="hidden md:flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 flex-1 justify-center" id="nav-tabs"></nav>
+            <!-- Mobile hamburger button -->
+            <button id="mobile-nav-toggle" onclick="toggleMobileMenu()" class="md:hidden flex items-center gap-1.5 py-2.5 text-ink-700 dark:text-ink-100 ml-auto" aria-label="Menu">
+                <i class="ph-bold ph-list text-xl" id="mobile-menu-icon"></i>
+                <span class="text-[11px] font-black uppercase tracking-wider">Menu</span>
+            </button>
+            <!-- Mobile active tab label -->
+            <div class="md:hidden flex-1 py-2.5 text-xs font-black uppercase tracking-widest text-tl-purple" id="mobile-active-tab">Home</div>
+        </div>
+        <!-- Mobile menu drawer -->
+        <div id="mobile-menu-drawer" class="menu-closed md:hidden absolute left-0 right-0 top-full z-50 bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/10 shadow-2xl">
+            <nav id="nav-tabs-mobile" class="flex flex-col px-4 py-2"></nav>
         </div>
     </div>
 </header>
@@ -749,49 +768,33 @@
 <script>
 
 // =====================================================================
-// CINEMATIC PRELOADER (TruthLens brand style with high-tech neural animation)
+// ORIGINAL PRELOADER — TruthLens simple bar animation
 // =====================================================================
 (function() {
-    var bar = document.getElementById('pl-bar');
-    var status = document.getElementById('pl-status');
-    var pctLabel = document.getElementById('pl-pct');
+    var bar = document.getElementById('pl-bar2');
+    var status = document.getElementById('pl-status2');
     var pl = document.getElementById('preloader');
     if (!pl) return;
 
     var pct = 0;
-    var statusSteps = [
-        'INITIALIZING NEURAL CORE...',
-        'CALIBRATING CONV1D-BILSTM LAYERS...',
-        'CONNECTING TAVILY LIVE GROUNDING...',
-        'SYNCHRONIZING VERIFIED FEEDS...',
-        'TRUTHLENS READY.'
-    ];
+    var statusMsgs = ['Initializing...', 'Loading feeds...', 'Connecting AI...', 'Almost ready...', 'TruthLens Ready!'];
 
     var intv = setInterval(function() {
-        pct += Math.random() * 9 + 4;
-        if (pct >= 100) {
-            pct = 100;
-            clearInterval(intv);
-        }
+        pct += Math.random() * 12 + 6;
+        if (pct >= 100) { pct = 100; clearInterval(intv); }
         if (bar) bar.style.width = pct + '%';
-        if (pctLabel) pctLabel.textContent = Math.round(pct) + '%';
-        var si = Math.min(Math.floor((pct / 100) * statusSteps.length), statusSteps.length - 1);
-        if (status) status.textContent = statusSteps[si];
-    }, 45);
+        var si = Math.min(Math.floor((pct / 100) * statusMsgs.length), statusMsgs.length - 1);
+        if (status) status.textContent = statusMsgs[si];
+    }, 40);
 
-    // Smoothly dismiss preloader after full reveal
     function dismissPreloader() {
         if (!pl || pl.classList.contains('preloader-hidden')) return;
         pl.classList.add('preloader-hidden');
-        setTimeout(function() {
-            if (pl && pl.parentNode) pl.remove();
-        }, 700);
+        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 600);
     }
 
-    setTimeout(dismissPreloader, 1850);
-    window.addEventListener('load', function() {
-        setTimeout(dismissPreloader, 1850);
-    });
+    setTimeout(dismissPreloader, 1600);
+    window.addEventListener('load', function() { setTimeout(dismissPreloader, 400); });
 })();
 
 // =====================================================================
@@ -1431,17 +1434,51 @@ function saveGuestScanToLocal(scanRecord) {
 // =====================================================================
 function renderNavTabs() {
     const nav = document.getElementById('nav-tabs');
-    nav.innerHTML = TABS.map(t => `
+    const navMobile = document.getElementById('nav-tabs-mobile');
+    const html = TABS.map(t => `
         <button onclick="nav('${t.id}')" class="nav-item flex items-center gap-1.5 text-ink-700 dark:text-ink-500 py-1 transition-all" id="nav-${t.id}">
             <i class="ph-bold ${t.icon} text-sm"></i> ${t.label}
         </button>`).join('');
+    if (nav) nav.innerHTML = html;
+    // Mobile nav — vertical list layout
+    if (navMobile) {
+        navMobile.innerHTML = TABS.map(t => `
+            <button onclick="nav('${t.id}');toggleMobileMenu(true)" class="nav-item-mobile flex items-center gap-3 py-3 border-b border-paper-200 dark:border-white/5 last:border-0 text-ink-700 dark:text-ink-100 text-sm font-bold" id="nav-mob-${t.id}">
+                <i class="ph-bold ${t.icon} text-lg text-tl-purple"></i> ${t.label}
+            </button>`).join('');
+    }
+}
+
+let _mobileMenuOpen = false;
+function toggleMobileMenu(forceClose) {
+    const drawer = document.getElementById('mobile-menu-drawer');
+    const icon = document.getElementById('mobile-menu-icon');
+    if (!drawer) return;
+    if (forceClose === true) _mobileMenuOpen = false;
+    else _mobileMenuOpen = !_mobileMenuOpen;
+    if (_mobileMenuOpen) {
+        drawer.classList.remove('menu-closed');
+        drawer.classList.add('menu-open');
+        if (icon) icon.className = 'ph-bold ph-x text-xl';
+    } else {
+        drawer.classList.add('menu-closed');
+        drawer.classList.remove('menu-open');
+        if (icon) icon.className = 'ph-bold ph-list text-xl';
+    }
 }
 
 function nav(page) {
     state.page = page;
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item-mobile').forEach(el => el.classList.remove('text-tl-purple'));
     const activeNav = document.getElementById(`nav-${page}`);
     if (activeNav) activeNav.classList.add('active');
+    const activeMob = document.getElementById(`nav-mob-${page}`);
+    if (activeMob) activeMob.classList.add('text-tl-purple');
+    // Update mobile active label
+    const lbl = document.getElementById('mobile-active-tab');
+    const tab = TABS.find(t => t.id === page);
+    if (lbl && tab) lbl.textContent = tab.label;
     window.scrollTo({top:0, behavior:'smooth'});
     if (page === 'bookmarks') renderBookmarks();
     else fetchNews(page);
@@ -2241,8 +2278,14 @@ function renderCricketCards(d) {
         hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0 flex items-center gap-1"><span>🏏</span> <span class="tracking-wider">MATCH CENTER</span></span>` + cards;
         container.classList.remove('hidden');
     } else {
-        hub.innerHTML = '';
-        container.classList.add('hidden');
+        // No matches today — show friendly empty state
+        hub.innerHTML = `
+            <span class="text-xs text-ink-500 font-bold shrink-0 flex items-center gap-1">🏏 MATCH CENTER</span>
+            <div class="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 text-xs text-ink-500 dark:text-slate-400">
+                <i class="ph-bold ph-calendar-x text-base text-slate-400"></i>
+                No matches scheduled for today — check back later!
+            </div>`;
+        container.classList.remove('hidden');
     }
 }
 
@@ -2950,18 +2993,21 @@ async function sendChat() {
     addChatMessage('thinking', '');
     state.chatHistory.push({role:'user', content:message});
     try {
+        const headers = {'Content-Type':'application/json'};
+        const token = localStorage.getItem('tl_auth_token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         const r = await fetch('/api/chat', {
-            method:'POST', headers:{'Content-Type':'application/json'},
+            method:'POST', headers,
             body: JSON.stringify({message, history: state.chatHistory})
         });
         const d = await r.json();
         document.getElementById('chat-thinking')?.remove();
-        const reply = d.reply || 'Sorry, I could not process that request.';
+        const reply = d.reply || d.error || 'I can help you fact-check claims, verify news credibility, or explain AI detection results. Try asking about a news story!';
         state.chatHistory.push({role:'assistant', content:reply});
         addChatMessage('assistant', reply);
     } catch(e) {
         document.getElementById('chat-thinking')?.remove();
-        addChatMessage('assistant', 'Network error. Please try again.');
+        addChatMessage('assistant', 'TruthLens AI is initializing. Please try again in a moment.');
     }
 }
 

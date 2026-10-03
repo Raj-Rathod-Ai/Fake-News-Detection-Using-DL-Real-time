@@ -2284,48 +2284,91 @@ def scan_history():
     return jsonify({"history": history})
 
 @app.route("/api/chat", methods=["POST"])
-@require_auth
 def chat():
+    """TruthLens AI Chatbot — works for all users (guests and logged-in)."""
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
-    if not message: return jsonify({"error": "Message required"}), 400
+    if not message:
+        return jsonify({"error": "Message required"}), 400
 
+    SYSTEM_PROMPT = (
+        "You are TruthLens AI, the intelligent assistant built into the TruthLens platform — "
+        "India's premier AI-powered fake news detection and news verification service. "
+        "Your role: help users fact-check claims, understand AI scan results (BiLSTM, NLP, real-time grounding), "
+        "evaluate news source credibility, explain misinformation patterns, discuss today's top news stories, "
+        "and guide users on verifying viral WhatsApp forwards or social media claims. "
+        "Always be concise, factual, and helpful. Never generate fake news. "
+        "If unsure, recommend using TruthLens AI Scanner for a deep neural analysis. "
+        "Respond in a friendly, professional tone. Keep answers under 200 words unless detail is explicitly requested."
+    )
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
     mistral_key = os.environ.get("MISTRAL_API_KEY", "")
+
+    # Try Gemini first
+    if gemini_key:
+        try:
+            history = data.get("history", [])
+            contents = []
+            for msg in history[-6:]:  # keep last 3 turns
+                role = "user" if msg.get("role") == "user" else "model"
+                contents.append({"role": role, "parts": [{"text": msg.get("content", "")}]})
+            contents.append({"role": "user", "parts": [{"text": message}]})
+
+            r = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                    "contents": contents,
+                    "generationConfig": {"maxOutputTokens": 300, "temperature": 0.4}
+                },
+                timeout=10
+            )
+            if r.status_code == 200:
+                rj = r.json()
+                reply_text = rj.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                if reply_text:
+                    return jsonify({"reply": reply_text})
+        except Exception as e:
+            print(f"[Gemini Chat] Error: {e}")
+
+    # Fallback to Mistral
     if mistral_key:
         try:
             r = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {mistral_key}",
-                    "Content-Type": "application/json"
-                },
+                headers={"Authorization": f"Bearer {mistral_key}", "Content-Type": "application/json"},
                 json={
                     "model": "open-mistral-7b",
                     "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are TruthLens AI, an expert news verification assistant. "
-                                "Provide concise, strictly factual, grounded answers to fact-check claims, "
-                                "explain news credibility, and guide users on verifying sources. Do NOT generate or invent fake news."
-                            )
-                        },
+                        {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": message}
                     ],
-                    "max_tokens": 350,
-                    "temperature": 0.3
+                    "max_tokens": 300,
+                    "temperature": 0.4
                 },
                 timeout=8
             )
             if r.status_code == 200:
-                resp_json = r.json()
-                reply_text = resp_json['choices'][0]['message']['content'].strip()
+                reply_text = r.json()['choices'][0]['message']['content'].strip()
                 return jsonify({"reply": reply_text})
         except Exception as e:
-            print(f"[Mistral API] Error: {e}")
+            print(f"[Mistral Chat] Error: {e}")
 
-    reply = f"Namaste! TruthLens AI verified your query. Based on real-time news sources, always cross-verify viral claims with official press releases or Tavily/TruthLens scanner above!"
-    return jsonify({"reply": reply})
+    # Smart fallback response
+    fallback_replies = {
+        "fake": "Use the TruthLens AI Scanner above to analyze this claim. Our BiLSTM neural model + real-time grounding can detect fake news with high accuracy.",
+        "verify": "Paste the article text or claim into the TruthLens Scanner for a deep neural analysis. We cross-check against live news databases in real-time.",
+        "news": "I can help you evaluate news credibility! Share the headline or claim and I'll guide you through verification steps.",
+        "scan": "Click the 'Scan' button or switch the search bar to Verify Mode to analyze any text with our AI neural engine.",
+    }
+    msg_lower = message.lower()
+    for key, reply in fallback_replies.items():
+        if key in msg_lower:
+            return jsonify({"reply": reply})
+
+    return jsonify({"reply": "Namaste! I'm TruthLens AI. I can help you fact-check claims, verify news credibility, and understand AI scan results. What would you like to verify today?"})
 
 
 @app.route("/api/markets")
