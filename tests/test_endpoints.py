@@ -355,6 +355,25 @@ class TestTruthLensEndpoints(unittest.TestCase):
         self.assertTrue(r_rec.get_json()["recovered"])
         self.assertIn("recovered", r_rec.get_json()["message"].lower())
 
+    def test_22_login_resolves_mongo_user_after_cache_wipe(self):
+        import sqlite3
+        from app import DB_PATH
+        # Simulate local SQLite being wiped or missing the user while MongoDB Atlas has the record
+        con = sqlite3.connect(DB_PATH)
+        con.execute("DELETE FROM users WHERE email = 'dhruv.aparnathi.1@gmail.com'")
+        con.commit()
+        con.close()
+
+        # Login must automatically resolve user from MongoDB Atlas without 'not found' error!
+        r_login = self.client.post("/api/auth/login", json={"email": "dhruv.aparnathi.1@gmail.com", "password": "dhruv@2006"})
+        self.assertEqual(r_login.status_code, 200)
+        data = r_login.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data["user"]["email"], "dhruv.aparnathi.1@gmail.com")
+        self.assertEqual(data["user"]["name"], "Dhruv")
+        self.assertEqual(data["quota"]["limit"], 50)
+        self.assertIsNotNone(data.get("token"))
+
 if __name__ == "__main__":
     unittest.main()
 

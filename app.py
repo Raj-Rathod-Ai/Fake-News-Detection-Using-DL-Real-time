@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from zoneinfo import ZoneInfo
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
@@ -114,20 +114,144 @@ dl_engine = FakeNewsDLInferenceEngine()
 DB_PATH = os.path.join(os.path.dirname(__file__), 'truthlens.db')
 mongo_client = None
 mongo_db = None
+_mongo_lock = threading.Lock()
+
+def get_mongo_db():
+    global mongo_client, mongo_db
+    if mongo_db is not None:
+        return mongo_db
+    if PYMONGO_AVAILABLE and MONGO_URI:
+        with _mongo_lock:
+            if mongo_db is not None:
+                return mongo_db
+            try:
+                client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
+                client.admin.command('ping')
+                mongo_client = client
+                mongo_db = client.get_database('truthlens_db')
+                return mongo_db
+            except Exception as e:
+                return None
+    return None
+
+def _sync_mongo_user_to_sqlite(u: dict, con=None):
+    if not u or not u.get("email"):
+        return
+    close_con = False
+    if con is None:
+        con = sqlite3.connect(DB_PATH)
+        close_con = True
+    try:
+        cur = con.cursor()
+        user_id = str(u.get("id") or u.get("_id") or uuid.uuid4())
+        name = u.get("name") or u["email"].split('@')[0]
+        email = u["email"].lower().strip()
+        password_hash = u.get("password_hash") or ""
+        salt = u.get("salt") or ""
+        role = u.get("role") or ("admin" if email in ADMIN_EMAILS else "user")
+        is_verified = 1 if u.get("is_verified") in [1, True, "1"] else 0
+        otp_code = u.get("otp_code")
+        otp_expires_at = u.get("otp_expires_at")
+        scans_used = int(u.get("scans_used") or 0)
+        created_at = u.get("created_at") or datetime.now(timezone.utc).isoformat()
+        last_reset_date = u.get("last_reset_date") or created_at
+        deletion_scheduled_at = u.get("deletion_scheduled_at")
+        is_admin = 1 if (role == "admin" or email in ADMIN_EMAILS or u.get("is_admin")) else 0
+
+        cur.execute("""
+            INSERT INTO users (id, name, email, password_hash, salt, role, is_verified, otp_code, otp_expires_at, scans_used, last_reset_date, created_at, deletion_scheduled_at, is_admin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                id = excluded.id,
+                name = COALESCE(excluded.name, users.name),
+                password_hash = CASE WHEN excluded.password_hash != '' THEN excluded.password_hash ELSE users.password_hash END,
+                salt = excluded.salt,
+                role = excluded.role,
+                is_verified = excluded.is_verified,
+                otp_code = excluded.otp_code,
+                otp_expires_at = excluded.otp_expires_at,
+                deletion_scheduled_at = excluded.deletion_scheduled_at,
+                is_admin = excluded.is_admin
+        """, (user_id, name, email, password_hash, salt, role, is_verified, otp_code, otp_expires_at, scans_used, last_reset_date, created_at, deletion_scheduled_at, is_admin))
+        con.commit()
+    except Exception as e:
+        print(f"[SYNC USER ERROR] {e}")
+    finally:
+        if close_con:
+            con.close()
+
+def _sync_all_mongo_users_to_sqlite():
+    try:
+        mdb = get_mongo_db()
+        if mdb is None:
+            return
+        users = list(mdb.users.find({}))
+        if users:
+            con = sqlite3.connect(DB_PATH)
+            for u in users:
+                _sync_mongo_user_to_sqlite(u, con=con)
+            con.close()
+            print(f"[OK] Synced {len(users)} users from MongoDB Atlas into local SQLite cache.")
+    except Exception as e:
+        print(f"[SYNC ALL ERROR] {e}")
 
 def _connect_mongo_async():
     global mongo_client, mongo_db
     if PYMONGO_AVAILABLE and MONGO_URI:
         try:
-            client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+            client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
             client.admin.command('ping')
             mongo_client = client
             mongo_db = client.get_database('truthlens_db')
             print("[OK] Connected to MongoDB Cloud Database (truthlens_db)")
+            _sync_all_mongo_users_to_sqlite()
         except Exception as e:
             print(f"[INFO] MongoDB connection info: {e}. Using local SQLite storage.")
 
 threading.Thread(target=_connect_mongo_async, daemon=True).start()
+
+def sync_and_get_user(identifier: str, con=None) -> Optional[Dict[str, Any]]:
+    if not identifier:
+        return None
+    ident = str(identifier).strip().lower()
+
+    close_con = False
+    if con is None:
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        close_con = True
+
+    try:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM users WHERE LOWER(email) = ? OR id = ?", (ident, str(identifier).strip()))
+        row = cur.fetchone()
+        if row:
+            return dict(row)
+
+        # Fallback to MongoDB
+        mdb = get_mongo_db()
+        if mdb is not None:
+            try:
+                m_user = mdb.users.find_one({
+                    "$or": [
+                        {"email": {"$regex": f"^{re.escape(ident)}$", "$options": "i"}},
+                        {"id": str(identifier).strip()}
+                    ]
+                })
+                if m_user:
+                    m_user["_id"] = str(m_user.get("_id", m_user.get("id", "")))
+                    _sync_mongo_user_to_sqlite(m_user, con=con)
+                    cur.execute("SELECT * FROM users WHERE LOWER(email) = ? OR id = ?", (ident, str(identifier).strip()))
+                    new_row = cur.fetchone()
+                    if new_row:
+                        return dict(new_row)
+                    return m_user
+            except Exception as e:
+                print(f"[Mongo Lookup Error] {e}")
+        return None
+    finally:
+        if close_con:
+            con.close()
 
 
 
@@ -218,6 +342,7 @@ def init_db():
 
         db.commit()
         db.close()
+        threading.Thread(target=_sync_all_mongo_users_to_sqlite, daemon=True).start()
 
 _persistent_api_cache = {}
 _api_cache_lock = threading.Lock()
@@ -491,26 +616,14 @@ def get_current_user():
         if not user_id and not email:
             return None
         
-        if mongo_db is not None:
-            query = {"id": user_id} if user_id else {"email": email}
-            u = mongo_db.users.find_one(query)
-            if u:
-                u["_id"] = str(u.get("_id", u["id"]))
-                return u
-        
-        con = sqlite3.connect(DB_PATH)
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE id = ? OR email = ?", (user_id, email))
-        row = cur.fetchone()
-        con.close()
-        if row:
-            u = dict(row)
+        u = sync_and_get_user(user_id or email)
+        if u:
             if (u.get("email") or "").lower() in ADMIN_EMAILS:
                 u["role"] = "admin"
                 u["is_admin"] = 1
                 u["unlimited"] = True
             return u
+        return None
     except Exception:
         return None
     return None
@@ -715,11 +828,9 @@ def auth_signup():
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE email = ?", (email,))
-        existing_row = cur.fetchone()
+        existing_user = sync_and_get_user(email, con)
 
-        if existing_row:
-            existing_user = dict(existing_row)
+        if existing_user:
             user_id = existing_user["id"]
             user_name = name or existing_user.get("name") or email.split('@')[0]
             # Require 7-digit verification before account can be accessed
@@ -732,13 +843,15 @@ def auth_signup():
             con.commit()
             con.close()
 
-            if mongo_db is not None:
+            mdb = get_mongo_db()
+            if mdb is not None:
                 try:
-                    mongo_db.users.update_one(
+                    mdb.users.update_one(
                         {"email": email},
                         {"$set": {
                             "password_hash": hashed_pw, "is_verified": 0, "otp_code": otp_code,
-                            "otp_expires_at": expires_iso, "deletion_scheduled_at": None
+                            "otp_expires_at": expires_iso, "deletion_scheduled_at": None,
+                            "name": user_name
                         }}
                     )
                 except Exception:
@@ -763,9 +876,10 @@ def auth_signup():
         con.commit()
         con.close()
 
-        if mongo_db is not None:
+        mdb = get_mongo_db()
+        if mdb is not None:
             try:
-                mongo_db.users.update_one(
+                mdb.users.update_one(
                     {"email": email},
                     {"$set": {
                         "id": user_id, "name": user_name, "email": email,
@@ -804,13 +918,11 @@ def auth_verify_otp():
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE email = ?", (email,))
-        row = cur.fetchone()
-        if not row:
+        user = sync_and_get_user(email, con)
+        if not user:
             con.close()
             return jsonify({"error": "No account found with this email."}), 404
 
-        user = dict(row)
         stored_otp = str(user.get("otp_code") or user.get("verification_otp") or "").strip()
         if stored_otp != otp:
             con.close()
@@ -823,9 +935,10 @@ def auth_verify_otp():
         con.commit()
         con.close()
 
-        if mongo_db is not None:
+        mdb = get_mongo_db()
+        if mdb is not None:
             try:
-                mongo_db.users.update_one({"id": user_id}, {"$set": {"is_verified": 1, "otp_code": None, "deletion_scheduled_at": None}})
+                mdb.users.update_one({"id": user_id}, {"$set": {"is_verified": 1, "otp_code": None, "deletion_scheduled_at": None}})
             except Exception:
                 pass
 
@@ -884,22 +997,23 @@ def auth_resend_otp():
 
     try:
         con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT id, name FROM users WHERE email = ?", (email,))
-        row = cur.fetchone()
-        if not row:
+        user = sync_and_get_user(email, con)
+        if not user:
             con.close()
             return jsonify({"error": "No account found with this email."}), 404
 
-        user_id = row[0]
-        user_name = row[1] or email.split('@')[0]
+        user_id = user["id"]
+        user_name = user.get("name") or email.split('@')[0]
         cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user_id))
         con.commit()
         con.close()
 
-        if mongo_db is not None:
+        mdb = get_mongo_db()
+        if mdb is not None:
             try:
-                mongo_db.users.update_one({"id": user_id}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+                mdb.users.update_one({"id": user_id}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
             except Exception:
                 pass
 
@@ -962,14 +1076,12 @@ def auth_login():
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE email = ?", (email,))
-        row = cur.fetchone()
+        user = sync_and_get_user(email, con)
 
-        if not row:
+        if not user:
             con.close()
             return jsonify({"error": "No account found with this email."}), 401
 
-        user = dict(row)
         pw_hash = user.get("password_hash", "")
         salt = user.get("salt", "")
 
@@ -985,6 +1097,12 @@ def auth_login():
             cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user["id"]))
             con.commit()
             con.close()
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one({"id": user["id"]}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+                except Exception:
+                    pass
             send_brevo_otp(email, otp_code, user.get("name"))
             return jsonify({
                 "error": "Your account is not verified yet. We have sent a 7-digit verification code to your email. Please verify before sign in.",
@@ -1008,10 +1126,11 @@ def auth_login():
                     cur.execute("DELETE FROM scan_history WHERE user_id = ?", (user["id"],))
                     con.commit()
                     con.close()
-                    if mongo_db is not None:
+                    mdb = get_mongo_db()
+                    if mdb is not None:
                         try:
-                            mongo_db.users.delete_one({"id": user["id"]})
-                            mongo_db.scan_history.delete_many({"user_id": user["id"]})
+                            mdb.users.delete_one({"id": user["id"]})
+                            mdb.scan_history.delete_many({"user_id": user["id"]})
                         except Exception:
                             pass
                     return jsonify({"error": "This account was scheduled for deletion and has been permanently deleted after 24 hours."}), 410
@@ -1019,9 +1138,10 @@ def auth_login():
                     # Within 24 hours -> Recover account!
                     cur.execute("UPDATE users SET deletion_scheduled_at = NULL WHERE id = ?", (user["id"],))
                     account_recovered = True
-                    if mongo_db is not None:
+                    mdb = get_mongo_db()
+                    if mdb is not None:
                         try:
-                            mongo_db.users.update_one({"id": user["id"]}, {"$set": {"deletion_scheduled_at": None}})
+                            mdb.users.update_one({"id": user["id"]}, {"$set": {"deletion_scheduled_at": None}})
                         except Exception:
                             pass
             except Exception:
@@ -1032,6 +1152,12 @@ def auth_login():
             try:
                 new_bcrypt_hash = hash_password_bcrypt(password)
                 cur.execute("UPDATE users SET password_hash = ?, salt = '' WHERE id = ?", (new_bcrypt_hash, user["id"]))
+                mdb = get_mongo_db()
+                if mdb is not None:
+                    try:
+                        mdb.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_bcrypt_hash, "salt": ""}})
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -1044,6 +1170,20 @@ def auth_login():
         scans_used = check_and_reset_weekly_user(cur, user)
         con.commit()
         con.close()
+
+        # Update last_login in MongoDB Atlas
+        mdb = get_mongo_db()
+        if mdb is not None:
+            try:
+                mdb.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "last_login": datetime.now(timezone.utc).isoformat(),
+                        "scans_used": scans_used
+                    }}
+                )
+            except Exception:
+                pass
 
         # Send login notification / welcome email via Brevo
         send_brevo_welcome_email(email, user.get("name"))
@@ -1307,6 +1447,12 @@ def admin_reset_quota():
         con.execute("UPDATE users SET scans_used = 0 WHERE email = ?", (target_email,))
         con.commit()
         con.close()
+        mdb = get_mongo_db()
+        if mdb is not None:
+            try:
+                mdb.users.update_one({"email": target_email}, {"$set": {"scans_used": 0}})
+            except Exception:
+                pass
     except Exception:
         pass
     return jsonify({"success": True, "message": f"Daily quota reset to 0 for {target_email}."})
