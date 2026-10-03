@@ -213,7 +213,10 @@ def analyze_grounding_evidence(
             "never happened", "did not endorse", "did not score", "did not win",
             "cannot confirm", "no credible report", "do not provide", "does not provide",
             "no information", "instead, they detail", "instead of", "unsubstantiated",
-            "unverified", "no record", "no credible", "contradicts", "refuted"
+            "unverified", "no record", "no credible", "contradicts", "refuted",
+            "do not support", "does not support", "not support the claim", "cannot cure",
+            "does not cure", "no cure", "no scientific evidence", "unproven", "misleading",
+            "fake", "baseless", "no basis", "scam", "rumor", "rumour", "fraud"
         ]
         ans_is_debunked = any(k in ans_lower for k in debunk_keywords)
 
@@ -227,7 +230,8 @@ def analyze_grounding_evidence(
             "meets", "hosted", "begins", "starts", "ends", "launched", "published",
             "cleared", "appointed", "developed", "built", "tested", "established"
         ]
-        ans_is_confirmed = (any(k in ans_lower for k in confirm_keywords) or (len(ans) > 40 and not ans_is_debunked)) and not ans_is_debunked
+        # Must affirmatively match confirmation keywords without debunking signals
+        ans_is_confirmed = (any(k in ans_lower for k in confirm_keywords) or (len(articles) > 0 and len(ans) > 60 and not ans_is_debunked and not signals.get("found_miracle") and not signals.get("found_conspiracy"))) and not ans_is_debunked
 
         if ans_is_debunked:
             neu = dict(base_neural)
