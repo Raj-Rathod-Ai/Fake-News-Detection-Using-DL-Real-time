@@ -242,6 +242,27 @@ class TestTruthLensEndpoints(unittest.TestCase):
         self.assertIn("wickets", bowler)
         self.assertIn("runs", bowler)
 
+    def test_18_chatbot_greeting_and_assistant_persona(self):
+        # 1. Test greeting "hi"
+        resp_hi = self.client.post("/api/chat", json={"message": "hi"})
+        self.assertEqual(resp_hi.status_code, 200)
+        reply_hi = resp_hi.get_json().get("reply", "")
+        self.assertIn("Hi! How can I assist", reply_hi)
+
+        # 2. Test greeting "hello"
+        resp_hello = self.client.post("/api/chat", json={"message": "hello"})
+        self.assertEqual(resp_hello.status_code, 200)
+        self.assertIn("Hi! How can I assist", resp_hello.get_json().get("reply", ""))
+
+        # 3. Test "who are you"
+        resp_who = self.client.post("/api/chat", json={"message": "who are you"})
+        self.assertEqual(resp_who.status_code, 200)
+        self.assertIn("TruthLens AI", resp_who.get_json().get("reply", ""))
+
+        # 4. Test validation error on empty message
+        resp_empty = self.client.post("/api/chat", json={"message": ""})
+        self.assertEqual(resp_empty.status_code, 400)
+
 if __name__ == "__main__":
     unittest.main()
 

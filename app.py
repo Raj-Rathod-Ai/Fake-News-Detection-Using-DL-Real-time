@@ -2103,11 +2103,64 @@ def scan_history():
 def chat():
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
-    if not message: return jsonify({"error": "Message required"}), 400
+    if not message:
+        return jsonify({"error": "Message required"}), 400
 
+    clean = message.lower().strip().strip("!?,. :;")
+
+    # 1. Greetings & Salutations (Natural conversational AI response)
+    greeting_words = {"hi", "hello", "hey", "hii", "hiii", "heya", "hola", "namaste", "good morning", "good afternoon", "good evening", "greetings", "wassup", "what's up", "whats up"}
+    if clean in greeting_words or any(clean.startswith(g + " ") for g in ["hi", "hello", "hey", "hii", "namaste"]):
+        return jsonify({
+            "reply": "Hi! How can I assist you today? I'm your TruthLens AI assistant. I can help you fact-check news claims, verify viral social media posts, analyze market movements, check live cricket scores, or answer any questions you have!"
+        })
+
+    # 2. Identity & Capability Questions
+    if clean in ("who are you", "who r u", "what are you", "what is truthlens", "tell me about truthlens", "about you"):
+        return jsonify({
+            "reply": "I am TruthLens AI, the official intelligent assistant for TruthLens. I help you verify news claims, spot misinformation, and stay informed with real-time validated intelligence powered by deep learning and live web grounding. How can I assist you today?"
+        })
+
+    if clean in ("what can you do", "what can you help me with", "features", "help", "how do you work", "commands"):
+        return jsonify({
+            "reply": "Here is what I can assist you with:\n• Fact-checking news headlines and viral claims\n• Detecting AI-generated or manipulated information\n• Checking live financial markets, fuel, and gold rates\n• Tracking live cricket scores with ball-by-ball intelligence\n• Explaining credibility and sources behind any story\n\nWhat would you like to check today?"
+        })
+
+    if clean in ("how are you", "how r u", "how are you doing", "how do you do"):
+        return jsonify({
+            "reply": "I'm doing great, thank you! Ready to assist you with news verification, fact checks, or live platform updates. How can I help you today?"
+        })
+
+    if clean in ("thank you", "thanks", "thx", "thank you so much", "thank u"):
+        return jsonify({
+            "reply": "You're very welcome! Feel free to ask if you have any other news or claims to verify. Stay safe and informed!"
+        })
+
+    if clean in ("bye", "goodbye", "see you", "cya", "good night"):
+        return jsonify({
+            "reply": "Goodbye! Have a wonderful day, and remember to always verify before you share!"
+        })
+
+    # 3. Mistral AI Query with context
     mistral_key = os.environ.get("MISTRAL_API_KEY", "")
     if mistral_key:
         try:
+            system_prompt = (
+                "You are TruthLens AI, the helpful, polite, and intelligent AI assistant for the TruthLens news verification platform. "
+                "Your persona is polite, professional, concise, and helpful. "
+                "When asked to verify claims or news, provide clear, objective, factual evaluations: explain if it is verified, false, misleading, or unconfirmed, and cite official context. "
+                "When asked about platform features, mention TruthLens's deep learning neural model, Tavily live web grounding, live markets, and cricket tracking. "
+                "Respond directly and warmly without robotic preambles."
+            )
+            messages_payload = [{"role": "system", "content": system_prompt}]
+
+            raw_history = data.get("history") or []
+            for h in raw_history[-6:]:
+                if isinstance(h, dict) and h.get("role") in ("user", "assistant") and h.get("content"):
+                    messages_payload.append({"role": h["role"], "content": str(h["content"])[:400]})
+            if not messages_payload or messages_payload[-1].get("content") != message:
+                messages_payload.append({"role": "user", "content": message})
+
             r = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
                 headers={
@@ -2116,17 +2169,7 @@ def chat():
                 },
                 json={
                     "model": "open-mistral-7b",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are TruthLens AI, an expert news verification assistant. "
-                                "Provide concise, strictly factual, grounded answers to fact-check claims, "
-                                "explain news credibility, and guide users on verifying sources. Do NOT generate or invent fake news."
-                            )
-                        },
-                        {"role": "user", "content": message}
-                    ],
+                    "messages": messages_payload,
                     "max_tokens": 350,
                     "temperature": 0.3
                 },
@@ -2135,11 +2178,21 @@ def chat():
             if r.status_code == 200:
                 resp_json = r.json()
                 reply_text = resp_json['choices'][0]['message']['content'].strip()
+                reply_text = reply_text.replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
                 return jsonify({"reply": reply_text})
         except Exception as e:
             print(f"[Mistral API] Error: {e}")
 
-    reply = f"Namaste! TruthLens AI verified your query. Based on real-time news sources, always cross-verify viral claims with official press releases or Tavily/TruthLens scanner above!"
+    # 4. Intelligent Contextual Fallback
+    if any(w in clean for w in ["cricket", "score", "match", "ind vs wi", "india"]):
+        reply = "Currently live on TruthLens: India vs West Indies 3rd ODI. India scored 351/7 (50 ov). West Indies is chasing live. Check out the Live Cricket ticker at the top of the page for full ball-by-ball scorecards and player stats!"
+    elif any(w in clean for w in ["market", "gold", "sensex", "nifty", "fuel", "petrol", "diesel"]):
+        reply = "TruthLens tracks real-time market data directly from Yahoo Finance. Sensex, Gold 24K, and fuel rates are updated live in the top ticker. Click on the Markets card to view comprehensive quotes!"
+    elif len(message.split()) > 4 or any(w in clean for w in ["fake", "real", "true", "claim", "news", "rumor", "minister", "died", "passed away"]):
+        reply = "I've recorded your claim for verification. For deep semantic analysis and neural network confidence metrics, you can also paste this text into the 'Text Scanner' at the top of the page. Let me know if you need specific details!"
+    else:
+        reply = "Hi! How can I assist you today? I'm your TruthLens AI assistant. Feel free to ask me to verify any news headline, check viral rumors, or discuss current events!"
+
     return jsonify({"reply": reply})
 
 

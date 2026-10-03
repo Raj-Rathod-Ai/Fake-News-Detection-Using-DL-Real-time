@@ -360,7 +360,7 @@
                     <i class="ph-fill ph-sparkle text-white text-xs"></i>
                 </div>
                 <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10">
-                    Namaste! I'm TruthLens AI 🇮🇳 Ask me to fact-check any claim, verify news sources, or discuss today's top stories!
+                    Hi! I'm TruthLens AI. How can I assist you today? You can ask me to fact-check any claim, verify viral news, or check live platform updates!
                 </div>
             </div>
         </div>
@@ -2418,6 +2418,20 @@ async function sendChat() {
     }
 }
 
+function formatChatResponse(text) {
+    if (!text) return '';
+    let formatted = escapeHtml(text);
+    // Bold: **text**
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-ink-900 dark:text-white">$1</strong>');
+    // Italics: *text*
+    formatted = formatted.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em class="italic opacity-90">$1</em>');
+    // Bullet points: • or -
+    formatted = formatted.replace(/^[\s]*[•\-]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-tl-purple shrink-0">•</span><span>$1</span></div>');
+    // Newlines
+    formatted = formatted.replace(/\n/g, '<br>');
+    return formatted;
+}
+
 function addChatMessage(role, text) {
     const container = document.getElementById('chat-messages');
     const el = document.createElement('div');
@@ -2442,7 +2456,7 @@ function addChatMessage(role, text) {
             <div class="w-7 h-7 bg-tl-purple rounded-lg flex items-center justify-center shrink-0">
                 <i class="ph-fill ph-sparkle text-white text-xs"></i>
             </div>
-            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[80%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+            <div class="bg-white dark:bg-paper-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-ink-900 dark:text-white max-w-[85%] shadow-sm border border-paper-200 dark:border-white/10 leading-relaxed">${formatChatResponse(text)}</div>`;
     }
     container.appendChild(el);
     container.scrollTop = container.scrollHeight;
