@@ -11,6 +11,8 @@ from app import app, init_db
 class TestTruthLensEndpoints(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        app.config['TESTING'] = True
+        app.testing = True
         init_db()
         cls.client = app.test_client()
 

@@ -169,16 +169,36 @@
 <canvas id="three-neural-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40 dark:opacity-25 transition-opacity duration-700"></canvas>
 
 <!-- CINEMATIC PRELOADER (TruthLens brand style) -->
-<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black pointer-events-none">
-    <div style="text-align:center;">
-        <div id="preloader-brand" style="
-            font-family:'Playfair Display',serif;font-size:clamp(2.5rem,10vw,5rem);
-            font-weight:900;font-style:italic;letter-spacing:-0.05em;color:white;display:inline-block;
-        ">TruthLens</div>
-        <div style="width:320px;height:2px;background:rgba(255,255,255,0.1);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
-            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:100%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#05070f] text-white">
+    <!-- Ambient glowing radial backdrop -->
+    <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(168,85,247,0.22),rgba(255,255,255,0))]"></div>
+    <div class="relative z-10 text-center px-4 max-w-md w-full">
+        <!-- Brand Emblem / Animated Neural Aperture -->
+        <div class="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
+            <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 opacity-30 blur-xl animate-pulse"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-white/10 dark:bg-white/5 border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-2xl">
+                <i class="ph-fill ph-shield-check text-3xl text-purple-400"></i>
+            </div>
+            <!-- Spinning orbital ring -->
+            <div class="absolute -inset-1.5 rounded-full border-2 border-dashed border-purple-500/40 animate-spin" style="animation-duration: 8s;"></div>
         </div>
-        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#888;text-transform:uppercase;">AI Verified Intelligence</p>
+
+        <!-- Typography Brand Name with shimmer gradient -->
+        <div id="preloader-brand" class="text-4xl sm:text-5xl font-serif font-black tracking-tight text-white mb-2">
+            <span class="bg-gradient-to-r from-purple-400 via-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">TruthLens</span>
+        </div>
+        <p class="text-[11px] font-mono uppercase tracking-[0.3em] text-slate-400 mb-6">AI Verified Intelligence</p>
+
+        <!-- Dynamic Holographic Progress Track -->
+        <div class="w-64 sm:w-80 h-1.5 bg-white/10 rounded-full overflow-hidden mx-auto relative mb-3">
+            <div id="pl-bar" class="h-full w-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 rounded-full transition-all duration-75 shadow-lg shadow-purple-500/50"></div>
+        </div>
+
+        <!-- Status indicator & Numeric Percentage -->
+        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 max-w-xs mx-auto px-1">
+            <span id="pl-status" class="truncate uppercase text-purple-300">INITIALIZING NEURAL CORE...</span>
+            <span id="pl-pct" class="font-bold text-white shrink-0">0%</span>
+        </div>
     </div>
 </div>
 
@@ -332,34 +352,76 @@
 </main>
 
 <!-- FOOTER -->
-<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-10 mt-auto">
-    <div class="max-w-[1680px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500">
-        <div>
-            <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2">TruthLens</h3>
-            <p class="opacity-70 text-sm leading-relaxed">AI-powered fake news detection & verified intelligence platform.</p>
-        </div>
-        <div>
-            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Sections</h4>
-            <div class="space-y-2">
-                <button onclick="nav('home')" class="block hover:text-tl-blue font-medium">Headlines</button>
-                <button onclick="nav('india')" class="block hover:text-tl-blue font-medium">India</button>
-                <button onclick="nav('technology')" class="block hover:text-tl-blue font-medium">Technology</button>
-                <button onclick="nav('business')" class="block hover:text-tl-blue font-medium">Business</button>
+<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-12 mt-auto transition-colors">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500 pb-10 border-b border-paper-200 dark:border-white/10">
+            <div>
+                <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2 flex items-center gap-2">
+                    <span>TruthLens</span>
+                    <span class="text-[9px] font-mono uppercase bg-tl-purple/10 text-tl-purple px-2 py-0.5 rounded-full border border-tl-purple/20">v8.0</span>
+                </h3>
+                <p class="opacity-75 text-xs leading-relaxed max-w-xs mb-4">
+                    AI-powered fake news verification & real-time ground-truth intelligence platform. Grounded via deep neural Conv1D-BiLSTM networks and web consensus verification.
+                </p>
+                <div class="flex items-center gap-2 text-[10px] text-emerald-500 dark:text-emerald-400 font-mono">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Systems Operational (2026 UTC)</span>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Intelligence Feeds</h4>
+                <div class="space-y-2 text-xs">
+                    <button onclick="nav('home')" class="block hover:text-tl-blue transition-colors">Breaking Headlines</button>
+                    <button onclick="nav('india')" class="block hover:text-tl-blue transition-colors">National India</button>
+                    <button onclick="nav('technology')" class="block hover:text-tl-blue transition-colors">Technology & AI</button>
+                    <button onclick="nav('business')" class="block hover:text-tl-blue transition-colors">Markets & Business</button>
+                    <button onclick="nav('sports')" class="block hover:text-tl-blue transition-colors">Cricket & Sports</button>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Deep Verification Tools</h4>
+                <div class="space-y-2 text-xs">
+                    <button onclick="openScanPanel('text')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
+                        <i class="ph-bold ph-shield-check text-tl-purple"></i> Neural Text Scanner
+                    </button>
+                    <button onclick="openScanPanel('history')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
+                        <i class="ph-bold ph-clock-counter-clockwise"></i> Audit & Scan History
+                    </button>
+                    <button onclick="openScanPanel('file')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
+                        <i class="ph-bold ph-file-text"></i> Multimodal Document Scan
+                    </button>
+                    <button onclick="toggleChat()" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
+                        <i class="ph-bold ph-chat-circle-dots"></i> AI Fact-Checking Assistant
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-col justify-between items-start sm:items-end">
+                <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
+                    class="bg-tl-purple/10 hover:bg-tl-purple text-tl-purple hover:text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm mb-4">
+                    Send Researcher Feedback
+                </button>
+                <div class="text-left sm:text-right space-y-1">
+                    <div class="text-[11px] font-mono text-slate-500 flex items-center gap-2 sm:justify-end">
+                        <i class="ph-bold ph-lock-key"></i> 256-Bit TLS • Brevo OTP Verified
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-500 flex items-center gap-2 sm:justify-end">
+                        <i class="ph-bold ph-brain"></i> Conv1D + BiLSTM + Tavily API
+                    </div>
+                </div>
             </div>
         </div>
-        <div>
-            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Tools</h4>
-            <div class="space-y-2">
-                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Scanner</button>
-                <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
+
+        <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-500">
+            <p class="font-mono">
+                &copy; 2026 TruthLens — AI Verified Intelligence. All Rights Reserved.
+            </p>
+            <div class="flex items-center gap-4 text-[11px] font-mono">
+                <span class="hover:text-tl-purple transition-colors cursor-default">Privacy Safeguards</span>
+                <span>&bull;</span>
+                <span class="hover:text-tl-purple transition-colors cursor-default">Editorial Policy</span>
+                <span>&bull;</span>
+                <span class="hover:text-tl-purple transition-colors cursor-default">24h Quota Reset Protocol</span>
             </div>
-        </div>
-        <div class="text-right">
-            <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
-                class="bg-tl-purple/10 text-tl-purple hover:bg-tl-purple hover:text-white px-5 py-2 rounded-xl font-bold text-xs transition-all mb-3">
-                Send Feedback
-            </button>
-            <p class="text-[10px] opacity-50">© 2024 TruthLens. AI-powered.</p>
         </div>
     </div>
 </footer>
@@ -687,73 +749,48 @@
 <script>
 
 // =====================================================================
-// CINEMATIC PRELOADER (TruthLens brand style with GSAP-inspired animation)
+// CINEMATIC PRELOADER (TruthLens brand style with high-tech neural animation)
 // =====================================================================
 (function() {
-    var brand = document.getElementById('preloader-brand');
     var bar = document.getElementById('pl-bar');
     var status = document.getElementById('pl-status');
-    if (!brand) return;
+    var pctLabel = document.getElementById('pl-pct');
+    var pl = document.getElementById('preloader');
+    if (!pl) return;
 
-    var text = 'TRUTHLENS';
-    var colors = ['#a855f7','#3b82f6','#10b981','#ef4444','#06b6d4'];
-    brand.innerHTML = '';
-    var chars = Array.from(text).map(function(c) {
-        var span = document.createElement('span');
-        span.textContent = c;
-        span.style.cssText = 'display:inline-block;opacity:0;filter:blur(14px);transform:translateY(16px) scale(0.9);will-change:filter,opacity,transform;';
-        brand.appendChild(span);
-        return span;
-    });
-
-    // Stagger reveal chars smoothly
-    chars.forEach(function(span, i) {
-        setTimeout(function() {
-            span.style.transition = 'opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease';
-            span.style.opacity = '1';
-            span.style.filter = 'blur(0)';
-            span.style.transform = 'translateY(0) scale(1)';
-        }, i * 45 + 50);
-    });
-
-    // Hover interactive glow
-    chars.forEach(function(span) {
-        span.addEventListener('mouseenter', function() {
-            var col = colors[Math.floor(Math.random()*colors.length)];
-            span.style.color = col;
-            span.style.transform = 'translateY(-6px) scale(1.08)';
-            span.style.textShadow = '0 0 25px ' + col + 'AA';
-        });
-        span.addEventListener('mouseleave', function() {
-            span.style.color = '';
-            span.style.transform = 'translateY(0) scale(1)';
-            span.style.textShadow = '';
-        });
-    });
-
-    // Progress bar animation
     var pct = 0;
-    var statusSteps = ['Initializing Neural Core...','Calibrating BiLSTM Layers...','Connecting Web Grounding...','TruthLens Intelligence Ready.'];
-    var stepIdx = 0;
+    var statusSteps = [
+        'INITIALIZING NEURAL CORE...',
+        'CALIBRATING CONV1D-BILSTM LAYERS...',
+        'CONNECTING TAVILY LIVE GROUNDING...',
+        'SYNCHRONIZING VERIFIED FEEDS...',
+        'TRUTHLENS READY.'
+    ];
+
     var intv = setInterval(function() {
-        pct += Math.random() * 12 + 6;
-        if (pct >= 100) { pct = 100; clearInterval(intv); }
+        pct += Math.random() * 9 + 4;
+        if (pct >= 100) {
+            pct = 100;
+            clearInterval(intv);
+        }
         if (bar) bar.style.width = pct + '%';
-        var si = Math.min(Math.floor(pct / (100 / statusSteps.length)), statusSteps.length - 1);
-        if (si !== stepIdx && status) { stepIdx = si; status.textContent = statusSteps[si]; }
+        if (pctLabel) pctLabel.textContent = Math.round(pct) + '%';
+        var si = Math.min(Math.floor((pct / 100) * statusSteps.length), statusSteps.length - 1);
+        if (status) status.textContent = statusSteps[si];
     }, 45);
 
     // Smoothly dismiss preloader after full reveal
     function dismissPreloader() {
-        var pl = document.getElementById('preloader');
         if (!pl || pl.classList.contains('preloader-hidden')) return;
         pl.classList.add('preloader-hidden');
-        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 650);
+        setTimeout(function() {
+            if (pl && pl.parentNode) pl.remove();
+        }, 700);
     }
 
-    setTimeout(dismissPreloader, 1150);
+    setTimeout(dismissPreloader, 1850);
     window.addEventListener('load', function() {
-        setTimeout(dismissPreloader, 1150);
+        setTimeout(dismissPreloader, 1850);
     });
 })();
 
@@ -1413,30 +1450,120 @@ function nav(page) {
 // =====================================================================
 // NEWS  (with smart retry for Render cold-start)
 // =====================================================================
-async function fetchNews(cat, retryCount = 0) {
+// =====================================================================
+// NEWS (Dynamic real-time updates & Featured Hero News Banner)
+// =====================================================================
+function renderFeaturedHeroBanner(a) {
+    if (!a) return '';
+    const safeTitle = escapeHtml(a.title || '');
+    const safeDesc = escapeHtml(a.description || '');
+    const safeSource = escapeHtml(a.source?.name || 'Verified Wire');
+    const safeUrl = encodeURI(a.url || '#');
+    const accuracy = a.accuracy || 96;
+    const scoreColor = accuracy >= 90 ? 'emerald' : accuracy >= 75 ? 'amber' : 'rose';
+    const bgImg = a.urlToImage || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200';
+    const encodedTitle = encodeURIComponent(a.title || '');
+
+    return `
+        <div class="col-span-full relative overflow-hidden rounded-3xl border border-paper-200 dark:border-white/10 shadow-2xl bg-gradient-to-br from-white via-slate-50 to-purple-50/40 dark:from-paper-900 dark:via-slate-900 dark:to-purple-950/20 group transition-all duration-300 mb-2">
+            <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[380px]">
+                <!-- Left: Headline & Verification Intel -->
+                <div class="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between relative z-10">
+                    <div>
+                        <!-- Live Breaking Story Pill -->
+                        <div class="flex items-center gap-2 mb-4 flex-wrap">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-500 text-white shadow-md shadow-rose-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                Top Story
+                            </span>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/10">
+                                ${safeSource}
+                            </span>
+                            <span class="text-[11px] font-mono text-slate-500">
+                                ${formatDate(a.publishedAt) || 'Updated Just Now'}
+                            </span>
+                        </div>
+
+                        <!-- Grand Headline -->
+                        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="block group/title">
+                            <h2 class="text-2xl sm:text-3xl lg:text-4xl font-serif font-black tracking-tight text-ink-900 dark:text-white leading-[1.2] group-hover/title:text-tl-purple transition-colors">
+                                ${safeTitle}
+                            </h2>
+                        </a>
+
+                        <!-- Descriptive Summary -->
+                        <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 line-clamp-3 leading-relaxed font-sans">
+                            ${safeDesc}
+                        </p>
+                    </div>
+
+                    <!-- Bottom Bar: Accuracy Score & Action Buttons -->
+                    <div class="mt-6 pt-5 border-t border-slate-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-${scoreColor}-500/10 border border-${scoreColor}-500/30 flex items-center justify-center shrink-0">
+                                <span class="text-xs font-mono font-black text-${scoreColor}-500">${accuracy}%</span>
+                            </div>
+                            <div>
+                                <div class="text-[11px] font-black uppercase tracking-wider text-${scoreColor}-500">AI Grounding Score</div>
+                                <div class="text-[10px] text-slate-400 font-mono">Consensus Verified by Deep Learning</div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2.5 w-full sm:w-auto">
+                            <button onclick="quickVerify('${encodedTitle}')"
+                                    class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-tl-purple hover:bg-purple-800 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-purple-500/20 flex items-center justify-center gap-1.5 active:scale-95">
+                                <i class="ph-bold ph-lightning"></i> Instant Verify
+                            </button>
+                            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
+                               class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-800 dark:text-white font-bold text-xs transition-all flex items-center justify-center gap-1">
+                                <span>Source</span>
+                                <i class="ph-bold ph-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: High Resolution Hero Visual -->
+                <div class="lg:col-span-5 relative overflow-hidden bg-slate-900 min-h-[240px] lg:min-h-full">
+                    <img src="${bgImg}" alt="${safeTitle}"
+                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
+                         onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1000'">
+                    <div class="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-white via-transparent to-transparent dark:from-paper-900 dark:via-transparent dark:to-transparent opacity-90 lg:opacity-70"></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function fetchNews(cat, retryCount = 0, isSilent = false) {
     const app = document.getElementById('app');
     const cacheKey = 'tl_cache_news_' + (cat || 'home');
 
     // 1. Instant Stale-While-Revalidate: Show cached content immediately
-    const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
-    if (cached) {
-        try {
-            const cachedArticles = JSON.parse(cached);
-            if (Array.isArray(cachedArticles) && cachedArticles.length > 0) {
-                state.articles = cachedArticles;
-                app.innerHTML = `
-                    <div class="col-span-full flex items-end justify-between mb-2">
-                        <div class="border-l-4 border-tl-purple pl-4">
-                            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
-                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
+    if (!isSilent) {
+        const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
+        if (cached) {
+            try {
+                const cachedArticles = JSON.parse(cached);
+                if (Array.isArray(cachedArticles) && cachedArticles.length > 0) {
+                    state.articles = cachedArticles;
+                    const hero = renderFeaturedHeroBanner(state.articles[0]);
+                    const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
+                    app.innerHTML = `
+                        <div class="col-span-full flex items-end justify-between mb-2">
+                            <div class="border-l-4 border-tl-purple pl-4">
+                                <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
+                                <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
+                            </div>
                         </div>
-                    </div>
-                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
-                renderSidebars();
-            }
-        } catch(e) {}
-    } else {
-        app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+                        ${hero}
+                        ${grid}`;
+                    renderSidebars();
+                }
+            } catch(e) {}
+        } else {
+            app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
+        }
     }
 
     let url = cat === 'local'
@@ -1452,10 +1579,8 @@ async function fetchNews(cat, retryCount = 0) {
             state.articles = d.articles;
             localStorage.setItem(cacheKey, JSON.stringify(d.articles));
             localStorage.setItem('tl_cache_news_home', JSON.stringify(d.articles));
-        } else if (retryCount < 3) {
-            // Backend cold-starting: show wake-up message and retry
-            const isFirstRetry = retryCount === 0;
-            if (isFirstRetry) {
+        } else if (retryCount < 3 && !isSilent) {
+            if (retryCount === 0) {
                 app.innerHTML = `<div class="col-span-full py-32 text-center">
                     <div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin mb-4"></div>
                     <p class="text-sm font-bold text-tl-purple mt-3">AI Engine warming up...</p>
@@ -1469,6 +1594,9 @@ async function fetchNews(cat, retryCount = 0) {
             if (fallbackCached) state.articles = JSON.parse(fallbackCached);
         }
 
+        const hero = state.articles.length > 0 ? renderFeaturedHeroBanner(state.articles[0]) : '';
+        const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
+
         app.innerHTML = `
             <div class="col-span-full flex items-end justify-between mb-2">
                 <div class="border-l-4 border-tl-purple pl-4">
@@ -1477,10 +1605,11 @@ async function fetchNews(cat, retryCount = 0) {
                 </div>
                 <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
             </div>
-            ${state.articles.map((a,i) => renderCard(a,i)).join('')}
+            ${hero}
+            ${grid}
             ${state.articles.length === 0 ? '<div class="col-span-full py-32 text-center text-ink-500 font-serif italic text-lg">No reports found in current archives.</div>' : ''}`;
     } catch(e) {
-        if (retryCount < 3) {
+        if (retryCount < 3 && !isSilent) {
             setTimeout(() => fetchNews(cat, retryCount + 1), 4000);
             return;
         }
@@ -1488,6 +1617,8 @@ async function fetchNews(cat, retryCount = 0) {
             const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
             if (fallbackCached) {
                 state.articles = JSON.parse(fallbackCached);
+                const hero = renderFeaturedHeroBanner(state.articles[0]);
+                const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
                 app.innerHTML = `
                     <div class="col-span-full flex items-end justify-between mb-2">
                         <div class="border-l-4 border-tl-purple pl-4">
@@ -1495,7 +1626,8 @@ async function fetchNews(cat, retryCount = 0) {
                             <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
                         </div>
                     </div>
-                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+                    ${hero}
+                    ${grid}`;
             } else {
                 app.innerHTML = `<div class="col-span-full py-32 text-center">
                     <i class="ph-bold ph-wifi-slash text-4xl text-paper-300 dark:text-white/20 mb-4 block"></i>
@@ -1506,6 +1638,15 @@ async function fetchNews(cat, retryCount = 0) {
         }
     }
     renderSidebars();
+}
+
+// Background auto-refresh for real-time news updates
+if (!window._newsAutoUpdateTimer) {
+    window._newsAutoUpdateTimer = setInterval(() => {
+        if (!document.hidden && (!state.page || state.page === 'home' || ['india','technology','business','sports','world'].includes(state.page))) {
+            fetchNews(state.page || 'home', 0, true);
+        }
+    }, 180000);
 }
 
 function renderCard(a, i) {
@@ -1859,7 +2000,7 @@ function formatTeamScore(ms, teamKey) {
 }
 
 function showCricketPopover(e, idx) {
-    const m = window._cricketMatches[idx];
+    const m = (window._cricketMatches && window._cricketMatches[idx]) || (window.liveCricketMatches && window.liveCricketMatches[idx]) || null;
     if (!m) return;
     const pop = document.getElementById('cricket-popover');
     if (!pop) return;
@@ -2009,10 +2150,26 @@ function renderCricketCards(d) {
                 const s2 = formatTeamScore(m.matchScore, 'team2Score');
 
                 const stateStr = mi.state || '';
-                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
+                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete' && stateStr !== 'Finished');
                 const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
-                const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
+                const badgeText = isLive ? 'LIVE' : (isComplete ? 'TODAY' : stateStr || 'UPCOMING');
                 const statusNote = mi.status || stateStr;
+
+                // Detect Popular Cricket Format: IPL T20, WPL T20, ODI, T20I, TEST
+                let formatLabel = (mi.matchFormat || '').toUpperCase();
+                const descUpper = ((mi.matchDesc || '') + ' ' + (mi.seriesName || '') + ' ' + (m.series || '')).toUpperCase();
+                if (descUpper.includes('IPL') || descUpper.includes('INDIAN PREMIER LEAGUE')) {
+                    formatLabel = 'IPL T20';
+                } else if (descUpper.includes('WPL') || descUpper.includes('WOMEN\'S PREMIER LEAGUE')) {
+                    formatLabel = 'WPL T20';
+                } else if (descUpper.includes('ODI')) {
+                    formatLabel = 'ODI';
+                } else if (descUpper.includes('TEST')) {
+                    formatLabel = 'TEST';
+                } else if (descUpper.includes('T20I') || descUpper.includes('T20')) {
+                    formatLabel = 'T20I';
+                }
+                if (!formatLabel) formatLabel = 'CRICKET';
 
                 // Micro player-bowler indicators directly on the card
                 const ld = m.liveDetails || {};
@@ -2029,11 +2186,22 @@ function renderCricketCards(d) {
                 }
 
                 cards += `
-                    <div class="cricket-card-item flex flex-col justify-between shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-xl hover:border-tl-purple/60 transition-all cursor-pointer min-w-[270px] relative group"
+                    <div class="cricket-card-item flex flex-col justify-between shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-xl hover:border-tl-purple/60 transition-all cursor-pointer min-w-[280px] relative group"
                          onclick="openCricketScorecardModal(${currentIdx})"
                          onmouseenter="showCricketPopover(event, ${currentIdx})"
                          onmouseleave="hideCricketPopover()"
                          onmousemove="positionCricketPopover(event)">
+                        
+                        <!-- Top format and match type bar -->
+                        <div class="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-100 dark:border-white/5">
+                            <span class="text-[9px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${formatLabel}</span>
+                            <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400 truncate max-w-[110px]" title="${mi.matchDesc || mi.seriesName || ''}">${mi.matchDesc || mi.seriesName || ''}</span>
+                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red flex items-center justify-end gap-1' : 'text-slate-500'}">
+                                ${isLive ? '<span class="w-1.5 h-1.5 rounded-full bg-tl-red animate-pulse"></span>' : ''}
+                                ${badgeText}
+                            </div>
+                        </div>
+
                         <div class="flex items-center justify-between gap-3">
                             <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                                 <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
@@ -2052,10 +2220,6 @@ function renderCricketCards(d) {
                                 </div>
                             </div>
                             <div class="ml-2 text-right shrink-0 max-w-[105px]">
-                                <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red flex items-center justify-end gap-1' : 'text-ink-500'}">
-                                    ${isLive ? '<span class="w-1.5 h-1.5 rounded-full bg-tl-red animate-pulse"></span>' : ''}
-                                    ${badgeText}
-                                </div>
                                 <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
                             </div>
                         </div>
@@ -2069,6 +2233,9 @@ function renderCricketCards(d) {
             }
         }
     }
+
+    // Synchronize both global references for popover and modal
+    window.liveCricketMatches = window._cricketMatches;
 
     if (cards) {
         hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0 flex items-center gap-1"><span>🏏</span> <span class="tracking-wider">MATCH CENTER</span></span>` + cards;
@@ -2947,7 +3114,7 @@ function renderPrice(m) {
 // CRICKET FULL SCORECARD & LIVE INTEL MODAL
 // ==========================================
 function openCricketScorecardModal(idx) {
-    const m = (window.liveCricketMatches && window.liveCricketMatches[idx]) || null;
+    const m = (window.liveCricketMatches && window.liveCricketMatches[idx]) || (window._cricketMatches && window._cricketMatches[idx]) || null;
     const body = document.getElementById('cricket-modal-body');
     const modal = document.getElementById('cricket-scorecard-modal');
     if (!modal || !body) return;
