@@ -139,7 +139,7 @@ def _sync_mongo_user_to_sqlite(u: dict, con=None):
         return
     close_con = False
     if con is None:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=30)
         close_con = True
     try:
         cur = con.cursor()
@@ -187,7 +187,7 @@ def _sync_all_mongo_users_to_sqlite():
             return
         users = list(mdb.users.find({}))
         if users:
-            con = sqlite3.connect(DB_PATH)
+            con = sqlite3.connect(DB_PATH, timeout=30)
             for u in users:
                 _sync_mongo_user_to_sqlite(u, con=con)
             con.close()
@@ -217,7 +217,7 @@ def sync_and_get_user(identifier: str, con=None) -> Optional[Dict[str, Any]]:
 
     close_con = False
     if con is None:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=30)
         con.row_factory = sqlite3.Row
         close_con = True
 
@@ -258,7 +258,7 @@ def sync_and_get_user(identifier: str, con=None) -> Optional[Dict[str, Any]]:
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect(DB_PATH)
+        db = g._database = sqlite3.connect(DB_PATH, timeout=30)
         db.row_factory = sqlite3.Row
     return db
 
@@ -270,7 +270,12 @@ def close_connection(exception):
 
 def init_db():
     with app.app_context():
-        db = sqlite3.connect(DB_PATH)
+        db = sqlite3.connect(DB_PATH, timeout=30)
+        try:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA synchronous=NORMAL")
+        except Exception:
+            pass
         # Create tables if they don't exist
         db.executescript("""
             CREATE TABLE IF NOT EXISTS users (
@@ -342,7 +347,6 @@ def init_db():
 
         db.commit()
         db.close()
-        threading.Thread(target=_sync_all_mongo_users_to_sqlite, daemon=True).start()
 
 _persistent_api_cache = {}
 _api_cache_lock = threading.Lock()
@@ -526,21 +530,23 @@ def verify_password_bcrypt(password: str, stored_hash: str, salt: str = None) ->
     """Verify password against bcrypt hash, werkzeug hash, or legacy sha256."""
     if not password or not stored_hash:
         return False
-    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+    pw_str = str(password).strip()
+    hash_str = str(stored_hash).strip()
+    if hash_str.startswith(("$2a$", "$2b$", "$2y$")):
         try:
-            return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+            return bcrypt.checkpw(pw_str.encode('utf-8'), hash_str.encode('utf-8'))
         except Exception:
             return False
     try:
-        if check_password_hash(stored_hash, password):
+        if check_password_hash(hash_str, pw_str):
             return True
     except Exception:
         pass
     if salt:
-        legacy_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
-        if legacy_hash == stored_hash:
+        legacy_hash = hashlib.sha256((pw_str + str(salt).strip()).encode('utf-8')).hexdigest()
+        if legacy_hash == hash_str:
             return True
-    return stored_hash == password
+    return hash_str == pw_str
 
 def verify_password(password: str, stored_hash: str, salt: str = None) -> bool:
     return verify_password_bcrypt(password, stored_hash, salt)
