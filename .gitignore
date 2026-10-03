@@ -54,6 +54,7 @@ uploads/*
 *.tmp
 *.temp
 *.log
+*.docx
 temp/
 tmp/
 .coverage
