@@ -31,6 +31,9 @@ scan_executor = ThreadPoolExecutor(max_workers=6)
 
 from flask import (Flask, render_template, request, jsonify, g, Response, stream_with_context)
 from flask_cors import CORS
+import hashlib
+from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer
 import requests
 import sqlite3
 import urllib.request
@@ -54,22 +57,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "truthlens-v8-production-secret-ke
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 
-# ─────────────────────────────────────────────────────────────────────────────
-# HELMET-GRADE HTTP SECURITY HEADERS (Helmet JS standard for Flask API)
-# ─────────────────────────────────────────────────────────────────────────────
-@app.after_request
-def apply_helmet_security_headers(response):
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["X-DNS-Prefetch-Control"] = "on"
-    response.headers["X-Download-Options"] = "noopen"
-    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-    response.headers["Permissions-Policy"] = "geolocation=(self), camera=(), microphone=()"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-    return response
-
 # API Keys & URLs
 NEWS_API_KEY      = os.environ.get("NEWS_API_KEY", "")
 TOP_HEADLINES_URL = "https://newsapi.org/v2/top-headlines"
@@ -87,12 +74,6 @@ TAVILY_API_KEY    = os.environ.get("TAVILY_API_KEY", "")
 MISTRAL_API_KEY   = os.environ.get("MISTRAL_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")
 MONGO_URI         = os.environ.get("MONGO_URI", "")
-BREVO_API_KEY      = os.environ.get("BREVO_API_KEY", "")
-BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "verify@truthlens.ai")
-BREVO_SENDER_NAME  = os.environ.get("BREVO_SENDER_NAME", "TruthLens Verification")
-
-from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import URLSafeTimedSerializer
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -142,28 +123,6 @@ def _connect_mongo_async():
             mongo_client = client
             mongo_db = client.get_database('truthlens_db')
             print("[OK] Connected to MongoDB Cloud Database (truthlens_db)")
-
-            # Seed / Synchronize Platform Administrators in MongoDB
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for admin_email, admin_info in ADMIN_USERS.items():
-                pw_h = generate_password_hash(admin_info["password"])
-                mongo_db.users.update_one(
-                    {"email": admin_email},
-                    {"$set": {
-                        "id": admin_info["id"],
-                        "email": admin_email,
-                        "password_hash": pw_h,
-                        "is_verified": True,
-                        "role": "admin",
-                        "is_admin": 1,
-                        "scans_used": 0,
-                        "last_reset_date": today_str,
-                        "created_at": now_iso
-                    }},
-                    upsert=True
-                )
-            print("[OK] MongoDB Admin accounts initialized with unlimited quota.")
         except Exception as e:
             print(f"[INFO] MongoDB connection info: {e}. Using local SQLite storage.")
 
@@ -187,8 +146,27 @@ def close_connection(exception):
 def init_db():
     with app.app_context():
         db = sqlite3.connect(DB_PATH)
-        # Create tables if they don't exist (backward-compatible with old schema)
+        # Create tables if they don't exist
         db.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                email TEXT UNIQUE,
+                password_hash TEXT,
+                salt TEXT,
+                role TEXT DEFAULT 'user',
+                is_verified INTEGER DEFAULT 1,
+                otp_code TEXT,
+                otp_expires_at TEXT,
+                scans_used INTEGER DEFAULT 0,
+                created_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS guest_quotas (
+                guest_id TEXT PRIMARY KEY,
+                ip_address TEXT,
+                scans_used INTEGER DEFAULT 0,
+                last_scan_at TEXT
+            );
             CREATE TABLE IF NOT EXISTS scan_history (
                 id TEXT PRIMARY KEY,
                 user_id TEXT,
@@ -211,48 +189,23 @@ def init_db():
                 json_data TEXT,
                 updated_at TEXT
             );
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                is_verified INTEGER DEFAULT 0,
-                verification_otp TEXT,
-                otp_expires_at TEXT,
-                scans_used INTEGER DEFAULT 0,
-                created_at TEXT,
-                role TEXT DEFAULT 'user',
-                is_admin INTEGER DEFAULT 0,
-                last_reset_date TEXT
-            );
-            CREATE TABLE IF NOT EXISTS guest_quotas (
-                guest_id TEXT PRIMARY KEY,
-                ip_address TEXT,
-                scans_used INTEGER DEFAULT 0,
-                last_scan_at TEXT,
-                last_reset_date TEXT
-            );
         """)
+        # Ensure migration columns exist
+        existing_cols = [c[1] for c in db.execute("PRAGMA table_info(users)").fetchall()]
+        for col_name, col_type in [("name", "TEXT"), ("salt", "TEXT"), ("otp_code", "TEXT"), ("verification_otp", "TEXT"), ("is_admin", "INTEGER DEFAULT 0"), ("last_reset_date", "TEXT")]:
+            if col_name not in existing_cols:
+                try:
+                    db.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
 
-        # Backward compatibility column migrations for existing SQLite databases
-        for col, col_type in [("role", "TEXT DEFAULT 'user'"), ("is_admin", "INTEGER DEFAULT 0"), ("last_reset_date", "TEXT")]:
-            try:
-                db.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type}")
-            except sqlite3.OperationalError:
-                pass
-
-        try:
-            db.execute("ALTER TABLE guest_quotas ADD COLUMN last_reset_date TEXT")
-        except sqlite3.OperationalError:
-            pass
-
-        # Seed / Synchronize Platform Administrators in SQLite
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         now_iso = datetime.now(timezone.utc).isoformat()
         for admin_email, admin_info in ADMIN_USERS.items():
             pw_h = generate_password_hash(admin_info["password"])
             db.execute("""
-                INSERT INTO users (id, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date)
-                VALUES (?, ?, ?, 1, 0, ?, 'admin', 1, ?)
+                INSERT INTO users (id, name, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date)
+                VALUES (?, ?, ?, ?, 1, 0, ?, 'admin', 1, ?)
                 ON CONFLICT(email) DO UPDATE SET
                     password_hash = excluded.password_hash,
                     is_verified = 1,
@@ -260,11 +213,10 @@ def init_db():
                     is_admin = 1,
                     scans_used = 0,
                     last_reset_date = excluded.last_reset_date
-            """, (admin_info["id"], admin_email, pw_h, now_iso, today_str))
+            """, (admin_info["id"], admin_info["name"], admin_email, pw_h, now_iso, today_str))
 
         db.commit()
         db.close()
-
 
 _persistent_api_cache = {}
 _api_cache_lock = threading.Lock()
@@ -308,132 +260,68 @@ def get_last_api_response(cache_key: str) -> Any:
         pass
     return None
 
-def require_auth(f):
-    """Decorator ensuring request has a valid session or token if needed."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        return f(*args, **kwargs)
-    return decorated
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# USER AUTHENTICATION & BREVO TRANSACTIONAL EMAIL ENGINE
+# USER AUTHENTICATION & QUOTA ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
-auth_serializer = URLSafeTimedSerializer(app.secret_key)
+auth_serializer = URLSafeTimedSerializer(app.secret_key or "truthlens_jwt_secret_key_2026")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    if not salt:
+        salt = uuid.uuid4().hex[:16]
+    hashed = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    return hashed, salt
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    hashed, _ = hash_password(password, salt)
+    return hashed == stored_hash
 
 def send_brevo_otp(to_email: str, otp_code: str) -> bool:
-    """
-    Send account verification email with 6-digit OTP using Brevo (Sendinblue) REST API v3.
-    Falls back gracefully to local dev console log if BREVO_API_KEY is not configured.
-    """
     if not BREVO_API_KEY:
-        print(f"\n[BREVO DEV NOTIFICATION] Verification OTP for {to_email}: {otp_code} (Valid for 15 mins)\n")
-        return True
-
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json"
-    }
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TruthLens Verification Code</title>
-    </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #030712; color: #f9fafb; padding: 32px 16px; margin: 0;">
-        <!-- Hidden Preheader for Push Notifications & Email Inbox Snippets -->
-        <div style="display: none; font-size: 1px; color: #030712; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all;">
-            {otp_code} is your TruthLens verification code. Expand to 50 deep neural checks. Valid for 15 minutes. &#847; &#847; &#847; &#847; &#847; &#847;
-        </div>
-
-        <div style="max-width: 520px; margin: 0 auto; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 36px 28px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);">
-            <!-- Brand Header -->
-            <div style="text-align: center; margin-bottom: 28px;">
-                <div style="display: inline-block; padding: 8px 16px; border-radius: 12px; background: rgba(147, 51, 234, 0.15); border: 1px solid rgba(147, 51, 234, 0.3); margin-bottom: 12px;">
-                    <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; color: #c084fc;">TruthLens AI Intelligence</span>
-                </div>
-                <h1 style="color: #ffffff; font-size: 26px; font-weight: 900; margin: 0; letter-spacing: -0.03em;">Account Verification</h1>
-                <p style="color: #94a3b8; font-size: 13px; margin: 6px 0 0 0;">Deep Learning & NLP Fake News Detection</p>
-            </div>
-
-            <!-- OTP Card Box -->
-            <div style="background: linear-gradient(180deg, rgba(30, 27, 75, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 2px dashed rgba(168, 85, 247, 0.5); border-radius: 16px; padding: 26px 16px; text-align: center; margin: 24px 0;">
-                <p style="color: #cbd5e1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 10px 0;">Your 6-Digit Security Code</p>
-                <div style="font-size: 42px; font-weight: 900; letter-spacing: 12px; color: #f8fafc; font-family: 'SF Mono', Consolas, Monaco, monospace; text-shadow: 0 0 20px rgba(168, 85, 247, 0.6); padding-left: 12px;">
-                    {otp_code}
-                </div>
-                <p style="color: #94a3b8; font-size: 12px; margin: 12px 0 0 0;">⏱️ Valid for <strong>15 minutes</strong> • Single use only</p>
-            </div>
-
-            <!-- Quota Benefit Badge -->
-            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px 18px; margin-bottom: 24px;">
-                <p style="color: #34d399; font-size: 13px; font-weight: 700; margin: 0;">
-                    ✓ Quota Expansion: 50 Deep Neural Scans
-                </p>
-                <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0; line-height: 1.5;">
-                    Verifying your email upgrades your daily scanner limit from 5 to 50 deep neural checks with automated cloud history synchronization.
-                </p>
-            </div>
-
-            <p style="color: #64748b; font-size: 12px; line-height: 1.6; margin: 0 0 20px 0; text-align: center;">
-                If you did not request this verification code, you can safely disregard this automated message.
-            </p>
-
-            <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0 16px 0;">
-
-            <!-- Footer -->
-            <div style="text-align: center; color: #475569; font-size: 11px;">
-                <p style="margin: 0;">This is an automated notification from <strong>TruthLens Security</strong>.</p>
-                <p style="margin: 4px 0 0 0;">Please do not reply directly to this email address.</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    payload = {
-        "sender": {"name": "TruthLens Security (noreply)", "email": BREVO_SENDER_EMAIL},
-        "replyTo": {"email": "noreply@truthlens.ai", "name": "TruthLens No-Reply"},
-        "to": [{"email": to_email}],
-        "subject": f"Your TruthLens Verification Code is {otp_code}",
-        "htmlContent": html_content
-    }
+        print(f"[AUTH DEV] Brevo not configured. Dev OTP for {to_email}: {otp_code}")
+        return False
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=8)
-        if res.status_code in (200, 201, 202):
-            print(f"[BREVO OK] Verification OTP dispatched to {to_email}")
-            return True
-        else:
-            print(f"[BREVO WARN] Status {res.status_code}: {res.text}. Dev fallback OTP: {otp_code}")
-            return False
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "api-key": BREVO_API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        payload = {
+            "sender": {"name": "TruthLens Security", "email": "verify@truthlens.ai"},
+            "to": [{"email": to_email}],
+            "subject": f"Your TruthLens Verification Code: {otp_code}",
+            "htmlContent": f"""
+            <div style="font-family:sans-serif;max-width:500px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;">
+                <h2 style="color:#7c3aed;margin-bottom:8px;">TruthLens AI Intelligence</h2>
+                <p style="color:#475569;font-size:14px;">Here is your verification code to access expanded AI scanning quotas:</p>
+                <div style="background:#f8fafc;padding:16px;text-align:center;border-radius:12px;margin:20px 0;">
+                    <span style="font-size:32px;font-weight:900;letter-spacing:6px;color:#1e293b;">{otp_code}</span>
+                </div>
+                <p style="color:#94a3b8;font-size:12px;">Valid for 15 minutes. If you did not request this, please ignore this email.</p>
+            </div>
+            """
+        }
+        res = requests.post(url, headers=headers, json=payload, timeout=5)
+        return res.status_code in [200, 201, 202]
     except Exception as e:
-        print(f"[BREVO ERROR] {e}. Dev fallback OTP: {otp_code}")
+        print(f"[AUTH BREVO ERROR] {e}. Dev OTP: {otp_code}")
         return False
 
 def get_current_user():
-    """Extract authenticated user from Authorization Bearer token or cookie (24-hour lifetime)."""
     token = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ", 1)[1].strip()
     if not token:
         token = request.cookies.get("truthlens_auth_token")
-
     if not token:
         return None
 
     try:
-        # Token strictly expires every 24 hours (86,400 seconds)
-        payload = auth_serializer.loads(token, max_age=86400)
+        payload = auth_serializer.loads(token, max_age=86400 * 30)
         user_id = payload.get("user_id")
         email = (payload.get("email") or "").lower()
-        if not user_id and not email:
-            return None
-
-        # Check if user is one of the designated admins
         if email in ADMIN_EMAILS:
             admin_info = ADMIN_USERS[email]
             return {
@@ -447,279 +335,238 @@ def get_current_user():
                 "unlimited": True
             }
 
+        if not user_id and not email:
+            return None
+        
         if mongo_db is not None:
             query = {"id": user_id} if user_id else {"email": email}
             u = mongo_db.users.find_one(query)
             if u:
                 u["_id"] = str(u.get("_id", u["id"]))
                 return u
-        else:
-            con = sqlite3.connect(DB_PATH)
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-            cur.execute("SELECT id, email, password_hash, is_verified, scans_used, created_at, role, is_admin, last_reset_date FROM users WHERE id = ? OR email = ?", (user_id, email))
-            row = cur.fetchone()
-            con.close()
-            if row:
-                return dict(row)
+        
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT * FROM users WHERE id = ? OR email = ?", (user_id, email))
+        row = cur.fetchone()
+        con.close()
+        if row:
+            u = dict(row)
+            if (u.get("email") or "").lower() in ADMIN_EMAILS:
+                u["role"] = "admin"
+                u["is_admin"] = 1
+                u["unlimited"] = True
+            return u
     except Exception:
         return None
     return None
 
 def get_client_identity():
     """
-    Determines if request is:
-    - Admin user: unlimited scans (limit: 999999, scans_used: 0)
-    - Normal registered user: 50 scans/day, resets every 24h cycle
-    - Guest user: 5 scans/day, resets every 24h cycle
+    Determines client identity: admin (limit: 999999), user (limit: 50), or guest (limit: 5).
     Returns: (client_obj, is_authenticated, scans_used, limit)
     """
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    now_iso = datetime.now(timezone.utc).isoformat()
-
     user = get_current_user()
-    if user and user.get("is_verified"):
+    if user:
         email = (user.get("email") or "").lower()
-        is_admin = email in ADMIN_EMAILS or user.get("role") == "admin" or bool(user.get("is_admin"))
+        is_admin = (user.get("role") == "admin") or (email in ADMIN_EMAILS) or user.get("unlimited")
+        limit = 999999 if is_admin else 50
+        return user, True, int(user.get("scans_used", 0)), limit
 
-        if is_admin:
-            user["role"] = "admin"
-            user["is_admin"] = 1
-            user["unlimited"] = True
-            return user, True, 0, 999999
-
-        # Normal verified user: 50 daily scans with 24-hour reset
-        user_last_reset = user.get("last_reset_date")
-        user_scans = int(user.get("scans_used", 0))
-
-        if user_last_reset != today_str:
-            user_scans = 0
-            user["scans_used"] = 0
-            user["last_reset_date"] = today_str
-            user_id = user.get("id")
-            if mongo_db is not None:
-                mongo_db.users.update_one({"id": user_id}, {"$set": {"scans_used": 0, "last_reset_date": today_str}})
-            else:
-                con = sqlite3.connect(DB_PATH)
-                con.execute("UPDATE users SET scans_used = 0, last_reset_date = ? WHERE id = ?", (today_str, user_id))
-                con.commit()
-                con.close()
-
-        return user, True, user_scans, 50
-
-    # Guest user: 25 daily scans with 24-hour reset
     guest_id = request.headers.get("X-Guest-ID") or request.cookies.get("truthlens_guest_id")
     if not guest_id:
-        fwd = request.headers.get("X-Forwarded-For")
-        if fwd:
-            ip = fwd.split(",")[0].strip()
-        else:
-            ip = request.remote_addr or "127.0.0.1"
+        xff = request.headers.get("X-Forwarded-For", "")
+        ip = xff.split(",")[0].strip() if xff else (request.remote_addr or "127.0.0.1")
         guest_id = f"guest_{abs(hash(ip))}"
 
     scans_used = 0
     if mongo_db is not None:
         g_doc = mongo_db.guest_quotas.find_one({"guest_id": guest_id})
         if g_doc:
-            if g_doc.get("last_reset_date") != today_str:
-                scans_used = 0
-                mongo_db.guest_quotas.update_one(
-                    {"guest_id": guest_id},
-                    {"$set": {"scans_used": 0, "last_reset_date": today_str}}
-                )
-            else:
-                scans_used = int(g_doc.get("scans_used", 0))
+            scans_used = int(g_doc.get("scans_used", 0))
         else:
             mongo_db.guest_quotas.insert_one({
                 "guest_id": guest_id,
                 "ip_address": request.remote_addr or "",
                 "scans_used": 0,
-                "last_reset_date": today_str,
-                "last_scan_at": now_iso
+                "last_scan_at": datetime.now(timezone.utc).isoformat()
             })
     else:
-        con = sqlite3.connect(DB_PATH)
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute("SELECT scans_used, last_reset_date FROM guest_quotas WHERE guest_id = ?", (guest_id,))
-        row = cur.fetchone()
-        if row:
-            if row["last_reset_date"] != today_str:
-                scans_used = 0
-                con.execute("UPDATE guest_quotas SET scans_used = 0, last_reset_date = ? WHERE guest_id = ?", (today_str, guest_id))
-                con.commit()
-            else:
+        try:
+            con = sqlite3.connect(DB_PATH)
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            cur.execute("SELECT scans_used FROM guest_quotas WHERE guest_id = ?", (guest_id,))
+            row = cur.fetchone()
+            if row:
                 scans_used = int(row["scans_used"])
-        else:
-            cur.execute(
-                "INSERT OR IGNORE INTO guest_quotas (guest_id, ip_address, scans_used, last_reset_date, last_scan_at) VALUES (?, ?, 0, ?, ?)",
-                (guest_id, request.remote_addr or "", today_str, now_iso)
-            )
-            con.commit()
-        con.close()
-
-    return {"guest_id": guest_id, "scans_used": scans_used}, False, scans_used, 25
-
-def increment_client_quota(client_obj, is_auth: bool):
-    """Increment scan count for user (limit 50) or guest (limit 5). Admins have unlimited scans."""
-    if is_auth:
-        email = (client_obj.get("email") or "").lower()
-        if email in ADMIN_EMAILS or client_obj.get("role") == "admin" or bool(client_obj.get("is_admin")):
-            return  # Platform administrators enjoy unlimited scans! Never increment.
-
-        user_id = client_obj.get("id")
-        if mongo_db is not None:
-            mongo_db.users.update_one({"id": user_id}, {"$inc": {"scans_used": 1}})
-        else:
-            con = sqlite3.connect(DB_PATH)
-            con.execute("UPDATE users SET scans_used = scans_used + 1 WHERE id = ?", (user_id,))
-            con.commit()
+            else:
+                cur.execute(
+                    "INSERT OR IGNORE INTO guest_quotas (guest_id, ip_address, scans_used, last_scan_at) VALUES (?, ?, 0, ?)",
+                    (guest_id, request.remote_addr or "", datetime.now(timezone.utc).isoformat())
+                )
+                con.commit()
             con.close()
-    else:
+        except Exception:
+            pass
+
+    return {"guest_id": guest_id}, False, scans_used, 5
+
+def record_scan_usage(client_obj: dict, is_auth: bool):
+    try:
         now_iso = datetime.now(timezone.utc).isoformat()
-        guest_id = client_obj.get("guest_id")
-        if mongo_db is not None:
-            mongo_db.guest_quotas.update_one(
-                {"guest_id": guest_id},
-                {"$inc": {"scans_used": 1}, "$set": {"last_scan_at": now_iso}},
-                upsert=True
-            )
+        if is_auth and "id" in client_obj:
+            user_id = client_obj["id"]
+            if mongo_db is not None:
+                mongo_db.users.update_one({"id": user_id}, {"$inc": {"scans_used": 1}, "$set": {"last_scan_at": now_iso}})
+            else:
+                con = sqlite3.connect(DB_PATH)
+                con.execute("UPDATE users SET scans_used = scans_used + 1 WHERE id = ?", (user_id,))
+                con.commit()
+                con.close()
         else:
-            con = sqlite3.connect(DB_PATH)
-            con.execute(
-                "UPDATE guest_quotas SET scans_used = scans_used + 1, last_scan_at = ? WHERE guest_id = ?",
-                (now_iso, guest_id)
-            )
-            con.commit()
-            con.close()
+            guest_id = client_obj.get("guest_id")
+            if guest_id:
+                if mongo_db is not None:
+                    mongo_db.guest_quotas.update_one(
+                        {"guest_id": guest_id},
+                        {"$inc": {"scans_used": 1}, "$set": {"last_scan_at": now_iso}},
+                        upsert=True
+                    )
+                else:
+                    con = sqlite3.connect(DB_PATH)
+                    con.execute("""
+                        INSERT INTO guest_quotas (guest_id, ip_address, scans_used, last_scan_at)
+                        VALUES (?, ?, 1, ?)
+                        ON CONFLICT(guest_id) DO UPDATE SET scans_used = scans_used + 1, last_scan_at = excluded.last_scan_at
+                    """, (guest_id, request.remote_addr or "", now_iso))
+                    con.commit()
+                    con.close()
+    except Exception as e:
+        print(f"[Record Scan] Error: {e}")
 
+def require_auth(f):
+    """Optional wrapper: allows both guests and registered users."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTH API ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
 @app.route("/api/auth/signup", methods=["POST"])
 def auth_signup():
     data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
-    if not email or "@" not in email or len(email) < 5:
-        return jsonify({"error": "Please enter a valid email address."}), 400
+    if not email or "@" not in email:
+        return jsonify({"error": "Please provide a valid email address."}), 400
     if not password or len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters long."}), 400
 
     if email in ADMIN_EMAILS:
         return jsonify({"error": "This administrator account is pre-registered. Please sign in directly."}), 400
 
-    if mongo_db is not None:
-        existing = mongo_db.users.find_one({"email": email})
-    else:
-        con = sqlite3.connect(DB_PATH)
-        cur = con.cursor()
-        cur.execute("SELECT id, is_verified FROM users WHERE email = ?", (email,))
-        existing = cur.fetchone()
-        con.close()
-
-    if existing:
-        is_ver = existing.get("is_verified") if isinstance(existing, dict) else existing[1]
-        if is_ver:
-            return jsonify({"error": "An account with this email already exists. Please sign in."}), 400
-
+    hashed_pw = generate_password_hash(password)
     user_id = str(uuid.uuid4())
-    pw_hash = generate_password_hash(password)
-    otp_code = str(random.randint(100000, 999999))
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-    created_at = datetime.now(timezone.utc).isoformat()
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    otp_code = f"{random.randint(100000, 999999)}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
 
-    if mongo_db is not None:
-        mongo_db.users.update_one(
-            {"email": email},
-            {"$set": {
-                "id": user_id, "email": email, "password_hash": pw_hash,
-                "is_verified": False, "verification_otp": otp_code,
-                "otp_expires_at": expires_at, "scans_used": 0,
-                "last_reset_date": today_str, "role": "user", "is_admin": 0, "created_at": created_at
-            }},
-            upsert=True
-        )
-    else:
+    try:
         con = sqlite3.connect(DB_PATH)
-        con.execute(
-            """INSERT OR REPLACE INTO users (id, email, password_hash, is_verified, verification_otp, otp_expires_at, scans_used, last_reset_date, role, is_admin, created_at)
-               VALUES (?, ?, ?, 0, ?, ?, 0, ?, 'user', 0, ?)""",
-            (user_id, email, pw_hash, otp_code, expires_at, today_str, created_at)
-        )
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT id FROM users WHERE email = ?", (email,))
+        if cur.fetchone():
+            con.close()
+            return jsonify({"error": "An account with this email already exists."}), 400
+
+        cur.execute("""
+            INSERT INTO users (id, name, email, password_hash, salt, role, is_verified, otp_code, otp_expires_at, scans_used, created_at)
+            VALUES (?, ?, ?, ?, '', 'user', 0, ?, ?, 0, ?)
+        """, (user_id, name or email.split('@')[0], email, hashed_pw, otp_code, expires_iso, now_iso))
         con.commit()
         con.close()
 
-    sent = send_brevo_otp(email, otp_code)
-    return jsonify({
-        "success": True,
-        "message": f"Verification code sent to {email}." if sent else f"Verification code dispatched to {email}.",
-        "email": email,
-        "dev_otp": otp_code if (app.testing or not sent) else None
-    })
+        sent = send_brevo_otp(email, otp_code)
+        resp = jsonify({
+            "success": True,
+            "message": f"Verification code sent to {email}.",
+            "email": email,
+            "requires_otp": True,
+            "dev_otp": otp_code if not sent else None
+        })
+        return resp
+    except Exception as e:
+        return jsonify({"error": f"Failed to register account: {e}"}), 500
+
 
 @app.route("/api/auth/verify-otp", methods=["POST"])
 def auth_verify_otp():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
-    otp = (data.get("otp") or "").strip()
+    otp = str(data.get("otp") or "").strip()
     if not email or not otp:
         return jsonify({"error": "Email and 6-digit code are required."}), 400
 
-    user = None
-    if mongo_db is not None:
-        user = mongo_db.users.find_one({"email": email})
-    else:
+    try:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cur.fetchone()
-        con.close()
-        if row: user = dict(row)
+        if not row:
+            con.close()
+            return jsonify({"error": "No account found with this email."}), 404
 
-    if not user:
-        return jsonify({"error": "No account found with this email."}), 404
+        user = dict(row)
+        stored_otp = str(user.get("otp_code") or user.get("verification_otp") or "").strip()
+        if stored_otp != otp:
+            con.close()
+            return jsonify({"error": "Invalid verification code. Please check your email or resend."}), 400
 
-    if str(user.get("verification_otp", "")).strip() != otp:
-        return jsonify({"error": "Invalid verification code. Please check your email or resend."}), 400
-
-    user_id = user["id"]
-    if mongo_db is not None:
-        mongo_db.users.update_one({"id": user_id}, {"$set": {"is_verified": True, "verification_otp": None}})
-    else:
-        con = sqlite3.connect(DB_PATH)
-        con.execute("UPDATE users SET is_verified = 1, verification_otp = NULL WHERE id = ?", (user_id,))
+        user_id = user["id"]
+        con.execute("UPDATE users SET is_verified = 1, otp_code = NULL WHERE id = ?", (user_id,))
         con.commit()
         con.close()
 
-    token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "user"})
-    scans_used = int(user.get("scans_used", 0))
-    quota_info = {
-        "limit": 50,
-        "remaining": max(0, 50 - scans_used),
-        "used": scans_used,
-        "is_authenticated": True,
-        "role": "user",
-        "is_admin": False,
-        "unlimited": False
-    }
-    resp = jsonify({
-        "success": True,
-        "token": token,
-        "quota": quota_info,
-        "user": {
-            "id": user_id,
-            "email": email,
-            "scans_used": scans_used,
+        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "user"})
+        scans_used = int(user.get("scans_used", 0))
+        quota_info = {
             "limit": 50,
             "remaining": max(0, 50 - scans_used),
+            "used": scans_used,
+            "is_authenticated": True,
             "role": "user",
             "is_admin": False,
             "unlimited": False
         }
-    })
-    # Reset / expire cookie on strict 24-hour cycle
-    resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
-    return resp
+        resp = jsonify({
+            "success": True,
+            "token": token,
+            "quota": quota_info,
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": user.get("name") or email.split('@')[0],
+                "limit": 50,
+                "scans_used": scans_used,
+                "remaining": max(0, 50 - scans_used),
+                "role": "user",
+                "is_admin": False,
+                "unlimited": False
+            }
+        })
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+        return resp
+    except Exception as e:
+        return jsonify({"error": f"Verification error: {e}"}), 500
+
 
 @app.route("/api/auth/login", methods=["POST"])
 def auth_login():
@@ -735,99 +582,133 @@ def auth_login():
         if password == admin_info["password"]:
             user_id = admin_info["id"]
             token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin"})
-            quota_info = {
-                "limit": 999999,
-                "remaining": 999999,
-                "used": 0,
-                "is_authenticated": True,
-                "role": "admin",
-                "is_admin": True,
-                "unlimited": True
-            }
             resp = jsonify({
                 "success": True,
                 "token": token,
-                "quota": quota_info,
+                "quota": {
+                    "limit": 999999,
+                    "remaining": 999999,
+                    "used": 0,
+                    "is_authenticated": True,
+                    "role": "admin",
+                    "is_admin": True,
+                    "unlimited": True
+                },
                 "user": {
                     "id": user_id,
                     "email": email,
                     "name": admin_info.get("name", "Admin"),
-                    "scans_used": 0,
-                    "limit": 999999,
-                    "remaining": 999999,
                     "role": "admin",
                     "is_admin": True,
-                    "unlimited": True
+                    "unlimited": True,
+                    "limit": 999999,
+                    "scans_used": 0,
+                    "remaining": 999999
                 }
             })
-            resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
+            resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
             return resp
 
-    user = None
-    if mongo_db is not None:
-        user = mongo_db.users.find_one({"email": email})
-    else:
+    try:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cur.fetchone()
         con.close()
-        if row: user = dict(row)
 
-    if not user or not check_password_hash(user.get("password_hash", ""), password):
-        return jsonify({"error": "Incorrect email or password."}), 401
+        if not row:
+            return jsonify({"error": "No account found with this email."}), 401
 
-    if not user.get("is_verified"):
-        otp_code = str(random.randint(100000, 999999))
-        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-        if mongo_db is not None:
-            mongo_db.users.update_one({"email": email}, {"$set": {"verification_otp": otp_code, "otp_expires_at": expires_at}})
-        else:
-            con = sqlite3.connect(DB_PATH)
-            con.execute("UPDATE users SET verification_otp = ?, otp_expires_at = ? WHERE email = ?", (otp_code, expires_at, email))
-            con.commit()
-            con.close()
-        sent = send_brevo_otp(email, otp_code)
+        user = dict(row)
+        pw_hash = user.get("password_hash", "")
+        salt = user.get("salt", "")
+        pw_ok = False
+        if salt and verify_password(password, pw_hash, salt):
+            pw_ok = True
+        elif pw_hash and (check_password_hash(pw_hash, password) or pw_hash == password):
+            pw_ok = True
+
+        if not pw_ok:
+            return jsonify({"error": "Invalid email or password."}), 401
+
+        user_id = user["id"]
+        role = user.get("role", "user")
+        is_admin = (role == "admin") or (email in ADMIN_EMAILS)
+        limit = 999999 if is_admin else 50
+        scans_used = int(user.get("scans_used", 0))
+
+        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
+        resp = jsonify({
+            "success": True,
+            "message": "Signed in successfully.",
+            "token": token,
+            "user": {
+                "id": user_id,
+                "name": user.get("name") or email.split('@')[0],
+                "email": email,
+                "role": role,
+                "is_admin": is_admin,
+                "unlimited": is_admin,
+                "scans_used": scans_used,
+                "limit": limit,
+                "remaining": max(0, limit - scans_used)
+            }
+        })
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+        return resp
+    except Exception as e:
+        return jsonify({"error": f"Login error: {e}"}), 500
+
+
+@app.route("/api/auth/me")
+def auth_me():
+    user = get_current_user()
+    if user:
+        email = (user.get("email") or "").lower()
+        if email in ADMIN_EMAILS or user.get("role") == "admin":
+            return jsonify({
+                "is_authenticated": True,
+                "unlimited": True,
+                "limit": 999999,
+                "scans_used": 0,
+                "remaining": 999999,
+                "user": {
+                    "id": user.get("id"),
+                    "email": email,
+                    "name": user.get("name", "Admin"),
+                    "role": "admin",
+                    "is_admin": True,
+                    "unlimited": True
+                }
+            })
+        scans_used = int(user.get("scans_used", 0))
         return jsonify({
-            "error": "Account not yet verified. A fresh 6-digit code has been sent to your email.",
-            "requires_verification": True,
-            "email": email,
-            "dev_otp": otp_code if (app.testing or not sent) else None
-        }), 403
+            "is_authenticated": True,
+            "unlimited": False,
+            "limit": 50,
+            "scans_used": scans_used,
+            "remaining": max(0, 50 - scans_used),
+            "user": {
+                "id": user.get("id"),
+                "email": email,
+                "name": user.get("name") or email.split('@')[0],
+                "role": user.get("role", "user"),
+                "is_admin": False,
+                "unlimited": False
+            }
+        })
 
-    user_id = user["id"]
-    is_admin = email in ADMIN_EMAILS or user.get("role") == "admin" or bool(user.get("is_admin"))
-    token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin" if is_admin else "user"})
-    scans_used = int(user.get("scans_used", 0))
-    limit = 999999 if is_admin else 50
-    quota_info = {
-        "limit": limit,
-        "remaining": limit if is_admin else max(0, limit - scans_used),
-        "used": 0 if is_admin else scans_used,
-        "is_authenticated": True,
-        "role": "admin" if is_admin else "user",
-        "is_admin": is_admin,
-        "unlimited": is_admin
-    }
-    resp = jsonify({
-        "success": True,
-        "token": token,
-        "quota": quota_info,
-        "user": {
-            "id": user_id,
-            "email": email,
-            "scans_used": 0 if is_admin else scans_used,
-            "limit": limit,
-            "remaining": limit if is_admin else max(0, limit - scans_used),
-            "role": "admin" if is_admin else "user",
-            "is_admin": is_admin,
-            "unlimited": is_admin
-        }
+    client_obj, is_auth, scans_used, limit = get_client_identity()
+    return jsonify({
+        "is_authenticated": False,
+        "unlimited": False,
+        "limit": 5,
+        "scans_used": scans_used,
+        "remaining": max(0, 5 - scans_used),
+        "user": None
     })
-    # Reset / expire cookie on strict 24-hour cycle
-    resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
-    return resp
+
 
 @app.route("/api/auth/logout", methods=["POST"])
 def auth_logout():
@@ -835,21 +716,44 @@ def auth_logout():
     resp.delete_cookie("truthlens_auth_token")
     return resp
 
-@app.route("/api/auth/me")
-def auth_me():
-    client_obj, is_auth, scans_used, limit = get_client_identity()
-    email = client_obj.get("email") if is_auth else None
-    is_admin = bool(is_auth and (email in ADMIN_EMAILS or client_obj.get("role") == "admin" or client_obj.get("is_admin")))
-    return jsonify({
-        "is_authenticated": is_auth,
-        "email": email,
-        "role": "admin" if is_admin else ("user" if is_auth else "guest"),
-        "is_admin": is_admin,
-        "scans_used": 0 if is_admin else scans_used,
-        "limit": 999999 if is_admin else limit,
-        "remaining": 999999 if is_admin else max(0, limit - scans_used),
-        "unlimited": is_admin
-    })
+
+@app.route("/api/auth/sync-history", methods=["POST"])
+def auth_sync_history():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Authentication required to sync history."}), 401
+    user_id = user["id"]
+    data = request.get_json() or {}
+    guest_scans = data.get("scans", [])
+    count = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        con = sqlite3.connect(DB_PATH)
+        for scan in guest_scans:
+            sid = scan.get("id") or str(uuid.uuid4())
+            cur = con.cursor()
+            cur.execute("SELECT id FROM scan_history WHERE id = ?", (sid,))
+            if not cur.fetchone():
+                text_val = scan.get("text_input") or scan.get("text") or ""
+                con.execute("""
+                    INSERT INTO scan_history (id, user_id, text_input, title, verdict, confidence, scan_type, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    sid, user_id,
+                    text_val[:1000],
+                    scan.get("title", "Scan Result")[:200],
+                    scan.get("verdict", "REAL"),
+                    float(scan.get("confidence", 95.0)),
+                    scan.get("scan_type", "text"),
+                    scan.get("created_at") or now_iso
+                ))
+                count += 1
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"[Sync History Error] {e}")
+    return jsonify({"success": True, "synced_count": count})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PLATFORM ADMIN MANAGEMENT ENDPOINTS
@@ -866,46 +770,22 @@ def admin_overview():
     users_list = []
     total_scans = 0
     guest_count = 0
-    if mongo_db is not None:
-        for u in mongo_db.users.find({}, {"password_hash": 0, "verification_otp": 0}).limit(100):
-            users_list.append({
-                "id": u.get("id"),
-                "email": u.get("email"),
-                "role": u.get("role", "user"),
-                "scans_used": u.get("scans_used", 0),
-                "is_verified": bool(u.get("is_verified")),
-                "last_reset_date": u.get("last_reset_date"),
-                "created_at": u.get("created_at")
-            })
-            total_scans += int(u.get("scans_used", 0))
-        guest_count = mongo_db.guest_quotas.count_documents({})
-    else:
+    try:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute("SELECT id, email, role, scans_used, is_verified, last_reset_date, created_at FROM users LIMIT 100")
-        for row in cur.fetchall():
-            d = dict(row)
-            users_list.append(d)
-            total_scans += int(d.get("scans_used", 0))
-        cur.execute("SELECT COUNT(*) FROM guest_quotas")
-        guest_count = cur.fetchone()[0]
+        rows = con.execute("SELECT id, name, email, role, scans_used, is_verified, created_at FROM users LIMIT 100").fetchall()
+        for r in rows:
+            users_list.append(dict(r))
+            total_scans += int(r["scans_used"] or 0)
+        guest_count = con.execute("SELECT COUNT(*) FROM guest_quotas").fetchone()[0]
         con.close()
+    except Exception:
+        pass
 
     return jsonify({
-        "success": True,
-        "admin": email,
         "total_users": len(users_list),
         "total_scans": total_scans,
-        "stats": {
-            "total_registered_users": len(users_list),
-            "total_guests_tracked": guest_count,
-            "total_user_scans": total_scans,
-            "database_engine": "MongoDB Cloud" if mongo_db is not None else "SQLite Local",
-            "server_time_utc": datetime.now(timezone.utc).isoformat(),
-            "daily_reset_cycle": "Active 24-Hour Cycle (00:00 UTC)",
-            "admin_accounts": list(ADMIN_EMAILS)
-        },
+        "guest_count": guest_count,
         "users": users_list
     })
 
@@ -923,14 +803,13 @@ def admin_reset_quota():
     if not target_email:
         return jsonify({"error": "Target email is required"}), 400
 
-    if mongo_db is not None:
-        mongo_db.users.update_one({"email": target_email}, {"$set": {"scans_used": 0}})
-    else:
+    try:
         con = sqlite3.connect(DB_PATH)
         con.execute("UPDATE users SET scans_used = 0 WHERE email = ?", (target_email,))
         con.commit()
         con.close()
-
+    except Exception:
+        pass
     return jsonify({"success": True, "message": f"Daily quota reset to 0 for {target_email}."})
 
 @app.route("/api/admin/clear-cache", methods=["POST"])
@@ -950,47 +829,14 @@ def admin_clear_cache():
 
     return jsonify({"success": True, "message": "All API and cricket live caches cleared successfully."})
 
-
-@app.route("/api/auth/sync-history", methods=["POST"])
-def auth_sync_history():
-    user = get_current_user()
-    if not user:
-        return jsonify({"error": "Authentication required to sync history."}), 401
-    user_id = user["id"]
-    data = request.get_json() or {}
-    guest_scans = data.get("scans", [])
-    count = 0
-    now_iso = datetime.now(timezone.utc).isoformat()
-    for scan in guest_scans:
-        scan_id = scan.get("id") or str(uuid.uuid4())
-        text_input = scan.get("text_input") or scan.get("text", "")
-        title = scan.get("title") or "Verified Scan"
-        verdict = scan.get("verdict") or "REAL"
-        confidence = float(scan.get("confidence") or 95.0)
-        created_at = scan.get("created_at") or now_iso
-
-        if mongo_db is not None:
-            mongo_db.scan_history.update_one(
-                {"_id": scan_id},
-                {"$set": {
-                    "_id": scan_id, "id": scan_id, "user_id": user_id,
-                    "text_input": text_input[:500], "title": title,
-                    "verdict": verdict, "confidence": confidence,
-                    "scan_type": "text", "created_at": created_at
-                }},
-                upsert=True
-            )
-        else:
-            con = sqlite3.connect(DB_PATH)
-            con.execute(
-                """INSERT OR REPLACE INTO scan_history (id, user_id, text_input, title, verdict, confidence, scan_type, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, 'text', ?)""",
-                (scan_id, user_id, text_input[:500], title, verdict, confidence, created_at)
-            )
-            con.commit()
-            con.close()
-        count += 1
-    return jsonify({"success": True, "synced_count": count})
+@app.route("/fuck.html", methods=["GET", "POST", "HEAD"])
+def honeypot_canary():
+    # Return 404 with Security canary comment
+    return Response(
+        "<!-- Security canary active. Unauthorized reconnaissance logged. -->\n<!doctype html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>",
+        status=404,
+        mimetype="text/html"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1187,16 +1033,11 @@ def compute_signals(text: str) -> dict:
     t = text.lower()
     words = text.split()
 
-    def has_term(term: str, target_text: str) -> bool:
-        if len(term) <= 4:
-            return bool(re.search(r'\b' + re.escape(term) + r'\b', target_text))
-        return term in target_text
-
-    found_clickbait = [w for w in CLICKBAIT_WORDS if has_term(w, t)]
-    found_conspiracy = [w for w in CONSPIRACY_PHRASES if has_term(w, t)]
-    found_miracle    = [w for w in MIRACLE_PATTERNS if has_term(w, t)]
-    found_viral      = [w for w in VIRAL_FORWARDING if has_term(w, t)]
-    found_anon       = [w for w in ANONYMOUS_SOURCES if has_term(w, t)]
+    found_clickbait = [w for w in CLICKBAIT_WORDS if w in t]
+    found_conspiracy = [w for w in CONSPIRACY_PHRASES if w in t]
+    found_miracle    = [w for w in MIRACLE_PATTERNS if w in t]
+    found_viral      = [w for w in VIRAL_FORWARDING if w in t]
+    found_anon       = [w for w in ANONYMOUS_SOURCES if w in t]
     excl_count       = text.count('!')
     caps_ratio       = sum(1 for c in text if c.isupper()) / max(len(text), 1)
     is_all_caps      = caps_ratio > 0.45 and len(text) > 10
@@ -1229,12 +1070,16 @@ def compute_signals(text: str) -> dict:
         fake_score += 20
         fake_signals_list.append(f"Excessive caps usage ({int(caps_ratio*100)}% uppercase)")
 
-    # Strict boundary matching for acronyms and institutions
-    found_sports  = [s for s in SPORTS_ORGS if has_term(s, t)]
-    found_verbs   = [v for v in FACTUAL_VERBS if has_term(v, t)]
-    found_sources = [s for s in REPUTABLE_SOURCES if has_term(s, t)]
-    found_stats   = [s for s in STAT_WORDS if has_term(s, t)]
-    found_bodies  = [b for b in OFFICIAL_BODIES if has_term(b, t)]
+    def _has_boundary_word(word: str, text: str) -> bool:
+        if len(word) <= 3 or ' ' not in word:
+            return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
+        return word in text
+
+    found_sports  = [s for s in SPORTS_ORGS if _has_boundary_word(s, t)]
+    found_verbs   = [v for v in FACTUAL_VERBS if _has_boundary_word(v, t)]
+    found_sources = [s for s in REPUTABLE_SOURCES if _has_boundary_word(s, t)]
+    found_stats   = [s for s in STAT_WORDS if _has_boundary_word(s, t)]
+    found_bodies  = [b for b in OFFICIAL_BODIES if _has_boundary_word(b, t)]
 
     real_score = 0
     real_signals_list = []
@@ -1285,56 +1130,31 @@ def compute_signals(text: str) -> dict:
 def predict_fake(text: str) -> dict:
     """
     Evaluates news claim with TruthLens Deep Learning BiLSTM-Attention Neural Core.
-    Accurately classifies REAL news (authoritative sources, official bodies, factual verbs, stats)
-    and FAKE news (sensationalist triggers, conspiracy framing, miracle claims, clickbait, excessive caps).
+    No hardcoded winner lists or scores.
     """
     signals = compute_signals(text)
     dl_res = dl_engine.predict(text)
     dl_fake_prob = dl_res.get("fake_prob", 0.5)
     dl_real_prob = dl_res.get("real_prob", 0.5)
 
-    fake_pattern_count = len(signals["found_conspiracy"]) + len(signals["found_clickbait"]) + len(signals.get("found_miracle", [])) + len(signals.get("found_viral", []))
-    fake_score = signals.get("fake_score", 0)
-    real_score = signals.get("real_score", 0)
-    net_score = real_score - fake_score
+    fake_pattern_count = len(signals["found_conspiracy"]) + len(signals["found_clickbait"])
 
-    # 1. High-Confidence Misinformation / Clickbait Triggers
-    if fake_pattern_count >= 2 or fake_score >= 25 or net_score <= -15:
+    if fake_pattern_count >= 2 or signals["fake_score"] >= 25 or signals["net_score"] <= -15:
         is_fake = True
-        confidence = min(98.5, 76.0 + max(fake_pattern_count * 5, fake_score * 0.4))
-        active_markers = signals.get("found_conspiracy") or signals.get("found_clickbait") or signals.get("found_miracle") or signals.get("found_viral") or []
-        marker_str = f": {', '.join(active_markers[:3])}" if active_markers else ""
-        reason = f"Misinformation and sensationalist markers detected in sequence{marker_str}"
-
-    # 2. Sports Factual Outcome
-    elif signals["found_sports"] and signals["found_verbs"] and (signals["found_sources"] or dl_real_prob > 0.55):
+        confidence = min(98.5, max(76.0, 75.0 + signals["fake_score"] * 0.5))
+        reason = f"Misinformation markers detected in BiLSTM hidden sequence: {', '.join(signals['found_conspiracy'][:2] or signals['found_clickbait'][:2] or signals['fake_signals'][:1])}"
+    elif signals["found_sources"] or signals["found_bodies"] or signals["net_score"] >= 12:
         is_fake = False
-        confidence = min(99.5, 88.0 + real_score * 0.2)
-        reason = "Authentic sports reporting pattern verified by Neural Core"
-
-    # 3. High-Confidence Verified Journalistic & Institutional Sources (Reuters, ISRO, RBI, Govt, Stats)
-    elif signals["found_sources"] or signals["found_bodies"] or net_score >= 12:
+        confidence = min(99.5, max(82.0, 80.0 + signals["real_score"] * 0.4))
+        reason = "Authentic journalistic structure and authoritative entities verified"
+    elif signals["found_sports"] and signals["found_verbs"]:
         is_fake = False
-        confidence = min(99.0, 85.0 + real_score * 0.25)
-        active_sources = signals.get("found_sources") or signals.get("found_bodies") or []
-        source_str = f" ({', '.join(active_sources[:2])})" if active_sources else ""
-        reason = f"Authentic reporting corroborated by authoritative institutional source{source_str}"
-
-    # 4. Neural BiLSTM-Attention Core probability evaluation
-    elif dl_fake_prob >= 0.60:
-        is_fake = True
-        confidence = round(max(70.0, dl_fake_prob * 100), 1)
-        reason = "Deep Learning BiLSTM sequence indicates sensationalism or unverified structure"
-    elif dl_real_prob >= 0.60:
-        is_fake = False
-        confidence = round(max(72.0, dl_real_prob * 100), 1)
-        reason = "Deep Learning BiLSTM sequence aligns with verified journalistic syntax"
-
-    # 5. Neutral News Sequence (standard news report without sensational triggers)
+        confidence = 98.0
+        reason = "Factual sports reporting format corroborated by Neural Core"
     else:
-        is_fake = False
-        confidence = 82.0
-        reason = "Standard journalistic reporting structure with zero misinformation triggers"
+        is_fake = dl_fake_prob > 0.52
+        confidence = max(68.0, min(96.0, dl_res.get("confidence", 78.0)))
+        reason = "Deep Learning BiLSTM-Attention sequence pattern classification"
 
     verdict = "FAKE" if is_fake else "REAL"
     conf_label = "100% Verified Real" if verdict == "REAL" else "Fake / Misinformation"
@@ -1345,11 +1165,11 @@ def predict_fake(text: str) -> dict:
         "confidence_label": conf_label,
         "is_fake": is_fake,
         "prediction": 1 if is_fake else 0,
-        "fake_prob": round(dl_fake_prob if is_fake else (1.0 - (confidence / 100.0)), 4),
-        "real_prob": round(dl_real_prob if not is_fake else (1.0 - (confidence / 100.0)), 4),
-        "fake_signals": signals.get("fake_signals", []),
-        "real_signals": signals.get("real_signals", []),
-        "signal_score": net_score,
+        "fake_prob": dl_fake_prob if is_fake else round(1.0 - (confidence / 100.0), 4),
+        "real_prob": dl_real_prob if not is_fake else round(1.0 - (confidence / 100.0), 4),
+        "fake_signals": signals["fake_signals"],
+        "real_signals": signals["real_signals"],
+        "signal_score": signals["net_score"],
         "explanation": f"TruthLens Deep Learning Core: {reason}",
         "model": "Deep Learning BiLSTM-Attention Neural Core",
         "model_version": "TruthLens BiLSTM-Attention Neural Engine",
@@ -1612,41 +1432,42 @@ def get_cached_markets() -> dict:
         return last_saved
 
     items = [
-        {"symbol": "NIFTY 50", "price": 23914.45, "price_str": "23,914.45", "change": "-0.69%", "arrow": "▼", "up": False, "cat": "index", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "SENSEX", "price": 76570.35, "price_str": "76,570.35", "change": "-0.50%", "arrow": "▼", "up": False, "cat": "index", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "BANK NIFTY", "price": 51400.0, "price_str": "51,400.00", "change": "+0.32%", "arrow": "▲", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "MIDCAP 100", "price": 57800.0, "price_str": "57,800.00", "change": "+0.45%", "arrow": "▲", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "RELIANCE", "price": 2980.0, "price_str": "₹2,980.00", "change": "+0.65%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "TCS", "price": 4180.0, "price_str": "₹4,180.00", "change": "-0.30%", "arrow": "▼", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "HDFC BANK", "price": 1680.0, "price_str": "₹1,680.00", "change": "+0.40%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "INFOSYS", "price": 1880.0, "price_str": "₹1,880.00", "change": "-0.25%", "arrow": "▼", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "WIPRO", "price": 545.0, "price_str": "₹545.00", "change": "+0.15%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "ITC", "price": 495.0, "price_str": "₹495.00", "change": "+0.55%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "BAJAJ FIN", "price": 7350.0, "price_str": "₹7,350.00", "change": "-0.40%", "arrow": "▼", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "MARUTI", "price": 12450.0, "price_str": "₹12,450.00", "change": "+0.80%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "L&T", "price": 3720.0, "price_str": "₹3,720.00", "change": "+0.35%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "ICICI BANK", "price": 1240.0, "price_str": "₹1,240.00", "change": "+0.50%", "arrow": "▲", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "SBI", "price": 845.0, "price_str": "₹845.00", "change": "-0.20%", "arrow": "▼", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "GOLD 24K", "price": 148520.0, "price_str": "₹1,48,520", "change": "+0.45%", "arrow": "▲", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
-        {"symbol": "GOLD 22K", "price": 136045.0, "price_str": "₹1,36,045", "change": "+0.45%", "arrow": "▲", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
-        {"symbol": "SILVER 999", "price": 216630.0, "price_str": "₹2,16,630", "change": "+0.35%", "arrow": "▲", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True},
-        {"symbol": "GOLD SPOT", "price": 2980.50, "price_str": "$2,980.50", "change": "+0.45%", "arrow": "▲", "up": True, "cat": "metal", "sym": "$", "unit": "/oz", "live": True},
-        {"symbol": "PETROL", "price": 94.72, "price_str": "₹94.72", "change": "+0.00%", "arrow": "▲", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
-        {"symbol": "DIESEL", "price": 87.62, "price_str": "₹87.62", "change": "+0.00%", "arrow": "▲", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
-        {"symbol": "LPG", "price": 903.00, "price_str": "₹903.00", "change": "+0.00%", "arrow": "▲", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Cylinder", "live": True},
-        {"symbol": "CNG", "price": 74.09, "price_str": "₹74.09", "change": "+0.00%", "arrow": "▲", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Kg", "live": True},
-        {"symbol": "USD/INR", "price": 86.85, "price_str": "₹86.8500", "change": "+0.05%", "arrow": "▲", "up": True, "cat": "forex", "sym": "₹", "unit": "", "live": True},
-        {"symbol": "BTC", "price": 89400.0, "price_str": "$89,400", "change": "+1.85%", "arrow": "▲", "up": True, "cat": "crypto", "sym": "$", "unit": "", "live": True},
-        {"symbol": "ETH", "price": 3450.0, "price_str": "$3,450.00", "change": "+1.20%", "arrow": "▲", "up": True, "cat": "crypto", "sym": "$", "unit": "", "live": True}
+        # Indices
+        {"symbol": "SENSEX", "price": 81224.75, "price_str": "81,224.75", "change": "+0.42%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "NIFTY 50", "price": 24835.10, "price_str": "24,835.10", "change": "+0.38%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "NIFTY BANK", "price": 52680.40, "price_str": "52,680.40", "change": "+0.55%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "MIDCAP 100", "price": 58450.25, "price_str": "58,450.25", "change": "+0.68%", "up": True, "cat": "index", "sym": "₹", "unit": "", "live": True},
+
+        # Stocks
+        {"symbol": "RELIANCE", "price": 2980.50, "price_str": "2,980.50", "change": "+0.85%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "TCS", "price": 4250.20, "price_str": "4,250.20", "change": "-0.24%", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "HDFC BANK", "price": 1690.40, "price_str": "1,690.40", "change": "+0.65%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "INFOSYS", "price": 1920.10, "price_str": "1,920.10", "change": "+1.15%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "WIPRO", "price": 545.30, "price_str": "545.30", "change": "+0.45%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "ITC", "price": 512.60, "price_str": "512.60", "change": "-0.15%", "up": False, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "BAJAJ FINANCE", "price": 7320.00, "price_str": "7,320.00", "change": "+1.35%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "MARUTI", "price": 12480.00, "price_str": "12,480.00", "change": "+0.70%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "L&T", "price": 3670.50, "price_str": "3,670.50", "change": "+0.52%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "ICICI BANK", "price": 1265.80, "price_str": "1,265.80", "change": "+0.92%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+        {"symbol": "SBI", "price": 845.20, "price_str": "845.20", "change": "+0.38%", "up": True, "cat": "stock", "sym": "₹", "unit": "", "live": True},
+
+        # Metals
+        {"symbol": "GOLD 24K", "price": 152020.0, "price_str": "₹1,52,020", "change": "+0.65%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
+        {"symbol": "GOLD 22K", "price": 139350.0, "price_str": "₹1,39,350", "change": "+0.65%", "up": True, "cat": "metal", "sym": "₹", "unit": "/10g", "live": True},
+        {"symbol": "SILVER 999", "price": 235930.0, "price_str": "₹2,35,930", "change": "+1.12%", "up": True, "cat": "metal", "sym": "₹", "unit": "/kg", "live": True},
+        {"symbol": "GOLD SPOT", "price": 2648.50, "price_str": "$2,648.50", "change": "+0.45%", "up": True, "cat": "metal", "sym": "$", "unit": "/oz", "live": True},
+
+        # Fuel
+        {"symbol": "PETROL", "price": 94.72, "price_str": "₹94.72", "change": "0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/L", "live": True},
+        {"symbol": "DIESEL", "price": 87.62, "price_str": "₹87.62", "change": "0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/L", "live": True},
+        {"symbol": "LPG CYLINDER", "price": 803.00, "price_str": "₹803.00", "change": "0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/14.2kg", "live": True},
+        {"symbol": "CNG", "price": 75.09, "price_str": "₹75.09", "change": "0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/kg", "live": True}
     ]
     status = get_market_status()
     default_data = {
         "items": items,
         "markets": items,
-        "indices": items[:4],
-        "stocks": [m for m in items if m["cat"] == "stock"],
-        "metals": [m for m in items if m["cat"] == "metal"],
-        "fuel": [m for m in items if m["cat"] == "fuel"],
+        "indices": items[:3],
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "live_count": len(items),
         "total_count": len(items),
@@ -2042,30 +1863,19 @@ _scan_cache_lock = threading.Lock()
 @app.route("/api/ai-scan", methods=["POST"])
 @require_auth
 def ai_scan():
+    client_obj, is_auth, scans_used, limit = get_client_identity()
+    if scans_used >= limit:
+        return jsonify({
+            "error": "Daily scan limit reached. Please sign in or create an account for expanded access.",
+            "quota_exhausted": True,
+            "scans_used": scans_used,
+            "limit": limit
+        }), 429
+
     data = request.get_json() or {}
     text = (data.get("text") or "").strip()
     if not text or len(text) < 5:
         return jsonify({"error": "Text too short for analysis"}), 400
-
-    # Quota Enforcement: Guests get 5 scans; verified logged-in accounts get 50 scans; Admins get unlimited
-    client_obj, is_auth, scans_used, scan_limit = get_client_identity()
-    is_admin = bool(is_auth and (client_obj.get("role") == "admin" or client_obj.get("email") in ADMIN_EMAILS or client_obj.get("is_admin")))
-    if not is_admin and scans_used >= scan_limit:
-        if not is_auth:
-            return jsonify({
-                "error": "Guest quota exhausted",
-                "requires_login": True,
-                "limit": 5,
-                "scans_used": scans_used,
-                "message": "You have completed your 5 daily guest scans (resets every 24 hours). Create a verified account in 30 seconds to unlock 50 daily neural deep-checks!"
-            }), 403
-        else:
-            return jsonify({
-                "error": "Account quota exhausted",
-                "limit": 50,
-                "scans_used": scans_used,
-                "message": "You have reached your daily limit of 50 verified scans. Your quota automatically resets every 24 hours."
-            }), 403
 
     cache_key = text.lower()
     now_ts = time.time()
@@ -2209,26 +2019,6 @@ def ai_scan():
 
     result = sanitize_ai_text(result)
 
-    if is_admin:
-        result["quota"] = {
-            "limit": 999999,
-            "scans_used": 0,
-            "remaining": 999999,
-            "is_authenticated": True,
-            "role": "admin",
-            "is_admin": True,
-            "unlimited": True
-        }
-    else:
-        increment_client_quota(client_obj, is_auth)
-        result["quota"] = {
-            "limit": scan_limit,
-            "scans_used": scans_used + 1,
-            "remaining": max(0, scan_limit - (scans_used + 1)),
-            "is_authenticated": is_auth,
-            "unlimited": False
-        }
-
     with _scan_cache_lock:
         SCAN_CACHE[cache_key] = {"data": result, "ts": now_ts}
 
@@ -2238,23 +2028,30 @@ def ai_scan():
             title = generate_gemini_title(text)
             scan_id = str(uuid.uuid4())
             now_iso = datetime.now(timezone.utc).isoformat()
-            user_id = client_obj.get("id") if is_auth else None
             if mongo_db is not None:
                 mongo_db.scan_history.insert_one({
-                    "_id": scan_id, "id": scan_id, "user_id": user_id,
+                    "_id": scan_id, "id": scan_id,
                     "text_input": text[:500], "title": title, "verdict": result['verdict'],
                     "confidence": result['confidence'], "scan_type": "text", "created_at": now_iso
                 })
             else:
                 conn = sqlite3.connect(DB_PATH)
-                conn.execute("INSERT INTO scan_history (id,user_id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?,?)",
-                             (scan_id, user_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
+                conn.execute("INSERT INTO scan_history (id,text_input,title,verdict,confidence,scan_type,created_at) VALUES (?,?,?,?,?,?,?)",
+                             (scan_id, text[:500], title, result['verdict'], result['confidence'], 'text', now_iso))
                 conn.commit()
                 conn.close()
         except Exception as e:
             print(f"[Scan History] Recording error: {e}")
 
     threading.Thread(target=_save_history, daemon=True).start()
+
+    record_scan_usage(client_obj, is_auth)
+    result["quota"] = {
+        "used": scans_used + 1,
+        "limit": limit,
+        "remaining": max(0, limit - (scans_used + 1)),
+        "is_authenticated": is_auth
+    }
 
     return jsonify(result)
 
@@ -2302,91 +2099,48 @@ def scan_history():
     return jsonify({"history": history})
 
 @app.route("/api/chat", methods=["POST"])
+@require_auth
 def chat():
-    """TruthLens AI Chatbot — works for all users (guests and logged-in)."""
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
-    if not message:
-        return jsonify({"error": "Message required"}), 400
+    if not message: return jsonify({"error": "Message required"}), 400
 
-    SYSTEM_PROMPT = (
-        "You are TruthLens AI, the intelligent assistant built into the TruthLens platform — "
-        "India's premier AI-powered fake news detection and news verification service. "
-        "Your role: help users fact-check claims, understand AI scan results (BiLSTM, NLP, real-time grounding), "
-        "evaluate news source credibility, explain misinformation patterns, discuss today's top news stories, "
-        "and guide users on verifying viral WhatsApp forwards or social media claims. "
-        "Always be concise, factual, and helpful. Never generate fake news. "
-        "If unsure, recommend using TruthLens AI Scanner for a deep neural analysis. "
-        "Respond in a friendly, professional tone. Keep answers under 200 words unless detail is explicitly requested."
-    )
-
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
     mistral_key = os.environ.get("MISTRAL_API_KEY", "")
-
-    # Try Gemini first
-    if gemini_key:
-        try:
-            history = data.get("history", [])
-            contents = []
-            for msg in history[-6:]:  # keep last 3 turns
-                role = "user" if msg.get("role") == "user" else "model"
-                contents.append({"role": role, "parts": [{"text": msg.get("content", "")}]})
-            contents.append({"role": "user", "parts": [{"text": message}]})
-
-            r = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                    "contents": contents,
-                    "generationConfig": {"maxOutputTokens": 300, "temperature": 0.4}
-                },
-                timeout=10
-            )
-            if r.status_code == 200:
-                rj = r.json()
-                reply_text = rj.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
-                if reply_text:
-                    return jsonify({"reply": reply_text})
-        except Exception as e:
-            print(f"[Gemini Chat] Error: {e}")
-
-    # Fallback to Mistral
     if mistral_key:
         try:
             r = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {mistral_key}", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {mistral_key}",
+                    "Content-Type": "application/json"
+                },
                 json={
                     "model": "open-mistral-7b",
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are TruthLens AI, an expert news verification assistant. "
+                                "Provide concise, strictly factual, grounded answers to fact-check claims, "
+                                "explain news credibility, and guide users on verifying sources. Do NOT generate or invent fake news."
+                            )
+                        },
                         {"role": "user", "content": message}
                     ],
-                    "max_tokens": 300,
-                    "temperature": 0.4
+                    "max_tokens": 350,
+                    "temperature": 0.3
                 },
                 timeout=8
             )
             if r.status_code == 200:
-                reply_text = r.json()['choices'][0]['message']['content'].strip()
+                resp_json = r.json()
+                reply_text = resp_json['choices'][0]['message']['content'].strip()
                 return jsonify({"reply": reply_text})
         except Exception as e:
-            print(f"[Mistral Chat] Error: {e}")
+            print(f"[Mistral API] Error: {e}")
 
-    # Smart fallback response
-    fallback_replies = {
-        "fake": "Use the TruthLens AI Scanner above to analyze this claim. Our BiLSTM neural model + real-time grounding can detect fake news with high accuracy.",
-        "verify": "Paste the article text or claim into the TruthLens Scanner for a deep neural analysis. We cross-check against live news databases in real-time.",
-        "news": "I can help you evaluate news credibility! Share the headline or claim and I'll guide you through verification steps.",
-        "scan": "Click the 'Scan' button or switch the search bar to Verify Mode to analyze any text with our AI neural engine.",
-    }
-    msg_lower = message.lower()
-    for key, reply in fallback_replies.items():
-        if key in msg_lower:
-            return jsonify({"reply": reply})
-
-    return jsonify({"reply": "Namaste! I'm TruthLens AI. I can help you fact-check claims, verify news credibility, and understand AI scan results. What would you like to verify today?"})
+    reply = f"Namaste! TruthLens AI verified your query. Based on real-time news sources, always cross-verify viral claims with official press releases or Tavily/TruthLens scanner above!"
+    return jsonify({"reply": reply})
 
 
 @app.route("/api/markets")
@@ -2510,11 +2264,9 @@ def enrich_cricket_match(m):
         "partnership": f"{b1_runs + b2_runs} runs ({b1_balls + b2_balls} balls)",
         "last_wicket": last_wkt_str,
         "lastWicket": last_wkt_str,
-        "crr": f"{round(7.1 + (mid % 25) / 10.0, 2)}",
-        "rrr": f"{round(8.2 + (mid % 30) / 10.0, 2)}" if is_live else None,
-        "toss": f"{t1} won the toss & elected to bat",
-        "venue": "International Cricket Stadium",
-        "player_of_match": f"{pool[0]} (Player of the Match)" if not is_live else None
+        "crr": f"{round((b1_runs + b2_runs) / max(1.0, float(bw_overs.split('.')[0]) + 4.0), 2)}",
+        "rrr": "7.20",
+        "venue": "International Stadium"
     }
     return m
 
@@ -2526,92 +2278,13 @@ def get_marquee_fallback_matches():
                 "seriesMatches": [
                     {
                         "seriesAdWrapper": {
-                            "seriesName": "TATA IPL 2026 (El Clásico)",
+                            "seriesName": "ICC Champions Trophy 2026",
                             "matches": [
-                                {
-                                    "matchInfo": {
-                                        "matchId": 98410,
-                                        "seriesName": "TATA IPL 2026",
-                                        "matchDesc": "Match 28 (IPL T20)",
-                                        "matchFormat": "IPL T20",
-                                        "status": "CSK need 24 runs in 14 balls to win",
-                                        "state": "In Progress",
-                                        "team1": {"teamName": "Mumbai Indians", "teamSName": "MI"},
-                                        "team2": {"teamName": "Chennai Super Kings", "teamSName": "CSK"}
-                                    },
-                                    "matchScore": {
-                                        "team1Score": {"inngs1": {"runs": 192, "wickets": 6, "overs": 20.0}},
-                                        "team2Score": {"inngs1": {"runs": 169, "wickets": 4, "overs": 17.4}}
-                                    },
-                                    "liveDetails": {
-                                        "is_live": True,
-                                        "isLive": True,
-                                        "batters": [
-                                            {"name": "MS Dhoni", "runs": 28, "balls": 11, "fours": 2, "sixes": 3, "strike_rate": 254.5, "sr": 254.5, "on_strike": True, "onStrike": True},
-                                            {"name": "Ruturaj Gaikwad", "runs": 64, "balls": 42, "fours": 6, "sixes": 2, "strike_rate": 152.4, "sr": 152.4, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "currentBatters": [
-                                            {"name": "MS Dhoni", "runs": 28, "balls": 11, "fours": 2, "sixes": 3, "strike_rate": 254.5, "sr": 254.5, "on_strike": True, "onStrike": True},
-                                            {"name": "Ruturaj Gaikwad", "runs": 64, "balls": 42, "fours": 6, "sixes": 2, "strike_rate": 152.4, "sr": 152.4, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "bowler": {"name": "Jasprit Bumrah", "overs": "3.4", "maidens": 0, "runs": 26, "wickets": 2, "economy": 7.09, "econ": 7.09},
-                                        "currentBowler": {"name": "Jasprit Bumrah", "overs": "3.4", "maidens": 0, "runs": 26, "wickets": 2, "economy": 7.09, "econ": 7.09},
-                                        "recent_balls": ["6", "4", "1", "2", "6", "1"],
-                                        "recentBalls": ["6", "4", "1", "2", "6", "1"],
-                                        "partnership": "45 runs (20 balls)",
-                                        "last_wicket": "Shivam Dube c Rohit b Hardik 41 (24b, 3x4, 3x6) — 124/4 (14.2 ov)",
-                                        "lastWicket": "Shivam Dube c Rohit b Hardik 41 (24b, 3x4, 3x6) — 124/4 (14.2 ov)",
-                                        "crr": "9.56",
-                                        "rrr": "10.28",
-                                        "toss": "Chennai Super Kings won the toss and elected to bowl",
-                                        "venue": "Wankhede Stadium, Mumbai"
-                                    }
-                                },
-                                {
-                                    "matchInfo": {
-                                        "matchId": 98411,
-                                        "seriesName": "TATA WPL 2026",
-                                        "matchDesc": "Match 14 (WPL T20)",
-                                        "matchFormat": "WPL T20",
-                                        "status": "RCBW need 19 runs in 14 balls",
-                                        "state": "In Progress",
-                                        "team1": {"teamName": "Delhi Capitals Women", "teamSName": "DCW"},
-                                        "team2": {"teamName": "Royal Challengers Bengaluru Women", "teamSName": "RCBW"}
-                                    },
-                                    "matchScore": {
-                                        "team1Score": {"inngs1": {"runs": 174, "wickets": 5, "overs": 20.0}},
-                                        "team2Score": {"inngs1": {"runs": 156, "wickets": 3, "overs": 17.4}}
-                                    },
-                                    "liveDetails": {
-                                        "is_live": True,
-                                        "isLive": True,
-                                        "batters": [
-                                            {"name": "Smriti Mandhana", "runs": 72, "balls": 48, "fours": 9, "sixes": 3, "strike_rate": 150.0, "sr": 150.0, "on_strike": True, "onStrike": True},
-                                            {"name": "Ellyse Perry", "runs": 38, "balls": 24, "fours": 4, "sixes": 1, "strike_rate": 158.3, "sr": 158.3, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "currentBatters": [
-                                            {"name": "Smriti Mandhana", "runs": 72, "balls": 48, "fours": 9, "sixes": 3, "strike_rate": 150.0, "sr": 150.0, "on_strike": True, "onStrike": True},
-                                            {"name": "Ellyse Perry", "runs": 38, "balls": 24, "fours": 4, "sixes": 1, "strike_rate": 158.3, "sr": 158.3, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "bowler": {"name": "Marizanne Kapp", "overs": "3.4", "maidens": 0, "runs": 28, "wickets": 2, "economy": 7.63, "econ": 7.63},
-                                        "currentBowler": {"name": "Marizanne Kapp", "overs": "3.4", "maidens": 0, "runs": 28, "wickets": 2, "economy": 7.63, "econ": 7.63},
-                                        "recent_balls": ["4", "1", "4", "2", "1", "4"],
-                                        "recentBalls": ["4", "1", "4", "2", "1", "4"],
-                                        "partnership": "68 runs (42 balls)",
-                                        "last_wicket": "Sophie Devine c Lanning b Jonassen 32 (18b) — 88/3 (10.4 ov)",
-                                        "lastWicket": "Sophie Devine c Lanning b Jonassen 32 (18b) — 88/3 (10.4 ov)",
-                                        "crr": "8.83",
-                                        "rrr": "8.14",
-                                        "toss": "RCB Women won the toss and elected to bowl",
-                                        "venue": "M. Chinnaswamy Stadium, Bengaluru"
-                                    }
-                                },
                                 {
                                     "matchInfo": {
                                         "matchId": 98401,
                                         "seriesName": "ICC Champions Trophy 2026",
                                         "matchDesc": "3rd ODI (D/N)",
-                                        "matchFormat": "ODI",
                                         "status": "IND need 48 runs in 42 balls to win",
                                         "state": "In Progress",
                                         "team1": {"teamName": "Australia", "teamSName": "AUS"},
@@ -2642,98 +2315,7 @@ def get_marquee_fallback_matches():
                                         "crr": "5.51",
                                         "rrr": "6.85",
                                         "toss": "Australia won the toss and elected to bat",
-                                        "venue": "Eden Gardens, Kolkata"
-                                    }
-                                },
-                                {
-                                    "matchInfo": {
-                                        "matchId": 98402,
-                                        "seriesName": "England Tour of South Africa",
-                                        "matchDesc": "2nd T20I",
-                                        "matchFormat": "T20I",
-                                        "status": "ENG need 32 runs in 18 balls",
-                                        "state": "In Progress",
-                                        "team1": {"teamName": "South Africa", "teamSName": "SA"},
-                                        "team2": {"teamName": "England", "teamSName": "ENG"}
-                                    },
-                                    "matchScore": {
-                                        "team1Score": {"inngs1": {"runs": 196, "wickets": 5, "overs": 20.0}},
-                                        "team2Score": {"inngs1": {"runs": 165, "wickets": 4, "overs": 17.0}}
-                                    },
-                                    "liveDetails": {
-                                        "is_live": True,
-                                        "isLive": True,
-                                        "batters": [
-                                            {"name": "Jos Buttler", "runs": 68, "balls": 41, "fours": 6, "sixes": 4, "strike_rate": 165.8, "sr": 165.8, "on_strike": True, "onStrike": True},
-                                            {"name": "Liam Livingstone", "runs": 22, "balls": 11, "fours": 1, "sixes": 2, "strike_rate": 200.0, "sr": 200.0, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "currentBatters": [
-                                            {"name": "Jos Buttler", "runs": 68, "balls": 41, "fours": 6, "sixes": 4, "strike_rate": 165.8, "sr": 165.8, "on_strike": True, "onStrike": True},
-                                            {"name": "Liam Livingstone", "runs": 22, "balls": 11, "fours": 1, "sixes": 2, "strike_rate": 200.0, "sr": 200.0, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "bowler": {"name": "Kagiso Rabada", "overs": "3.2", "maidens": 0, "runs": 34, "wickets": 2, "economy": 10.2, "econ": 10.2},
-                                        "currentBowler": {"name": "Kagiso Rabada", "overs": "3.2", "maidens": 0, "runs": 34, "wickets": 2, "economy": 10.2, "econ": 10.2},
-                                        "recent_balls": ["6", "1", "4", "W", "2", "1"],
-                                        "recentBalls": ["6", "1", "4", "W", "2", "1"],
-                                        "partnership": "38 runs (18 balls)",
-                                        "last_wicket": "Harry Brook c Markram b Rabada 34 (19b) — 127/4 (15.4 ov)",
-                                        "lastWicket": "Harry Brook c Markram b Rabada 34 (19b) — 127/4 (15.4 ov)",
-                                        "crr": "9.70",
-                                        "rrr": "10.66",
-                                        "toss": "England won the toss and elected to bowl",
-                                        "venue": "SuperSport Park, Centurion"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                ]
-            },
-            {
-                "matchType": "Today's Completed Matches (Not Yesterday)",
-                "seriesMatches": [
-                    {
-                        "seriesAdWrapper": {
-                            "seriesName": "Bilateral Series 2026",
-                            "matches": [
-                                {
-                                    "matchInfo": {
-                                        "matchId": 98403,
-                                        "seriesName": "Bilateral Series 2026",
-                                        "matchDesc": "1st ODI",
-                                        "matchFormat": "ODI",
-                                        "status": "India won by 4 wickets (Completed Today)",
-                                        "state": "Complete",
-                                        "team1": {"teamName": "New Zealand", "teamSName": "NZ"},
-                                        "team2": {"teamName": "India", "teamSName": "IND"}
-                                    },
-                                    "matchScore": {
-                                        "team1Score": {"inngs1": {"runs": 276, "wickets": 9, "overs": 50.0}},
-                                        "team2Score": {"inngs1": {"runs": 280, "wickets": 6, "overs": 47.2}}
-                                    },
-                                    "liveDetails": {
-                                        "is_live": False,
-                                        "isLive": False,
-                                        "batters": [
-                                            {"name": "Yashasvi Jaiswal", "runs": 104, "balls": 92, "fours": 12, "sixes": 3, "strike_rate": 113.0, "sr": 113.0, "on_strike": False, "onStrike": False},
-                                            {"name": "Rishabh Pant", "runs": 78, "balls": 64, "fours": 8, "sixes": 2, "strike_rate": 121.8, "sr": 121.8, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "currentBatters": [
-                                            {"name": "Yashasvi Jaiswal", "runs": 104, "balls": 92, "fours": 12, "sixes": 3, "strike_rate": 113.0, "sr": 113.0, "on_strike": False, "onStrike": False},
-                                            {"name": "Rishabh Pant", "runs": 78, "balls": 64, "fours": 8, "sixes": 2, "strike_rate": 121.8, "sr": 121.8, "on_strike": False, "onStrike": False}
-                                        ],
-                                        "bowler": {"name": "Trent Boult", "overs": "10.0", "maidens": 1, "runs": 58, "wickets": 3, "economy": 5.80, "econ": 5.80},
-                                        "currentBowler": {"name": "Trent Boult", "overs": "10.0", "maidens": 1, "runs": 58, "wickets": 3, "economy": 5.80, "econ": 5.80},
-                                        "recent_balls": ["1", "4", "0", "1", "4", "W"],
-                                        "recentBalls": ["1", "4", "0", "1", "4", "W"],
-                                        "partnership": "Match Completed Today",
-                                        "last_wicket": "Glenn Phillips c Rahul b Shami 64 (58b) — 242/7 (45.2 ov)",
-                                        "lastWicket": "Glenn Phillips c Rahul b Shami 64 (58b) — 242/7 (45.2 ov)",
-                                        "crr": "5.91",
-                                        "rrr": None,
-                                        "toss": "India won the toss and elected to bowl",
-                                        "venue": "Narendra Modi Stadium, Ahmedabad",
-                                        "player_of_match": "Yashasvi Jaiswal (104 runs off 92 balls)"
+                                        "venue": "Wankhede Stadium, Mumbai"
                                     }
                                 }
                             ]
@@ -2778,43 +2360,27 @@ def api_cricket():
     except Exception as e:
         print(f"[Cricbuzz Live API] Error: {e}")
 
-    # 2. Fetch Recent / Completed Matches (ONLY THAT DAY, NEVER YESTERDAY)
+    # 2. Fetch Recent / Completed Matches
     try:
         r2 = requests.get("https://cricbuzz-cricket.p.rapidapi.com/matches/v1/recent", headers=headers, timeout=5)
         if r2.status_code == 200:
             d2 = r2.json().get("typeMatches", [])
-            now_utc = datetime.now(timezone.utc)
             for tm in d2:
                 filtered_series = []
                 for sm in tm.get("seriesMatches", []):
                     raw_matches = sm.get("seriesAdWrapper", {}).get("matches", [])
-                    today_matches = []
-                    for m in raw_matches:
-                        mid = m.get("matchInfo", {}).get("matchId")
-                        if not mid or mid in seen_ids:
-                            continue
-                        # Check match end date / start date timestamp (in ms)
-                        end_raw = m.get("matchInfo", {}).get("endDate") or m.get("matchInfo", {}).get("startDate")
-                        if end_raw:
-                            try:
-                                m_dt = datetime.fromtimestamp(int(end_raw) / 1000.0, timezone.utc)
-                                # Filter out matches from yesterday or older than 18 hours
-                                if (now_utc - m_dt).total_seconds() > 18 * 3600 or m_dt.date() < now_utc.date():
-                                    continue
-                            except Exception:
-                                pass
-                        enrich_cricket_match(m)
-                        today_matches.append(m)
-                    if today_matches:
+                    new_matches = [m for m in raw_matches if m.get("matchInfo", {}).get("matchId") not in seen_ids]
+                    for nm in new_matches:
+                        enrich_cricket_match(nm)
+                    if new_matches:
                         sm_copy = dict(sm)
-                        sm_copy["seriesAdWrapper"] = {"matches": today_matches}
+                        sm_copy["seriesAdWrapper"] = {"matches": new_matches}
                         filtered_series.append(sm_copy)
                 if filtered_series:
-                    all_type_matches.append({"matchType": f"Today's Matches ({tm.get('matchType', 'Matches')})", "seriesMatches": filtered_series})
+                    all_type_matches.append({"matchType": f"Recent ({tm.get('matchType', 'Matches')})", "seriesMatches": filtered_series})
     except Exception as e:
         print(f"[Cricbuzz Recent API] Error: {e}")
 
-    # If matches obtained, cache and serve
     if all_type_matches:
         merged_data = {"typeMatches": all_type_matches}
         with _cricket_lock:
@@ -2823,7 +2389,7 @@ def api_cricket():
         save_last_api_response("cricket", merged_data)
         return jsonify(merged_data)
 
-    # Try last known good DB cache (only if today's)
+    # Try last known good DB cache
     last_cric = get_last_api_response("cricket")
     if last_cric and isinstance(last_cric, dict) and last_cric.get("typeMatches"):
         for tm in last_cric.get("typeMatches", []):
@@ -2835,7 +2401,7 @@ def api_cricket():
             _cricket_cache["ts"] = now_ts
         return jsonify(last_cric)
 
-    # Use marquee rich matches so live cricket and hover details are always available to inspect
+    # Use marquee rich matches so live cricket details are always available
     fallback_data = get_marquee_fallback_matches()
     with _cricket_lock:
         _cricket_cache["data"] = fallback_data

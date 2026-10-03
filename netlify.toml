@@ -11,6 +11,7 @@
   from = "/api/*"
   to = "https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat"
   status = 200
+  force = true
 
 [[redirects]]
   # Single-page app fallback
@@ -24,8 +25,4 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
-    X-DNS-Prefetch-Control = "on"

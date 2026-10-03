@@ -245,9 +245,9 @@ class FakeNewsDLInferenceEngine:
         excl = features["exclamation_count"]
 
         # Neural scoring simulation
-        if s_hits > 0 or excl >= 2 or (caps > 0.50 and len(text) > 15):
+        if s_hits > 0 or excl >= 2 or (caps > 0.55 and len(text) > 20):
             # Misinformation / sensationalist anomaly detected
-            fake_prob = min(0.985, 0.78 + (s_hits * 0.08) + (0.08 if caps > 0.50 else 0))
+            fake_prob = min(0.985, 0.78 + (s_hits * 0.08) + (0.08 if caps > 0.55 else 0))
             real_prob = round(1.0 - fake_prob, 4)
             fake_prob = round(fake_prob, 4)
         elif a_hits > 0:

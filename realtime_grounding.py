@@ -155,12 +155,17 @@ def check_affirmative_corroboration(claim: str, articles: List[Dict[str, Any]]) 
             if sig_numbers and not any(n in combined_text for n in sig_numbers):
                 continue
 
-        # Check keyword overlap
+        # Check keyword overlap ratio
         matched_tokens = [tok for tok in claim_tokens if tok in combined_text]
         ratio = len(matched_tokens) / max(len(claim_tokens), 1)
 
-        # Ensure at least 2 significant claim tokens or sufficient ratio match
-        if (len(matched_tokens) >= 2 and ratio >= 0.20) or len(matched_tokens) >= 3 or ratio >= 0.35:
+        # Ensure primary claim tokens (e.g. key subjects) are actually in the article
+        key_tokens = [w for w in re.findall(r'[a-z0-9]+', claim.lower()) if len(w) >= 4 and w not in COMMON_STOPWORDS]
+        matched_keys = [w for w in key_tokens if w in combined_text]
+        if key_tokens and len(key_tokens) >= 2 and not matched_keys:
+            continue
+
+        if ratio >= 0.22 or len(matched_tokens) >= 2 or len(matched_keys) >= 2:
             src_name = a.get("source") or "Authoritative Source"
             corroborating_sources.append(src_name)
 
@@ -214,24 +219,19 @@ def analyze_grounding_evidence(
             "cannot confirm", "no credible report", "do not provide", "does not provide",
             "no information", "instead, they detail", "instead of", "unsubstantiated",
             "unverified", "no record", "no credible", "contradicts", "refuted",
-            "do not support", "does not support", "not support the claim", "cannot cure",
-            "does not cure", "no cure", "no scientific evidence", "unproven", "misleading",
-            "fake", "baseless", "no basis", "scam", "rumor", "rumour", "fraud"
+            "cannot cure", "does not cure", "unproven", "no scientific backing",
+            "no medical evidence", "myth", "fake", "do not support"
         ]
         ans_is_debunked = any(k in ans_lower for k in debunk_keywords)
 
         confirm_keywords = [
-            "won the", "won by", "champion", "approved the", "confirmed that",
-            "reported that", "passed the", "is true", "official announcement",
-            "was born on", "born in", "took place on", "inaugurated", "elected",
-            "awarded", "launched the", "achieved", "defeated", "announced",
-            "kept", "holds", "decided", "stated", "held", "scores", "unveiled",
-            "rises", "falls", "hits", "reaches", "remains", "signed", "passed",
-            "meets", "hosted", "begins", "starts", "ends", "launched", "published",
-            "cleared", "appointed", "developed", "built", "tested", "established"
+            "won the", "won by", "champion", "approved", "confirmed",
+            "reported", "passed", "is true", "official announcement",
+            "was born on", "born in", "took place", "inaugurated", "elected",
+            "awarded", "launched", "achieved", "defeated", "announced", "stated",
+            "decided", "holds", "kept", "rises", "falls", "hits", "published", "released"
         ]
-        # Must affirmatively match confirmation keywords without debunking signals
-        ans_is_confirmed = (any(k in ans_lower for k in confirm_keywords) or (len(articles) > 0 and len(ans) > 60 and not ans_is_debunked and not signals.get("found_miracle") and not signals.get("found_conspiracy"))) and not ans_is_debunked
+        ans_is_confirmed = any(k in ans_lower for k in confirm_keywords) and not ans_is_debunked
 
         if ans_is_debunked:
             neu = dict(base_neural)

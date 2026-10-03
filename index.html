@@ -6,8 +6,6 @@
     <title>TruthLens — AI Verified Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <script>
@@ -36,9 +34,8 @@
 
     <style>
         *, *::before, *::after { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; font-family:'DM Sans',sans-serif; }
-        .dark body { background:#0a0a0f; color:#e8eaed; }
+        body { background:#fdfcf8; color:#1a1a2e; overflow-x:hidden; }
+        .dark body { background:#0f0f0f; color:#e8eaed; }
         * { transition: background-color 0.25s ease, border-color 0.25s ease; }
 
         ::-webkit-scrollbar { width:4px; height:4px; }
@@ -140,98 +137,33 @@
         .currency { font-size:0.85em; vertical-align:baseline; opacity:0.95; margin-right:0.12em; }
         .price-amt { font-size:1.02em; font-weight:800; }
 
-        /* ============ PRELOADER — Blur-In Brand Animation ============ */
+        /* Pure CSS Guaranteed Preloader Auto-Dismiss */
         #preloader {
-            position: fixed; inset: 0; z-index: 9999;
-            background: #000;
-            display: flex; align-items: center; justify-content: center; flex-direction: column;
-            transition: opacity 0.7s ease, visibility 0.7s ease;
+            pointer-events: none;
+            animation: autoPreloaderDismiss 0.45s 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        #preloader.preloader-hidden {
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-        }
-        /* Ambient glow orbs */
-        .pl-glow-1 {
-            position: absolute; width: 400px; height: 400px; border-radius: 50%;
-            background: radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%);
-            top: 50%; left: 50%; transform: translate(-50%, -60%);
-            animation: plGlowPulse 3s ease-in-out infinite alternate;
-        }
-        .pl-glow-2 {
-            position: absolute; width: 300px; height: 300px; border-radius: 50%;
-            background: radial-gradient(circle, rgba(26,115,232,0.25) 0%, transparent 70%);
-            top: 50%; left: 50%; transform: translate(-30%, -40%);
-            animation: plGlowPulse 3s ease-in-out 1.5s infinite alternate;
-        }
-        @keyframes plGlowPulse { from{opacity:0.5;transform:translate(-50%,-60%) scale(1)} to{opacity:1;transform:translate(-50%,-60%) scale(1.15)} }
-        /* Brand text blur-in */
-        #pl-brand-wrap {
-            position: relative; z-index: 1; text-align: center;
-            animation: plBlurIn 0.9s cubic-bezier(0.23,1,0.32,1) forwards;
-            opacity: 0;
-        }
-        @keyframes plBlurIn {
-            0%  { opacity:0; filter:blur(20px); transform:scale(0.9); }
-            60% { opacity:1; filter:blur(2px);  transform:scale(1.02); }
-            100%{ opacity:1; filter:blur(0);    transform:scale(1); }
-        }
-        #pl-title {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.8rem, 10vw, 5rem);
-            font-weight: 900;
-            letter-spacing: -0.04em;
-            line-height: 1;
-            color: #fff;
-            text-shadow: 0 0 60px rgba(124,58,237,0.8), 0 0 120px rgba(26,115,232,0.4);
-        }
-        #pl-sub {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            letter-spacing: 0.35em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.4);
-            margin-top: 8px;
-            margin-bottom: 28px;
-        }
-        #pl-track { width: 200px; height: 2px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; margin: 0 auto; }
-        #pl-bar3 { height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, #7c3aed, #1a73e8, #06b6d4); transition: width 0.05s linear; box-shadow: 0 0 8px rgba(124,58,237,0.8); }
-        #pl-status3 { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.3em; text-transform:uppercase; color:rgba(124,58,237,0.9); margin-top:12px; }
-
-        /* DevTools Inspect Shield */
-        body.inspect-blocked > *:not(#devtools-guard) { display: none !important; }
-        body.inspect-blocked { overflow: hidden !important; background: #030712 !important; }
-        body.inspect-blocked #devtools-guard { display: flex !important; }
-
-        /* Mobile hamburger menu */
-        #mobile-menu-drawer { transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
-        #mobile-menu-drawer.menu-closed { transform: translateY(-8px); opacity: 0; pointer-events: none; }
-        #mobile-menu-drawer.menu-open  { transform: translateY(0); opacity: 1; pointer-events: all; }
-
-        /* Responsive fixes */
-        @media (max-width: 640px) {
-            main { padding-left: 12px; padding-right: 12px; }
-            .news-card { border-radius: 14px; }
-            footer { padding-left: 16px; padding-right: 16px; }
+        @keyframes autoPreloaderDismiss {
+            0% { opacity: 1; visibility: visible; }
+            90% { opacity: 0; visibility: visible; }
+            100% { opacity: 0; visibility: hidden; display: none !important; }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 
-<body class="antialiased min-h-screen flex flex-col font-sans relative selection:bg-purple-500/20 selection:text-purple-300">
+<body class="antialiased min-h-screen flex flex-col font-sans">
 
-<!-- THREE.JS INTERACTIVE 3D NEURAL CANVAS (ThreeUI / WebGL background) -->
-<canvas id="three-neural-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40 dark:opacity-25 transition-opacity duration-700"></canvas>
-
-<!-- PRELOADER — Blur-In Black Background -->
-<div id="preloader">
-    <div class="pl-glow-1"></div>
-    <div class="pl-glow-2"></div>
-    <div id="pl-brand-wrap">
-        <div id="pl-title">TruthLens</div>
-        <div id="pl-sub">AI Verified Intelligence</div>
-        <div id="pl-track"><div id="pl-bar3"></div></div>
-        <div id="pl-status3">Initializing...</div>
+<!-- CINEMATIC PRELOADER (TruthLens brand style) -->
+<div id="preloader" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black pointer-events-none">
+    <div style="text-align:center;">
+        <div id="preloader-brand" style="
+            font-family:'Playfair Display',serif;font-size:clamp(2.5rem,10vw,5rem);
+            font-weight:900;font-style:italic;letter-spacing:-0.05em;color:white;display:inline-block;
+        ">TruthLens</div>
+        <div style="width:320px;height:2px;background:rgba(255,255,255,0.1);position:relative;overflow:hidden;margin:22px auto 0;border-radius:10px;">
+            <div id="pl-bar" style="position:absolute;left:0;top:0;height:100%;width:100%;background:linear-gradient(90deg,#a855f7,#3b82f6);box-shadow:0 0 18px #a855f7;border-radius:10px;"></div>
+        </div>
+        <p id="pl-status" style="margin-top:18px;font-size:0.6rem;letter-spacing:0.25em;font-family:'JetBrains Mono',monospace;color:#888;text-transform:uppercase;">AI Verified Intelligence</p>
     </div>
 </div>
 
@@ -249,13 +181,16 @@
 <!-- HEADER -->
 <header class="glass border-b border-paper-200 dark:border-white/10 sticky top-0 z-50 shadow-sm">
     <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center justify-between h-14">
-        <!-- Weather -->
-        <div class="flex items-center gap-3 w-1/3">
-            <button id="weather-box" onclick="requestLoc()" class="flex items-center gap-2 hover:bg-paper-100 dark:hover:bg-white/5 rounded-xl px-3 py-1.5 transition-all opacity-0">
-                <i id="weather-icon" class="ph-fill ph-cloud-sun text-tl-yellow text-2xl"></i>
+        <!-- Weather & Mobile Menu -->
+        <div class="flex items-center gap-2 md:gap-3 w-1/3">
+            <button onclick="toggleMobileMenu()" class="md:hidden p-2 rounded-xl hover:bg-paper-100 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 transition-all" aria-label="Open Navigation Menu">
+                <i class="ph-bold ph-list text-2xl"></i>
+            </button>
+            <button id="weather-box" onclick="requestLoc()" class="flex items-center gap-2 hover:bg-paper-100 dark:hover:bg-white/5 rounded-xl px-2.5 py-1.5 transition-all opacity-0">
+                <i id="weather-icon" class="ph-fill ph-cloud-sun text-tl-yellow text-xl md:text-2xl"></i>
                 <div class="hidden sm:flex flex-col">
-                    <span class="text-sm font-black dark:text-white leading-none" id="weather-temp">--°C</span>
-                    <span class="text-[9px] text-ink-500 font-bold uppercase tracking-wider truncate max-w-[100px]" id="weather-loc">Locating...</span>
+                    <span class="text-xs md:text-sm font-black dark:text-white leading-none" id="weather-temp">--°C</span>
+                    <span class="text-[9px] text-ink-500 font-bold uppercase tracking-wider truncate max-w-[90px]" id="weather-loc">Locating...</span>
                 </div>
             </button>
         </div>
@@ -276,25 +211,42 @@
         </div>
     </div>
 
-    <!-- NAV TABS (desktop: visible; mobile: behind hamburger) -->
-    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2 relative">
-        <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center">
-            <!-- Desktop nav -->
-            <nav class="hidden md:flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 flex-1 justify-center" id="nav-tabs"></nav>
-            <!-- Mobile hamburger button -->
-            <button id="mobile-nav-toggle" onclick="toggleMobileMenu()" class="md:hidden flex items-center gap-1.5 py-2.5 text-ink-700 dark:text-ink-100 ml-auto" aria-label="Menu">
-                <i class="ph-bold ph-list text-xl" id="mobile-menu-icon"></i>
-                <span class="text-[11px] font-black uppercase tracking-wider">Menu</span>
-            </button>
-            <!-- Mobile active tab label -->
-            <div class="md:hidden flex-1 py-2.5 text-xs font-black uppercase tracking-widest text-tl-purple" id="mobile-active-tab">Home</div>
-        </div>
-        <!-- Mobile menu drawer -->
-        <div id="mobile-menu-drawer" class="menu-closed md:hidden absolute left-0 right-0 top-full z-50 bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/10 shadow-2xl">
-            <nav id="nav-tabs-mobile" class="flex flex-col px-4 py-2"></nav>
+    <!-- NAV TABS -->
+    <div class="border-t border-paper-200 dark:border-white/5 bg-white/20 dark:bg-white/2">
+        <div class="max-w-[1680px] mx-auto px-4 md:px-6">
+            <nav class="flex gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2.5 justify-center" id="nav-tabs"></nav>
         </div>
     </div>
 </header>
+
+<!-- MOBILE DRAWER -->
+<div id="mobile-drawer" class="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm hidden md:hidden" onclick="if(event.target===this)toggleMobileMenu()">
+    <div class="bg-white dark:bg-paper-900 w-72 h-full p-6 shadow-2xl flex flex-col justify-between overflow-y-auto">
+        <div>
+            <div class="flex items-center justify-between pb-4 border-b border-paper-200 dark:border-white/10 mb-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-tl-purple text-white flex items-center justify-center font-serif font-black text-sm">TL</div>
+                    <span class="font-serif font-black text-lg text-ink-900 dark:text-white">TruthLens</span>
+                </div>
+                <button onclick="toggleMobileMenu()" class="p-1.5 text-ink-500 hover:text-ink-900 dark:hover:text-white rounded-lg">
+                    <i class="ph-bold ph-x text-xl"></i>
+                </button>
+            </div>
+            <nav class="space-y-1.5" id="mobile-nav-links"></nav>
+        </div>
+        <div class="pt-4 border-t border-paper-200 dark:border-white/10 space-y-3">
+            <button onclick="openScanPanel('text'); toggleMobileMenu();" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-tl-purple to-tl-blue text-white font-bold text-xs flex items-center justify-center gap-2">
+                <i class="ph-fill ph-shield-check"></i> AI Deep Scanner
+            </button>
+            <button onclick="openScanPanel('history'); toggleMobileMenu();" class="w-full py-2.5 rounded-xl bg-paper-100 dark:bg-white/10 text-xs font-bold flex items-center justify-center gap-2 text-ink-700 dark:text-ink-300">
+                <i class="ph-bold ph-clock-counter-clockwise"></i> Scan History
+            </button>
+            <button onclick="toggleTheme()" class="w-full py-2.5 rounded-xl bg-paper-100 dark:bg-white/10 text-xs font-bold flex items-center justify-center gap-2 text-ink-700 dark:text-ink-300">
+                <i class="ph-bold ph-moon dark:hidden"></i><i class="ph-bold ph-sun hidden dark:inline text-tl-yellow"></i> Toggle Dark Theme
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- SEARCH & SCANNER BAR -->
 <div class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-5 px-4">
@@ -323,61 +275,10 @@
     </div>
 </div>
 
-<!-- CRICKET HUB & LIVE MATCH HOVER INTELLIGENCE -->
-<div id="cricket-container" class="bg-white/85 dark:bg-paper-900/85 backdrop-blur-md border-b border-paper-200 dark:border-white/5 py-3 hidden relative z-30">
-    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar relative" id="cricket-hub">
+<!-- CRICKET HUB -->
+<div id="cricket-container" class="bg-white dark:bg-paper-900 border-b border-paper-200 dark:border-white/5 py-3 hidden">
+    <div class="max-w-[1680px] mx-auto px-4 md:px-6 flex items-center gap-4 overflow-x-auto no-scrollbar" id="cricket-hub">
         <span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>
-    </div>
-
-    <!-- FLOATING CRICKET HOVER INTELLIGENCE CARD (TasteSkill / 21st.dev style) -->
-    <div id="cricket-popover" class="fixed hidden z-[180] w-[350px] md:w-[390px] p-4 rounded-2xl shadow-2xl pointer-events-none transition-all duration-150 opacity-0 bg-slate-950/95 dark:bg-black/95 backdrop-blur-2xl border border-white/15 text-white font-sans text-xs">
-        <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span id="cpop-badge" class="text-[10px] font-black uppercase tracking-wider text-emerald-400">LIVE ACTION</span>
-            </div>
-            <span id="cpop-series" class="text-[10px] font-bold text-slate-400 truncate max-w-[200px]">ICC Champions Trophy</span>
-        </div>
-
-        <!-- Live Batters -->
-        <div class="mb-3 bg-white/5 rounded-xl p-2.5 border border-white/5">
-            <div class="text-[9px] font-black tracking-wider uppercase text-slate-400 mb-1.5 flex justify-between">
-                <span>ACTIVE BATTERS</span>
-                <span>R (B) • 4s • 6s • SR</span>
-            </div>
-            <div id="cpop-batters" class="space-y-1"></div>
-        </div>
-
-        <!-- Current Bowler -->
-        <div class="mb-3 bg-white/5 rounded-xl p-2.5 border border-white/5">
-            <div class="text-[9px] font-black tracking-wider uppercase text-slate-400 mb-1.5 flex justify-between">
-                <span>CURRENT BOWLER</span>
-                <span>O - M - R - W • ECON</span>
-            </div>
-            <div id="cpop-bowler" class="flex justify-between items-center text-xs font-bold"></div>
-        </div>
-
-        <!-- Recent Deliveries Strip -->
-        <div class="mb-2.5 flex items-center justify-between">
-            <span class="text-[9px] font-black text-slate-400 uppercase">THIS OVER</span>
-            <div id="cpop-balls" class="flex gap-1.5"></div>
-        </div>
-
-        <!-- Fall of Wickets & Partnership Summary -->
-        <div class="pt-2 border-t border-white/10 text-[10px] text-slate-300 flex flex-col gap-1">
-            <div class="flex justify-between">
-                <span class="text-slate-400">Partnership:</span>
-                <span id="cpop-partnership" class="font-bold text-white">-</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-400">Last Wicket:</span>
-                <span id="cpop-last-wicket" class="font-semibold text-rose-300 truncate max-w-[230px]">-</span>
-            </div>
-            <div class="flex justify-between mt-1 text-[9px] font-mono text-cyan-400">
-                <span id="cpop-crr">CRR: -</span>
-                <span id="cpop-rrr"></span>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -397,76 +298,34 @@
 </main>
 
 <!-- FOOTER -->
-<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-12 mt-auto transition-colors">
-    <div class="max-w-[1680px] mx-auto px-4 md:px-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500 pb-10 border-b border-paper-200 dark:border-white/10">
-            <div>
-                <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2 flex items-center gap-2">
-                    <span>TruthLens</span>
-                    <span class="text-[9px] font-mono uppercase bg-tl-purple/10 text-tl-purple px-2 py-0.5 rounded-full border border-tl-purple/20">v8.0</span>
-                </h3>
-                <p class="opacity-75 text-xs leading-relaxed max-w-xs mb-4">
-                    AI-powered fake news verification & real-time ground-truth intelligence platform. Grounded via deep neural Conv1D-BiLSTM networks and web consensus verification.
-                </p>
-                <div class="flex items-center gap-2 text-[10px] text-emerald-500 dark:text-emerald-400 font-mono">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Systems Operational (2026 UTC)</span>
-                </div>
-            </div>
-            <div>
-                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Intelligence Feeds</h4>
-                <div class="space-y-2 text-xs">
-                    <button onclick="nav('home')" class="block hover:text-tl-blue transition-colors">Breaking Headlines</button>
-                    <button onclick="nav('india')" class="block hover:text-tl-blue transition-colors">National India</button>
-                    <button onclick="nav('technology')" class="block hover:text-tl-blue transition-colors">Technology & AI</button>
-                    <button onclick="nav('business')" class="block hover:text-tl-blue transition-colors">Markets & Business</button>
-                    <button onclick="nav('sports')" class="block hover:text-tl-blue transition-colors">Cricket & Sports</button>
-                </div>
-            </div>
-            <div>
-                <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Deep Verification Tools</h4>
-                <div class="space-y-2 text-xs">
-                    <button onclick="openScanPanel('text')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
-                        <i class="ph-bold ph-shield-check text-tl-purple"></i> Neural Text Scanner
-                    </button>
-                    <button onclick="openScanPanel('history')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
-                        <i class="ph-bold ph-clock-counter-clockwise"></i> Audit & Scan History
-                    </button>
-                    <button onclick="openScanPanel('file')" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
-                        <i class="ph-bold ph-file-text"></i> Multimodal Document Scan
-                    </button>
-                    <button onclick="toggleChat()" class="block hover:text-tl-purple transition-colors flex items-center gap-1.5">
-                        <i class="ph-bold ph-chat-circle-dots"></i> AI Fact-Checking Assistant
-                    </button>
-                </div>
-            </div>
-            <div class="flex flex-col justify-between items-start sm:items-end">
-                <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
-                    class="bg-tl-purple/10 hover:bg-tl-purple text-tl-purple hover:text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm mb-4">
-                    Send Researcher Feedback
-                </button>
-                <div class="text-left sm:text-right space-y-1">
-                    <div class="text-[11px] font-mono text-slate-500 flex items-center gap-2 sm:justify-end">
-                        <i class="ph-bold ph-lock-key"></i> 256-Bit TLS • Brevo OTP Verified
-                    </div>
-                    <div class="text-[11px] font-mono text-slate-500 flex items-center gap-2 sm:justify-end">
-                        <i class="ph-bold ph-brain"></i> Conv1D + BiLSTM + Tavily API
-                    </div>
-                </div>
+<footer class="bg-white dark:bg-paper-900 border-t border-paper-200 dark:border-white/10 py-10 mt-auto">
+    <div class="max-w-[1680px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm text-ink-700 dark:text-ink-500">
+        <div>
+            <h3 class="text-2xl font-serif font-black text-ink-900 dark:text-white mb-2">TruthLens</h3>
+            <p class="opacity-70 text-sm leading-relaxed">AI-powered fake news detection & verified intelligence platform.</p>
+        </div>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">Sections</h4>
+            <div class="space-y-2">
+                <button onclick="nav('home')" class="block hover:text-tl-blue font-medium">Headlines</button>
+                <button onclick="nav('india')" class="block hover:text-tl-blue font-medium">India</button>
+                <button onclick="nav('technology')" class="block hover:text-tl-blue font-medium">Technology</button>
+                <button onclick="nav('business')" class="block hover:text-tl-blue font-medium">Business</button>
             </div>
         </div>
-
-        <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-500">
-            <p class="font-mono">
-                &copy; 2026 TruthLens — AI Verified Intelligence. All Rights Reserved.
-            </p>
-            <div class="flex items-center gap-4 text-[11px] font-mono">
-                <span class="hover:text-tl-purple transition-colors cursor-default">Privacy Safeguards</span>
-                <span>&bull;</span>
-                <span class="hover:text-tl-purple transition-colors cursor-default">Editorial Policy</span>
-                <span>&bull;</span>
-                <span class="hover:text-tl-purple transition-colors cursor-default">24h Quota Reset Protocol</span>
+        <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-ink-900 dark:text-white mb-3">AI Tools</h4>
+            <div class="space-y-2">
+                <button onclick="openScanPanel('text')" class="block hover:text-tl-purple font-medium">Text Scanner</button>
+                <button onclick="openScanPanel('history')" class="block hover:text-tl-purple font-medium">Scan History</button>
             </div>
+        </div>
+        <div class="text-right">
+            <button onclick="document.getElementById('feedback-modal').classList.remove('hidden'); document.getElementById('feedback-modal').classList.add('flex')"
+                class="bg-tl-purple/10 text-tl-purple hover:bg-tl-purple hover:text-white px-5 py-2 rounded-xl font-bold text-xs transition-all mb-3">
+                Send Feedback
+            </button>
+            <p class="text-[10px] opacity-50">© 2024 TruthLens. AI-powered.</p>
         </div>
     </div>
 </footer>
@@ -620,173 +479,68 @@
     </div>
 </div>
 
-<!-- AUTHENTICATION & QUOTA UPGRADE MODAL -->
-<div id="auth-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
-    <div class="relative bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
-        <!-- Ambient decorative header gradient -->
-        <div class="h-2 bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-500"></div>
-
-        <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+<!-- AUTHENTICATION MODAL -->
+<div id="auth-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-black/75 backdrop-blur-md p-4">
+    <div class="relative bg-white dark:bg-paper-800 rounded-3xl w-full max-w-md shadow-2xl border border-paper-200 dark:border-white/10 overflow-hidden">
+        <div class="h-2 bg-gradient-to-r from-tl-purple via-tl-blue to-tl-cyan"></div>
+        <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-ink-500 hover:text-ink-900 dark:hover:text-white transition-colors">
             <i class="ph-bold ph-x text-xl"></i>
         </button>
-
         <div class="p-7">
-            <!-- Modal Header -->
             <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-purple-500/10 text-tl-purple mb-3">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-tl-purple/10 text-tl-purple mb-3">
                     <i class="ph-fill ph-shield-check text-2xl"></i>
                 </div>
-                <h3 class="text-2xl font-serif font-black dark:text-white text-slate-900" id="auth-modal-title">Researcher Access</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed" id="auth-modal-sub">
-                    Sign in or verify your account to expand your allowance from 5 to 50 deep neural checks.
+                <h3 class="text-2xl font-serif font-black dark:text-white text-ink-900" id="auth-modal-title">Researcher Access</h3>
+                <p class="text-xs text-ink-500 mt-1 max-w-xs mx-auto leading-relaxed" id="auth-modal-sub">
+                    Sign in or create an account to access 100 deep scans daily and persistent history.
                 </p>
             </div>
 
             <!-- Tab Switcher -->
-            <div class="flex rounded-xl bg-slate-100 dark:bg-white/5 p-1 mb-6" id="auth-tabs-bar">
-                <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all text-slate-600 dark:text-slate-400">Sign In</button>
-                <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all text-slate-600 dark:text-slate-400">Create Account</button>
+            <div class="flex rounded-xl bg-paper-100 dark:bg-white/5 p-1 mb-6" id="auth-tabs-bar">
+                <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-paper-800 text-tl-purple shadow-sm">Sign In</button>
+                <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all text-ink-500 hover:text-ink-900 dark:hover:text-white">Create Account</button>
             </div>
 
-            <!-- VIEW 1: SIGN IN -->
+            <!-- SIGN IN FORM -->
             <form id="form-login" onsubmit="event.preventDefault(); submitLogin();" class="space-y-4">
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Email Address</label>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Email Address</label>
                     <input id="login-email" type="email" required placeholder="researcher@newsroom.com"
-                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                           class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
                 </div>
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Password</label>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Password</label>
                     <input id="login-password" type="password" required placeholder="••••••••"
-                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                           class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
                 </div>
-                <button type="submit" id="btn-login-submit" class="w-full py-3.5 rounded-xl bg-tl-purple hover:bg-purple-800 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 active:scale-[0.98]">
-                    Sign In & Unlock 50 Scans
+                <button type="submit" id="btn-login-submit" class="w-full py-3.5 rounded-xl bg-tl-purple hover:bg-purple-800 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
+                    Sign In & Unlock 100 Scans
                 </button>
             </form>
 
-            <!-- VIEW 2: SIGN UP -->
+            <!-- SIGN UP FORM -->
             <form id="form-signup" onsubmit="event.preventDefault(); submitSignup();" class="space-y-4 hidden">
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Email Address</label>
-                    <input id="signup-email" type="email" required placeholder="researcher@newsroom.com"
-                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Full Name</label>
+                    <input id="signup-name" type="text" placeholder="Dr. Raj Rathod"
+                           class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
                 </div>
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Password (Min 6 Characters)</label>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Email Address</label>
+                    <input id="signup-email" type="email" required placeholder="researcher@truthlens.ai"
+                           class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1.5">Password (min 6 characters)</label>
                     <input id="signup-password" type="password" required minlength="6" placeholder="••••••••"
-                           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
+                           class="w-full px-4 py-3 rounded-xl border border-paper-200 dark:border-white/10 bg-paper-50 dark:bg-white/5 text-ink-900 dark:text-white text-sm outline-none focus:border-tl-purple transition-all">
                 </div>
-                <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
-                    <i class="ph-bold ph-envelope text-tl-purple"></i>
-                    <span>We will dispatch a 6-digit OTP code to verify your address.</span>
-                </div>
-                <button type="submit" id="btn-signup-submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
-                    Dispatch Verification Code
+                <button type="submit" id="btn-signup-submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-tl-purple to-tl-blue hover:opacity-90 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
+                    Create Free Account (100 Scans)
                 </button>
             </form>
-
-            <!-- VIEW 3: OTP VERIFY -->
-            <div id="form-otp" class="space-y-5 hidden">
-                <div class="text-center">
-                    <span class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-bold mb-2">
-                        Code Sent to <span id="otp-target-email" class="underline"></span>
-                    </span>
-                    <p class="text-xs text-slate-500">Check your inbox and enter the 6-digit code below:</p>
-                </div>
-
-                <!-- 6-digit pin inputs -->
-                <div class="flex justify-center gap-2" id="otp-inputs-row">
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                    <input maxlength="1" class="otp-digit w-10 h-12 text-center text-xl font-mono font-black rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/15 focus:border-tl-purple outline-none text-slate-900 dark:text-white" />
-                </div>
-
-                <div id="dev-otp-banner" class="hidden p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center text-xs text-amber-300 font-mono">
-                    Dev Code: <span id="dev-otp-code" class="font-bold"></span>
-                </div>
-
-                <button onclick="submitVerifyOtp()" id="btn-otp-submit" class="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]">
-                    Verify & Unlock 50 Scans
-                </button>
-
-                <div class="text-center">
-                    <button onclick="switchAuthTab('signup')" class="text-xs text-slate-500 hover:text-tl-purple font-medium">← Change email address</button>
-                </div>
-            </div>
-
-            <!-- Footer Note -->
-            <div class="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] text-slate-400">
-                <span class="flex items-center gap-1"><i class="ph-bold ph-lock"></i> 256-bit Encrypted</span>
-                <span>Automatic cloud history sync</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- CRICKET FULL SCORECARD & LIVE INTEL MODAL -->
-<div id="cricket-scorecard-modal" class="fixed inset-0 z-[170] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-    <div class="relative bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10 p-6">
-        <button onclick="closeCricketModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-            <i class="ph-bold ph-x text-xl"></i>
-        </button>
-        <div id="cricket-modal-body"></div>
-    </div>
-</div>
-
-<!-- PLATFORM ADMIN CONTROL CENTER MODAL -->
-<div id="admin-control-modal" class="fixed inset-0 z-[165] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-    <div class="relative bg-slate-950 text-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border border-amber-500/30 p-6 font-sans">
-        <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors">
-            <i class="ph-bold ph-x text-xl"></i>
-        </button>
-        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
-            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-2xl">
-                👑
-            </div>
-            <div>
-                <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                    TruthLens Admin Control Center
-                    <span class="text-[10px] font-mono uppercase bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">Unlimited Quota</span>
-                </h3>
-                <p class="text-xs text-slate-400">Platform oversight, user scan quota resets, cache purging, and system metrics.</p>
-            </div>
-        </div>
-
-        <div id="admin-modal-content" class="space-y-6">
-            <div class="flex items-center justify-center py-10">
-                <div class="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- DEVTOOLS ANTI-INSPECT 404 SCREEN -->
-<div id="devtools-guard" class="fixed inset-0 z-[999999] bg-[#030712] text-slate-400 font-mono flex items-center justify-center p-6 hidden">
-    <div class="max-w-md w-full text-center space-y-5">
-        <div class="w-16 h-16 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-3xl font-black shadow-lg shadow-rose-500/10">
-            404
-        </div>
-        <div>
-            <h1 class="text-2xl font-bold text-white tracking-tight mb-2">404 - Resource Not Found</h1>
-            <p class="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
-                The requested URL / was not found on this server. Inspect mode detected; diagnostic traces routed to canary honeypot.
-            </p>
-        </div>
-        <div class="p-3.5 bg-black/60 border border-white/10 rounded-2xl text-[11px] text-rose-400 font-mono flex items-center justify-between">
-            <span class="truncate">GET /fuck.html</span>
-            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold shrink-0">404 Not Found</span>
-        </div>
-        <div class="text-[11px] text-slate-500">
-            Close Developer Tools to restore verified intelligence feed.
-        </div>
-        <div>
-            <button onclick="window._closeDevToolsGuard()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all">
-                Close & Return
-            </button>
         </div>
     </div>
 </div>
@@ -794,130 +548,79 @@
 <script>
 
 // =====================================================================
-// PRELOADER — Blur-In Black Background Animation
+// CINEMATIC PRELOADER (TruthLens brand style with GSAP-inspired animation)
 // =====================================================================
 (function() {
-    var bar    = document.getElementById('pl-bar3');
-    var status = document.getElementById('pl-status3');
-    var pl     = document.getElementById('preloader');
-    if (!pl) return;
+    var brand = document.getElementById('preloader-brand');
+    var bar = document.getElementById('pl-bar');
+    var status = document.getElementById('pl-status');
+    if (!brand) return;
 
+    var text = 'TRUTHLENS';
+    var colors = ['#a855f7','#3b82f6','#10b981','#ef4444','#06b6d4'];
+    brand.innerHTML = '';
+    var chars = Array.from(text).map(function(c) {
+        var span = document.createElement('span');
+        span.textContent = c;
+        span.style.cssText = 'display:inline-block;opacity:0;filter:blur(20px);transform:translateY(15px) scale(0.95);will-change:filter,opacity,transform;';
+        brand.appendChild(span);
+        return span;
+    });
+
+    // Stagger reveal chars
+    chars.forEach(function(span, i) {
+        setTimeout(function() {
+            span.style.transition = 'opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease';
+            span.style.opacity = '1';
+            span.style.filter = 'blur(0)';
+            span.style.transform = 'translateY(0) scale(1)';
+        }, i * 90 + 200);
+    });
+
+    // Hover colors
+    chars.forEach(function(span) {
+        span.addEventListener('mouseenter', function() {
+            var col = colors[Math.floor(Math.random()*colors.length)];
+            span.style.color = col;
+            span.style.transform = 'translateY(-10px)';
+            span.style.textShadow = '0 0 25px ' + col + 'AA';
+        });
+        span.addEventListener('mouseleave', function() {
+            span.style.color = '';
+            span.style.transform = 'translateY(0)';
+            span.style.textShadow = '';
+        });
+    });
+
+    // Progress bar animation
     var pct = 0;
-    var msgs = ['Initializing...', 'Loading feeds...', 'Connecting AI...', 'Almost ready...', 'TruthLens Ready!'];
-
+    var statusSteps = ['Initializing AI Engine...','Loading Signal Engine...','Fetching Market Data...','Calibrating Models...','Connecting News Feed...','Ready.'];
+    var stepIdx = 0;
     var intv = setInterval(function() {
-        pct += Math.random() * 14 + 7;
+        pct += Math.random() * 10 + 6;
         if (pct >= 100) { pct = 100; clearInterval(intv); }
         if (bar) bar.style.width = pct + '%';
-        var si = Math.min(Math.floor((pct / 100) * msgs.length), msgs.length - 1);
-        if (status) status.textContent = msgs[si];
-    }, 38);
+        var si = Math.min(Math.floor(pct / (100/statusSteps.length)), statusSteps.length-1);
+        if (si !== stepIdx && status) { stepIdx = si; status.textContent = statusSteps[si]; }
+    }, 30);
 
-    function dismissPreloader() {
-        if (!pl || pl.classList.contains('preloader-hidden')) return;
-        pl.classList.add('preloader-hidden');
-        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 800);
-    }
-
-    setTimeout(dismissPreloader, 1800);
-    window.addEventListener('load', function() { setTimeout(dismissPreloader, 500); });
+    // Dismiss preloader
+    setTimeout(function() {
+        var pl = document.getElementById('preloader');
+        if (!pl) return;
+        pl.style.transition = 'opacity 0.4s ease';
+        pl.style.opacity = '0';
+        setTimeout(function() { if (pl && pl.parentNode) pl.remove(); }, 400);
+    }, 450);
 })();
 
-// =====================================================================
-// THREE.JS 3D NEURAL CANVAS (ThreeUI / WebGL Interactive Wave Lattice)
-// =====================================================================
-let _threeScene, _threeCamera, _threeRenderer, _threeParticles, _threeAnimId;
-let _mouseX = 0, _mouseY = 0, _targetMouseX = 0, _targetMouseY = 0;
-
-function initThreeCanvas() {
-    const canvas = document.getElementById('three-neural-canvas');
-    if (!canvas || typeof THREE === 'undefined') return;
-
-    try {
-        _threeScene = new THREE.Scene();
-        _threeCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
-        _threeCamera.position.z = 1000;
-        _threeCamera.position.y = 350;
-
-        _threeRenderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-        _threeRenderer.setSize(window.innerWidth, window.innerHeight);
-        _threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-        const SEPARATION = 75, AMOUNTX = 40, AMOUNTY = 40;
-        const numParticles = AMOUNTX * AMOUNTY;
-        const positions = new Float32Array(numParticles * 3);
-        const scales = new Float32Array(numParticles);
-
-        let i = 0, j = 0;
-        for (let ix = 0; ix < AMOUNTX; ix++) {
-            for (let iy = 0; iy < AMOUNTY; iy++) {
-                positions[i] = ix * SEPARATION - ((AMOUNTX * SEPARATION) / 2);
-                positions[i + 1] = 0;
-                positions[i + 2] = iy * SEPARATION - ((AMOUNTY * SEPARATION) / 2);
-                scales[j] = 1;
-                i += 3;
-                j++;
-            }
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('scale', new THREE.BufferAttribute(scales, 1));
-
-        const isDark = document.documentElement.classList.contains('dark');
-        const particleColor = isDark ? 0x9333ea : 0x7c3aed;
-
-        const material = new THREE.PointsMaterial({
-            color: particleColor,
-            size: 3.5,
-            transparent: true,
-            opacity: 0.65,
-            blending: THREE.AdditiveBlending
-        });
-
-        _threeParticles = new THREE.Points(geometry, material);
-        _threeScene.add(_threeParticles);
-
-        let count = 0;
-        function animate() {
-            _threeAnimId = requestAnimationFrame(animate);
-            count += 0.03;
-            _mouseX += (_targetMouseX - _mouseX) * 0.05;
-            _mouseY += (_targetMouseY - _mouseY) * 0.05;
-
-            _threeCamera.position.x = _mouseX * 0.35;
-            _threeCamera.position.y = 350 + (-_mouseY * 0.25);
-            _threeCamera.lookAt(_threeScene.position);
-
-            const pos = _threeParticles.geometry.attributes.position.array;
-            let idx = 1;
-            for (let ix = 0; ix < AMOUNTX; ix++) {
-                for (let iy = 0; iy < AMOUNTY; iy++) {
-                    pos[idx] = (Math.sin((ix + count) * 0.3) * 45) +
-                               (Math.sin((iy + count) * 0.45) * 45);
-                    idx += 3;
-                }
-            }
-            _threeParticles.geometry.attributes.position.needsUpdate = true;
-            _threeRenderer.render(_threeScene, _threeCamera);
-        }
-        animate();
-
-        window.addEventListener('resize', () => {
-            if (!_threeCamera || !_threeRenderer) return;
-            _threeCamera.aspect = window.innerWidth / window.innerHeight;
-            _threeCamera.updateProjectionMatrix();
-            _threeRenderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            _targetMouseX = e.clientX - window.innerWidth / 2;
-            _targetMouseY = e.clientY - window.innerHeight / 2;
-        }, { passive: true });
-    } catch(e) {
-        console.warn('Three.js canvas init notice:', e);
-    }
-}
+// Fail-safe preloader remover
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const pl = document.getElementById('preloader');
+        if (pl && pl.parentNode) pl.remove();
+    }, 500);
+});
 
 // =====================================================================
 // STATE
@@ -925,8 +628,6 @@ function initThreeCanvas() {
 const state = {
     page: 'home',
     user: { id: 'open_user', name: 'TruthLens User' },
-    currentUser: null,
-    quota: { limit: 5, used: 0, remaining: 5, is_authenticated: false },
     scanMode: false,
     city: 'India',
     articles: [],
@@ -954,9 +655,8 @@ const TABS = [
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
-    initThreeCanvas();
     renderNavTabs();
-    initAuthSystem();
+    renderAuthArea();
     // Clear stale empty cache that may block fresh results
     clearStaleNewsCache();
     // Wake backend first, then load news (handles Render cold-start)
@@ -1011,161 +711,97 @@ async function wakeUpBackend() {
 }
 
 // =====================================================================
-// AUTHENTICATION & QUOTA UPGRADE SYSTEM (Guest 5 -> Verified 50)
+// AUTHENTICATION & QUOTA STATE
 // =====================================================================
-let _pendingEmail = '';
+let currentUser = null;
+let currentQuota = { limit: 25, used: 0, remaining: 25, is_authenticated: false };
 
-function initAuthSystem() {
-    const token = localStorage.getItem('tl_auth_token');
-    const cachedUser = localStorage.getItem('tl_auth_user');
-
-    if (token) {
-        try {
-            if (cachedUser) state.currentUser = JSON.parse(cachedUser);
-        } catch(e) {}
-        fetchCurrentUser(token);
-    } else {
-        fetchGuestQuota();
+function getGuestId() {
+    let gid = localStorage.getItem('tl_guest_id');
+    if (!gid) {
+        gid = 'g_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('tl_guest_id', gid);
     }
-    setupOtpInputs();
+    return gid;
 }
 
-async function fetchGuestQuota() {
-    try {
-        const r = await fetch('/api/auth/me');
-        if (r.ok) {
-            const d = await r.json();
-            if (d.user) {
-                state.currentUser = d.user;
-                state.quota = d.quota;
-            } else if (d.quota) {
-                state.quota = d.quota;
-            }
-        }
-    } catch(e) {}
-    renderAuthArea();
+function getAuthHeaders() {
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-Guest-ID': getGuestId()
+    };
+    const token = localStorage.getItem('tl_auth_token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
 }
 
-async function fetchCurrentUser(token) {
+async function checkAuthStatus() {
     try {
-        const r = await fetch('/api/auth/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (r.ok) {
-            const d = await r.json();
-            state.currentUser = d.user;
-            state.quota = d.quota || { limit: 50, remaining: 50, used: 0, is_authenticated: true };
-            localStorage.setItem('tl_auth_user', JSON.stringify(d.user));
-        } else {
-            localStorage.removeItem('tl_auth_token');
-            localStorage.removeItem('tl_auth_user');
-            state.currentUser = null;
-            state.quota = { limit: 5, used: 0, remaining: 5, is_authenticated: false };
+        const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            currentQuota = {
+                limit: data.limit || 25,
+                used: data.scans_used || 0,
+                remaining: data.remaining !== undefined ? data.remaining : Math.max(0, (data.limit || 25) - (data.scans_used || 0)),
+                is_authenticated: data.is_authenticated
+            };
+            currentUser = data.user || null;
+            renderAuthArea();
         }
-    } catch(e) {}
-    renderAuthArea();
+    } catch(e) {
+        console.warn('Auth check skipped:', e);
+    }
 }
 
 function renderAuthArea() {
     const area = document.getElementById('auth-area');
     if (!area) return;
 
-    const q = state.quota || { limit: 5, remaining: 5, used: 0, is_authenticated: false };
-    const isAuth = !!state.currentUser && q.is_authenticated;
-    const isAdmin = isAuth && (state.currentUser.role === 'admin' || state.currentUser.is_admin || q.unlimited || q.limit >= 999999);
-    const isExhausted = !isAdmin && q.remaining <= 0;
-
-    let pillHtml = '';
-    if (isAdmin) {
-        pillHtml = `
-            <div id="quota-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-black transition-all shadow-sm">
-                <span class="text-sm">👑</span>
-                <span class="font-mono text-xs tracking-wider">UNLIMITED</span>
-                <span class="text-[9px] uppercase tracking-wider text-amber-300 font-bold hidden sm:inline">Admin</span>
-            </div>
-            <div class="relative group">
-                <button class="flex items-center gap-2 p-1 pl-2.5 pr-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all text-xs font-bold text-amber-300">
-                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center text-[10px] font-black uppercase shadow-sm">
-                        👑
-                    </div>
-                    <span class="truncate max-w-[110px] text-xs font-mono hidden md:inline">${state.currentUser.email ? state.currentUser.email.split('@')[0] : 'Admin'}</span>
-                    <i class="ph-bold ph-caret-down text-amber-400 text-xs"></i>
-                </button>
-                <div class="absolute right-0 mt-2 w-56 bg-slate-900 border border-amber-500/30 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50 animate-in fade-in duration-150 text-white">
-                    <div class="px-3 py-2 border-b border-white/10 mb-1">
-                        <p class="text-[9px] text-amber-400 font-black uppercase tracking-wider flex items-center gap-1">
-                            👑 Platform Administrator
-                        </p>
-                        <p class="text-xs font-bold text-white truncate mt-0.5">${state.currentUser.email}</p>
-                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">Quota: Unlimited Scans</p>
-                    </div>
-                    <button onclick="openAdminModal()" class="w-full text-left px-3 py-2 text-xs font-bold text-amber-400 hover:bg-amber-500/15 rounded-xl transition-all flex items-center gap-2">
-                        <i class="ph-bold ph-sliders text-sm"></i> Admin Control Center
-                    </button>
-                    <button onclick="handleLogout()" class="w-full text-left px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-2">
-                        <i class="ph-bold ph-sign-out text-sm"></i> Sign Out
-                    </button>
+    if (currentUser && currentQuota.is_authenticated) {
+        const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
+        const displayName = currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
+        area.innerHTML = `
+            <div class="flex items-center gap-2">
+                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tl-purple/10 border border-tl-purple/20 text-tl-purple text-xs font-bold" title="Remaining Daily Scans">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="font-mono">${currentQuota.remaining}/${currentQuota.limit}</span>
+                    <span class="text-[10px] uppercase text-ink-500 hidden md:inline">Scans</span>
                 </div>
-            </div>`;
-    } else if (isAuth) {
-        pillHtml = `
-            <div id="quota-pill" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-tl-purple text-xs font-bold transition-all shadow-sm">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="font-mono text-sm">${q.remaining}/${q.limit}</span>
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Daily</span>
-            </div>
-            <div class="relative group">
-                <button class="flex items-center gap-2 p-1 pl-2.5 pr-3 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 transition-all text-xs font-bold text-slate-800 dark:text-white">
-                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-tl-purple to-tl-blue text-white flex items-center justify-center text-[10px] font-black uppercase shadow-sm">
-                        ${state.currentUser.email ? state.currentUser.email[0].toUpperCase() : 'U'}
-                    </div>
-                    <span class="truncate max-w-[110px] text-xs font-mono hidden md:inline">${state.currentUser.email.split('@')[0]}</span>
-                    <i class="ph-bold ph-caret-down text-slate-400 text-xs"></i>
-                </button>
-                <div class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50 animate-in fade-in duration-150">
-                    <div class="px-3 py-2 border-b border-slate-100 dark:border-white/5 mb-1">
-                        <p class="text-[9px] text-emerald-400 font-black uppercase tracking-wider flex items-center gap-1">
-                            <i class="ph-fill ph-check-circle"></i> Verified Researcher (50/Day)
-                        </p>
-                        <p class="text-xs font-bold text-slate-900 dark:text-white truncate mt-0.5">${state.currentUser.email}</p>
-                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">Resets every 24 hours</p>
-                    </div>
-                    <button onclick="handleLogout()" class="w-full text-left px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-2">
-                        <i class="ph-bold ph-sign-out text-sm"></i> Sign Out
+                <div class="relative group">
+                    <button class="flex items-center gap-2 p-1.5 pl-2.5 pr-3 rounded-xl bg-paper-100 dark:bg-white/10 hover:bg-paper-200 dark:hover:bg-white/15 transition-all text-xs font-bold">
+                        <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-tl-purple to-tl-blue text-white flex items-center justify-center text-[10px] font-black uppercase">
+                            ${initial}
+                        </div>
+                        <span class="truncate max-w-[100px] text-xs font-mono hidden md:inline text-ink-900 dark:text-white">${displayName}</span>
+                        <i class="ph-bold ph-caret-down text-ink-500 text-xs"></i>
                     </button>
+                    <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50">
+                        <div class="px-3 py-2 border-b border-paper-200 dark:border-white/5 mb-1">
+                            <p class="text-xs font-bold truncate text-ink-900 dark:text-white">${currentUser.email || displayName}</p>
+                            <p class="text-[10px] text-ink-500 uppercase tracking-wider">${currentUser.role || 'Verified Researcher'}</p>
+                        </div>
+                        <button onclick="openScanPanel('history')" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 flex items-center gap-2 text-ink-700 dark:text-ink-300">
+                            <i class="ph-bold ph-clock-counter-clockwise"></i> Scan History
+                        </button>
+                        <button onclick="handleLogout()" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 flex items-center gap-2">
+                            <i class="ph-bold ph-sign-out"></i> Sign Out
+                        </button>
+                    </div>
                 </div>
             </div>`;
     } else {
-        pillHtml = `
-            <div id="quota-pill" onclick="openAuthModal('signup')" title="Free Guest Scans (Resets every 24h). Click to unlock 50 daily scans!"
-                 class="flex items-center gap-2 px-3 py-1.5 rounded-xl ${isExhausted ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 animate-pulse' : 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'} border text-xs font-bold cursor-pointer hover:border-tl-purple hover:text-tl-purple transition-all shadow-sm">
-                <span class="w-2 h-2 rounded-full ${isExhausted ? 'bg-rose-500' : 'bg-amber-400'}"></span>
-                <span class="font-mono text-sm">${q.remaining}/${q.limit}</span>
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline">Guest (24h)</span>
-            </div>
-            <button onclick="openAuthModal('login')" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
-                <i class="ph-fill ph-user-circle text-base"></i>
-                <span>Sign In <span class="hidden md:inline font-mono text-[10px] opacity-80">(50/Day)</span></span>
-            </button>`;
-    }
-
-    area.innerHTML = `
-        <div class="flex items-center gap-2">
-            ${pillHtml}
-            <button onclick="openScanPanel('history')" class="p-2 text-ink-500 hover:text-tl-purple hover:bg-paper-100 dark:hover:bg-white/10 rounded-xl transition-all" title="Scan History">
-                <i class="ph-bold ph-clock-counter-clockwise text-lg"></i>
-            </button>
-        </div>`;
-}
-
-function updateQuotaUI(newQuota) {
-    if (!newQuota) return;
-    state.quota = newQuota;
-    renderAuthArea();
-
-    const pill = document.getElementById('quota-pill');
-    if (pill && typeof gsap !== 'undefined') {
-        gsap.fromTo(pill, { scale: 0.92 }, { scale: 1, duration: 0.4, ease: "back.out(2)" });
+        area.innerHTML = `
+            <div class="flex items-center gap-2">
+                <button onclick="openScanPanel('text')" class="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
+                    <i class="ph-fill ph-shield-check text-sm"></i> AI Scanner
+                </button>
+                <button onclick="openAuthModal('login')" class="flex items-center gap-1.5 text-xs font-bold text-ink-900 dark:text-white bg-paper-100 dark:bg-white/10 hover:bg-paper-200 dark:hover:bg-white/15 px-3 py-2 rounded-xl transition-all">
+                    <i class="ph-bold ph-user text-sm text-tl-purple"></i> Sign In
+                </button>
+            </div>`;
     }
 }
 
@@ -1175,13 +811,6 @@ function openAuthModal(tab = 'login') {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     switchAuthTab(tab);
-
-    if (typeof gsap !== 'undefined') {
-        gsap.fromTo(modal.firstElementChild, 
-            { opacity: 0, scale: 0.95, y: 15 }, 
-            { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "power3.out" }
-        );
-    }
 }
 
 function closeAuthModal() {
@@ -1192,267 +821,156 @@ function closeAuthModal() {
 }
 
 function switchAuthTab(tab) {
-    const loginForm = document.getElementById('form-login');
-    const signupForm = document.getElementById('form-signup');
-    const otpForm = document.getElementById('form-otp');
+    const formLogin = document.getElementById('form-login');
+    const formSignup = document.getElementById('form-signup');
     const tabLogin = document.getElementById('tab-login');
     const tabSignup = document.getElementById('tab-signup');
-    const tabsBar = document.getElementById('auth-tabs-bar');
     const title = document.getElementById('auth-modal-title');
     const sub = document.getElementById('auth-modal-sub');
 
     if (tab === 'login') {
-        loginForm.classList.remove('hidden');
-        signupForm.classList.add('hidden');
-        otpForm.classList.add('hidden');
-        tabsBar.classList.remove('hidden');
-
-        tabLogin.className = 'flex-1 py-2 text-xs font-black rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm';
-        tabSignup.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all';
-        title.textContent = 'Welcome Back';
-        sub.textContent = 'Sign in to access your 50 deep neural scans and synchronized research history.';
-    } else if (tab === 'signup') {
-        loginForm.classList.add('hidden');
-        signupForm.classList.remove('hidden');
-        otpForm.classList.add('hidden');
-        tabsBar.classList.remove('hidden');
-
-        tabSignup.className = 'flex-1 py-2 text-xs font-black rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm';
-        tabLogin.className = 'flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all';
-        title.textContent = 'Expand to 50 Scans';
-        sub.textContent = 'Create a researcher profile to unlock 50 neural checks and cloud synchronization.';
-    } else if (tab === 'otp') {
-        loginForm.classList.add('hidden');
-        signupForm.classList.add('hidden');
-        otpForm.classList.remove('hidden');
-        tabsBar.classList.add('hidden');
-
-        title.textContent = 'Security Verification';
-        sub.textContent = 'Enter the 6-digit confirmation code dispatched to your email address.';
-    }
-}
-
-function setupOtpInputs() {
-    const inputs = document.querySelectorAll('.otp-digit');
-    inputs.forEach((input, index) => {
-        input.addEventListener('input', (e) => {
-            const val = e.target.value;
-            if (val.length === 1 && index < inputs.length - 1) {
-                inputs[index + 1].focus();
-            }
-        });
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                inputs[index - 1].focus();
-            }
-        });
-        input.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim();
-            if (/^\d{6}$/.test(pasteData)) {
-                pasteData.split('').forEach((digit, i) => {
-                    if (inputs[i]) inputs[i].value = digit;
-                });
-                inputs[inputs.length - 1].focus();
-            }
-        });
-    });
-}
-
-async function submitSignup() {
-    const email = document.getElementById('signup-email').value.trim();
-    const password = document.getElementById('signup-password').value;
-    const btn = document.getElementById('btn-signup-submit');
-
-    if (!email || !password || password.length < 6) {
-        showToast('Please provide a valid email and minimum 6-character password', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = `<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>`;
-
-    try {
-        const r = await fetch('/api/auth/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        const d = await r.json();
-        btn.disabled = false;
-        btn.innerHTML = `Dispatch Verification Code`;
-
-        if (!r.ok) {
-            showToast(d.error || 'Failed to dispatch code', 'error');
-            return;
-        }
-
-        _pendingEmail = email;
-        document.getElementById('otp-target-email').textContent = email;
-
-        const devBanner = document.getElementById('dev-otp-banner');
-        if (d.dev_otp && devBanner) {
-            document.getElementById('dev-otp-code').textContent = d.dev_otp;
-            devBanner.classList.remove('hidden');
-        } else if (devBanner) {
-            devBanner.classList.add('hidden');
-        }
-
-        switchAuthTab('otp');
-        showToast('6-digit verification code sent to your email!', 'success');
-
-        const firstOtp = document.querySelector('.otp-digit');
-        if (firstOtp) {
-            firstOtp.value = '';
-            setTimeout(() => firstOtp.focus(), 150);
-        }
-    } catch(e) {
-        btn.disabled = false;
-        btn.innerHTML = `Dispatch Verification Code`;
-        showToast('Network error while dispatching code', 'error');
-    }
-}
-
-async function submitVerifyOtp() {
-    const digits = Array.from(document.querySelectorAll('.otp-digit')).map(i => i.value).join('');
-    const btn = document.getElementById('btn-otp-submit');
-
-    if (digits.length !== 6) {
-        showToast('Please enter all 6 digits', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = `<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>`;
-
-    try {
-        const r = await fetch('/api/auth/verify-otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: _pendingEmail, otp: digits })
-        });
-        const d = await r.json();
-        btn.disabled = false;
-        btn.innerHTML = `Verify & Unlock 50 Scans`;
-
-        if (!r.ok) {
-            showToast(d.error || 'Invalid or expired code', 'error');
-            return;
-        }
-
-        localStorage.setItem('tl_auth_token', d.token);
-        localStorage.setItem('tl_auth_user', JSON.stringify(d.user));
-        state.currentUser = d.user;
-        state.quota = d.quota || { limit: 50, remaining: 50, used: 0, is_authenticated: true };
-
-        await syncGuestScansOnLogin(d.token);
-
-        renderAuthArea();
-        closeAuthModal();
-        showToast('Identity verified! Your allowance is upgraded to 50 scans.', 'success');
-    } catch(e) {
-        btn.disabled = false;
-        btn.innerHTML = `Verify & Unlock 50 Scans`;
-        showToast('Network error during verification', 'error');
+        formLogin.classList.remove('hidden');
+        formSignup.classList.add('hidden');
+        tabLogin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-paper-800 text-tl-purple shadow-sm";
+        tabSignup.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-ink-500 hover:text-ink-900 dark:hover:text-white";
+        title.textContent = "Welcome Back";
+        sub.textContent = "Sign in to access 100 daily neural scans and persistent history.";
+    } else {
+        formLogin.classList.add('hidden');
+        formSignup.classList.remove('hidden');
+        tabSignup.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-paper-800 text-tl-purple shadow-sm";
+        tabLogin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-ink-500 hover:text-ink-900 dark:hover:text-white";
+        title.textContent = "Create Account";
+        sub.textContent = "Create an account to unlock expanded neural intelligence and 100 daily scans.";
     }
 }
 
 async function submitLogin() {
     const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
+    const password = document.getElementById('login-password').value.trim();
     const btn = document.getElementById('btn-login-submit');
 
     if (!email || !password) {
-        showToast('Please enter email and password', 'error');
+        showToast("Please enter email and password.", "error");
         return;
     }
 
     btn.disabled = true;
-    btn.innerHTML = `<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>`;
+    btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Authenticating...`;
 
     try {
-        const r = await fetch('/api/auth/login', {
+        const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Guest-ID': getGuestId() },
             body: JSON.stringify({ email, password })
         });
-        const d = await r.json();
-        btn.disabled = false;
-        btn.innerHTML = `Sign In & Unlock 50 Scans`;
-
-        if (!r.ok) {
-            if (d.error && d.error.includes('verify')) {
-                _pendingEmail = email;
-                document.getElementById('otp-target-email').textContent = email;
-                switchAuthTab('otp');
-                showToast('Please enter verification OTP sent to your email', 'neutral');
-                return;
-            }
-            showToast(d.error || 'Authentication failed', 'error');
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || "Login failed.", "error");
+            btn.disabled = false;
+            btn.textContent = "Sign In & Unlock 100 Scans";
             return;
         }
 
-        localStorage.setItem('tl_auth_token', d.token);
-        localStorage.setItem('tl_auth_user', JSON.stringify(d.user));
-        state.currentUser = d.user;
-        state.quota = d.quota || { limit: 50, remaining: 50, used: 0, is_authenticated: true };
-
-        await syncGuestScansOnLogin(d.token);
-
-        renderAuthArea();
+        if (data.token) {
+            localStorage.setItem('tl_auth_token', data.token);
+        }
+        currentUser = data.user;
+        currentQuota = {
+            limit: data.user.limit || 100,
+            used: data.user.scans_used || 0,
+            remaining: data.user.remaining !== undefined ? data.user.remaining : (data.user.limit - data.user.scans_used),
+            is_authenticated: true
+        };
         closeAuthModal();
-        showToast('Welcome back! 50 scans active.', 'success');
+        renderAuthArea();
+        showToast("Welcome back! 100 deep scans unlocked.", "success");
     } catch(e) {
+        showToast("Network error. Please try again.", "error");
+    } finally {
         btn.disabled = false;
-        btn.innerHTML = `Sign In & Unlock 50 Scans`;
-        showToast('Network error during sign-in', 'error');
+        btn.textContent = "Sign In & Unlock 100 Scans";
+    }
+}
+
+async function submitSignup() {
+    const name = document.getElementById('signup-name').value.trim();
+    const email = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value.trim();
+    const btn = document.getElementById('btn-signup-submit');
+
+    if (!email || !password) {
+        showToast("Please enter email and password.", "error");
+        return;
+    }
+    if (password.length < 6) {
+        showToast("Password must be at least 6 characters.", "error");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Registering...`;
+
+    try {
+        const res = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Guest-ID': getGuestId() },
+            body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || "Signup failed.", "error");
+            btn.disabled = false;
+            btn.textContent = "Create Free Account (100 Scans)";
+            return;
+        }
+
+        if (data.token) {
+            localStorage.setItem('tl_auth_token', data.token);
+        }
+        currentUser = data.user;
+        currentQuota = {
+            limit: data.user.limit || 100,
+            used: 0,
+            remaining: 100,
+            is_authenticated: true
+        };
+        closeAuthModal();
+        renderAuthArea();
+        showToast("Account created successfully! 100 scans unlocked.", "success");
+    } catch(e) {
+        showToast("Network error. Please try again.", "error");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Create Free Account (100 Scans)";
     }
 }
 
 async function handleLogout() {
-    const token = localStorage.getItem('tl_auth_token');
     try {
-        if (token) {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-        }
+        await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
     } catch(e) {}
-
     localStorage.removeItem('tl_auth_token');
-    localStorage.removeItem('tl_auth_user');
-    state.currentUser = null;
-    state.quota = { limit: 5, used: 0, remaining: 5, is_authenticated: false };
+    currentUser = null;
+    currentQuota = { limit: 25, used: 0, remaining: 25, is_authenticated: false };
     renderAuthArea();
-    showToast('Signed out. Reset to 5 free guest scans.', 'neutral');
+    showToast("Signed out successfully.", "info");
 }
 
-async function syncGuestScansOnLogin(token) {
-    const guestScansRaw = localStorage.getItem('tl_guest_scans');
-    if (!guestScansRaw) return;
-    try {
-        const guestScans = JSON.parse(guestScansRaw);
-        if (Array.isArray(guestScans) && guestScans.length > 0) {
-            await fetch('/api/auth/sync-history', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ scans: guestScans })
-            });
-            localStorage.removeItem('tl_guest_scans');
-        }
-    } catch(e) {}
+function toggleMobileMenu() {
+    const drawer = document.getElementById('mobile-drawer');
+    if (!drawer) return;
+    drawer.classList.toggle('hidden');
 }
 
-function saveGuestScanToLocal(scanRecord) {
-    try {
-        const existing = JSON.parse(localStorage.getItem('tl_guest_scans') || '[]');
-        existing.unshift(scanRecord);
-        localStorage.setItem('tl_guest_scans', JSON.stringify(existing.slice(0, 25)));
-    } catch(e) {}
+function renderMobileNav() {
+    const nav = document.getElementById('mobile-nav-links');
+    if (!nav) return;
+    nav.innerHTML = TABS.map(t => `
+        <button onclick="nav('${t.id}'); toggleMobileMenu();" class="w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-ink-700 dark:text-ink-300 hover:bg-paper-100 dark:hover:bg-white/5 transition-all">
+            <i class="ph-bold ${t.icon} text-base text-tl-purple"></i> ${t.label}
+        </button>
+    `).join('');
 }
 
 // =====================================================================
@@ -1460,51 +978,18 @@ function saveGuestScanToLocal(scanRecord) {
 // =====================================================================
 function renderNavTabs() {
     const nav = document.getElementById('nav-tabs');
-    const navMobile = document.getElementById('nav-tabs-mobile');
-    const html = TABS.map(t => `
+    nav.innerHTML = TABS.map(t => `
         <button onclick="nav('${t.id}')" class="nav-item flex items-center gap-1.5 text-ink-700 dark:text-ink-500 py-1 transition-all" id="nav-${t.id}">
             <i class="ph-bold ${t.icon} text-sm"></i> ${t.label}
         </button>`).join('');
-    if (nav) nav.innerHTML = html;
-    // Mobile nav — vertical list layout
-    if (navMobile) {
-        navMobile.innerHTML = TABS.map(t => `
-            <button onclick="nav('${t.id}');toggleMobileMenu(true)" class="nav-item-mobile flex items-center gap-3 py-3 border-b border-paper-200 dark:border-white/5 last:border-0 text-ink-700 dark:text-ink-100 text-sm font-bold" id="nav-mob-${t.id}">
-                <i class="ph-bold ${t.icon} text-lg text-tl-purple"></i> ${t.label}
-            </button>`).join('');
-    }
-}
-
-let _mobileMenuOpen = false;
-function toggleMobileMenu(forceClose) {
-    const drawer = document.getElementById('mobile-menu-drawer');
-    const icon = document.getElementById('mobile-menu-icon');
-    if (!drawer) return;
-    if (forceClose === true) _mobileMenuOpen = false;
-    else _mobileMenuOpen = !_mobileMenuOpen;
-    if (_mobileMenuOpen) {
-        drawer.classList.remove('menu-closed');
-        drawer.classList.add('menu-open');
-        if (icon) icon.className = 'ph-bold ph-x text-xl';
-    } else {
-        drawer.classList.add('menu-closed');
-        drawer.classList.remove('menu-open');
-        if (icon) icon.className = 'ph-bold ph-list text-xl';
-    }
+    renderMobileNav();
 }
 
 function nav(page) {
     state.page = page;
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item-mobile').forEach(el => el.classList.remove('text-tl-purple'));
     const activeNav = document.getElementById(`nav-${page}`);
     if (activeNav) activeNav.classList.add('active');
-    const activeMob = document.getElementById(`nav-mob-${page}`);
-    if (activeMob) activeMob.classList.add('text-tl-purple');
-    // Update mobile active label
-    const lbl = document.getElementById('mobile-active-tab');
-    const tab = TABS.find(t => t.id === page);
-    if (lbl && tab) lbl.textContent = tab.label;
     window.scrollTo({top:0, behavior:'smooth'});
     if (page === 'bookmarks') renderBookmarks();
     else fetchNews(page);
@@ -1513,120 +998,30 @@ function nav(page) {
 // =====================================================================
 // NEWS  (with smart retry for Render cold-start)
 // =====================================================================
-// =====================================================================
-// NEWS (Dynamic real-time updates & Featured Hero News Banner)
-// =====================================================================
-function renderFeaturedHeroBanner(a) {
-    if (!a) return '';
-    const safeTitle = escapeHtml(a.title || '');
-    const safeDesc = escapeHtml(a.description || '');
-    const safeSource = escapeHtml(a.source?.name || 'Verified Wire');
-    const safeUrl = encodeURI(a.url || '#');
-    const accuracy = a.accuracy || 96;
-    const scoreColor = accuracy >= 90 ? 'emerald' : accuracy >= 75 ? 'amber' : 'rose';
-    const bgImg = a.urlToImage || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200';
-    const encodedTitle = encodeURIComponent(a.title || '');
-
-    return `
-        <div class="col-span-full relative overflow-hidden rounded-3xl border border-paper-200 dark:border-white/10 shadow-2xl bg-gradient-to-br from-white via-slate-50 to-purple-50/40 dark:from-paper-900 dark:via-slate-900 dark:to-purple-950/20 group transition-all duration-300 mb-2">
-            <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[380px]">
-                <!-- Left: Headline & Verification Intel -->
-                <div class="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between relative z-10">
-                    <div>
-                        <!-- Live Breaking Story Pill -->
-                        <div class="flex items-center gap-2 mb-4 flex-wrap">
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-500 text-white shadow-md shadow-rose-500/20">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                                Top Story
-                            </span>
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/10">
-                                ${safeSource}
-                            </span>
-                            <span class="text-[11px] font-mono text-slate-500">
-                                ${formatDate(a.publishedAt) || 'Updated Just Now'}
-                            </span>
-                        </div>
-
-                        <!-- Grand Headline -->
-                        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="block group/title">
-                            <h2 class="text-2xl sm:text-3xl lg:text-4xl font-serif font-black tracking-tight text-ink-900 dark:text-white leading-[1.2] group-hover/title:text-tl-purple transition-colors">
-                                ${safeTitle}
-                            </h2>
-                        </a>
-
-                        <!-- Descriptive Summary -->
-                        <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 line-clamp-3 leading-relaxed font-sans">
-                            ${safeDesc}
-                        </p>
-                    </div>
-
-                    <!-- Bottom Bar: Accuracy Score & Action Buttons -->
-                    <div class="mt-6 pt-5 border-t border-slate-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-2xl bg-${scoreColor}-500/10 border border-${scoreColor}-500/30 flex items-center justify-center shrink-0">
-                                <span class="text-xs font-mono font-black text-${scoreColor}-500">${accuracy}%</span>
-                            </div>
-                            <div>
-                                <div class="text-[11px] font-black uppercase tracking-wider text-${scoreColor}-500">AI Grounding Score</div>
-                                <div class="text-[10px] text-slate-400 font-mono">Consensus Verified by Deep Learning</div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2.5 w-full sm:w-auto">
-                            <button onclick="quickVerify('${encodedTitle}')"
-                                    class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-tl-purple hover:bg-purple-800 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-purple-500/20 flex items-center justify-center gap-1.5 active:scale-95">
-                                <i class="ph-bold ph-lightning"></i> Instant Verify
-                            </button>
-                            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
-                               class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-800 dark:text-white font-bold text-xs transition-all flex items-center justify-center gap-1">
-                                <span>Source</span>
-                                <i class="ph-bold ph-arrow-up-right"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right: High Resolution Hero Visual -->
-                <div class="lg:col-span-5 relative overflow-hidden bg-slate-900 min-h-[240px] lg:min-h-full">
-                    <img src="${bgImg}" alt="${safeTitle}"
-                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
-                         onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1000'">
-                    <div class="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-white via-transparent to-transparent dark:from-paper-900 dark:via-transparent dark:to-transparent opacity-90 lg:opacity-70"></div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-async function fetchNews(cat, retryCount = 0, isSilent = false) {
+async function fetchNews(cat, retryCount = 0) {
     const app = document.getElementById('app');
     const cacheKey = 'tl_cache_news_' + (cat || 'home');
 
     // 1. Instant Stale-While-Revalidate: Show cached content immediately
-    if (!isSilent) {
-        const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
-        if (cached) {
-            try {
-                const cachedArticles = JSON.parse(cached);
-                if (Array.isArray(cachedArticles) && cachedArticles.length > 0) {
-                    state.articles = cachedArticles;
-                    const hero = renderFeaturedHeroBanner(state.articles[0]);
-                    const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
-                    app.innerHTML = `
-                        <div class="col-span-full flex items-end justify-between mb-2">
-                            <div class="border-l-4 border-tl-purple pl-4">
-                                <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
-                                <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
-                            </div>
+    const cached = localStorage.getItem(cacheKey) || localStorage.getItem('tl_cache_news_home');
+    if (cached) {
+        try {
+            const cachedArticles = JSON.parse(cached);
+            if (Array.isArray(cachedArticles) && cachedArticles.length > 0) {
+                state.articles = cachedArticles;
+                app.innerHTML = `
+                    <div class="col-span-full flex items-end justify-between mb-2">
+                        <div class="border-l-4 border-tl-purple pl-4">
+                            <h2 class="text-3xl font-serif font-black text-ink-900 dark:text-white capitalize tracking-tight">${cat}</h2>
+                            <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
                         </div>
-                        ${hero}
-                        ${grid}`;
-                    renderSidebars();
-                }
-            } catch(e) {}
-        } else {
-            app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
-        }
+                    </div>
+                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
+                renderSidebars();
+            }
+        } catch(e) {}
+    } else {
+        app.innerHTML = `<div class="col-span-full py-32 text-center"><div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin"></div><p class="text-xs text-ink-500 mt-3 font-mono">Fetching verified reports...</p></div>`;
     }
 
     let url = cat === 'local'
@@ -1642,8 +1037,10 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
             state.articles = d.articles;
             localStorage.setItem(cacheKey, JSON.stringify(d.articles));
             localStorage.setItem('tl_cache_news_home', JSON.stringify(d.articles));
-        } else if (retryCount < 3 && !isSilent) {
-            if (retryCount === 0) {
+        } else if (retryCount < 3) {
+            // Backend cold-starting: show wake-up message and retry
+            const isFirstRetry = retryCount === 0;
+            if (isFirstRetry) {
                 app.innerHTML = `<div class="col-span-full py-32 text-center">
                     <div class="inline-block w-10 h-10 border-4 border-paper-200 border-t-tl-purple rounded-full animate-spin mb-4"></div>
                     <p class="text-sm font-bold text-tl-purple mt-3">AI Engine warming up...</p>
@@ -1657,9 +1054,6 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
             if (fallbackCached) state.articles = JSON.parse(fallbackCached);
         }
 
-        const hero = state.articles.length > 0 ? renderFeaturedHeroBanner(state.articles[0]) : '';
-        const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
-
         app.innerHTML = `
             <div class="col-span-full flex items-end justify-between mb-2">
                 <div class="border-l-4 border-tl-purple pl-4">
@@ -1668,11 +1062,10 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
                 </div>
                 <span class="text-[10px] font-mono text-ink-500 uppercase">${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
             </div>
-            ${hero}
-            ${grid}
+            ${state.articles.map((a,i) => renderCard(a,i)).join('')}
             ${state.articles.length === 0 ? '<div class="col-span-full py-32 text-center text-ink-500 font-serif italic text-lg">No reports found in current archives.</div>' : ''}`;
     } catch(e) {
-        if (retryCount < 3 && !isSilent) {
+        if (retryCount < 3) {
             setTimeout(() => fetchNews(cat, retryCount + 1), 4000);
             return;
         }
@@ -1680,8 +1073,6 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
             const fallbackCached = localStorage.getItem('tl_cache_news_home') || localStorage.getItem(cacheKey);
             if (fallbackCached) {
                 state.articles = JSON.parse(fallbackCached);
-                const hero = renderFeaturedHeroBanner(state.articles[0]);
-                const grid = state.articles.slice(1).map((a,i) => renderCard(a,i)).join('');
                 app.innerHTML = `
                     <div class="col-span-full flex items-end justify-between mb-2">
                         <div class="border-l-4 border-tl-purple pl-4">
@@ -1689,8 +1080,7 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
                             <p class="text-xs text-ink-500 font-mono mt-0.5">${state.articles.length} verified reports</p>
                         </div>
                     </div>
-                    ${hero}
-                    ${grid}`;
+                    ${state.articles.map((a,i) => renderCard(a,i)).join('')}`;
             } else {
                 app.innerHTML = `<div class="col-span-full py-32 text-center">
                     <i class="ph-bold ph-wifi-slash text-4xl text-paper-300 dark:text-white/20 mb-4 block"></i>
@@ -1701,15 +1091,6 @@ async function fetchNews(cat, retryCount = 0, isSilent = false) {
         }
     }
     renderSidebars();
-}
-
-// Background auto-refresh for real-time news updates
-if (!window._newsAutoUpdateTimer) {
-    window._newsAutoUpdateTimer = setInterval(() => {
-        if (!document.hidden && (!state.page || state.page === 'home' || ['india','technology','business','sports','world'].includes(state.page))) {
-            fetchNews(state.page || 'home', 0, true);
-        }
-    }, 180000);
 }
 
 function renderCard(a, i) {
@@ -2045,11 +1426,6 @@ function renderMarketTable() {
 // =====================================================================
 // CRICKET
 // =====================================================================
-// =====================================================================
-// CRICKET & LIVE MATCH HOVER INTELLIGENCE (TasteSkill / 21st.dev style)
-// =====================================================================
-window._cricketMatches = [];
-
 function formatTeamScore(ms, teamKey) {
     if (!ms || !ms[teamKey]) return '';
     const t = ms[teamKey];
@@ -2062,149 +1438,21 @@ function formatTeamScore(ms, teamKey) {
     return `${r}/${w}${ov}`;
 }
 
-function showCricketPopover(e, idx) {
-    const m = (window._cricketMatches && window._cricketMatches[idx]) || (window.liveCricketMatches && window.liveCricketMatches[idx]) || null;
-    if (!m) return;
-    const pop = document.getElementById('cricket-popover');
-    if (!pop) return;
-
-    const mi = m.matchInfo || {};
-    const d = m.liveDetails || {};
-
-    const series = d.series || mi.seriesName || 'ICC International Match';
-    const isLive = d.isLive || d.is_live || mi.state === 'In Progress' || mi.state === 'Stumps';
-
-    // Badge & Series
-    const badge = document.getElementById('cpop-badge');
-    badge.textContent = isLive ? 'LIVE BALL-BY-BALL' : (mi.state || 'MATCH DETAILS');
-    badge.className = isLive 
-        ? 'text-[10px] font-black uppercase tracking-wider text-emerald-400' 
-        : 'text-[10px] font-black uppercase tracking-wider text-amber-400';
-
-    document.getElementById('cpop-series').textContent = series;
-
-    // Batters (Who made runs)
-    const battersContainer = document.getElementById('cpop-batters');
-    const batters = d.currentBatters || d.batters || [];
-    if (batters.length > 0) {
-        battersContainer.innerHTML = batters.map(b => {
-            const onStrike = (b.onStrike !== undefined ? b.onStrike : b.on_strike);
-            const srVal = b.sr !== undefined ? b.sr : (b.strike_rate || '0.0');
-            return `
-                <div class="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg ${onStrike ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}">
-                    <span class="font-bold flex items-center gap-1.5 ${onStrike ? 'text-emerald-300' : 'text-slate-200'}">
-                        ${onStrike ? '<span class="text-emerald-400 font-mono font-black text-sm leading-none animate-pulse">*</span>' : '<span class="opacity-0 font-mono text-sm leading-none">*</span>'}
-                        ${escapeHtml(b.name)}
-                    </span>
-                    <span class="font-mono text-slate-200 text-[11px]">
-                        <strong class="text-white text-xs">${b.runs}</strong> (${b.balls}) • ${b.fours || 0}×4 • ${b.sixes || 0}×6 • <span class="text-emerald-400 text-[10px] font-semibold">${srVal} SR</span>
-                    </span>
-                </div>
-            `;
-        }).join('');
-    } else {
-        battersContainer.innerHTML = `<span class="text-slate-400 text-[11px] italic">Innings intermission or lineup refreshing...</span>`;
-    }
-
-    // Current Bowler (Who took wickets)
-    const bowlerContainer = document.getElementById('cpop-bowler');
-    const bowler = d.currentBowler || d.bowler;
-    if (bowler && bowler.name) {
-        const econVal = bowler.econ !== undefined ? bowler.econ : (bowler.economy || '0.0');
-        bowlerContainer.innerHTML = `
-            <div class="flex items-center justify-between w-full py-0.5">
-                <span class="text-slate-200 font-bold flex items-center gap-1">
-                    <span class="text-rose-400">🎯</span> ${escapeHtml(bowler.name)}
-                </span>
-                <span class="font-mono text-slate-300 text-[11px]">
-                    ${bowler.overs} ov · ${bowler.maidens || 0}m · ${bowler.runs}r · <strong class="text-rose-400 text-xs">${bowler.wickets}w</strong>
-                    <span class="text-slate-400 text-[10px] ml-1">(${econVal} econ)</span>
-                </span>
-            </div>
-        `;
-    } else {
-        bowlerContainer.innerHTML = `<span class="text-slate-400 text-[11px] italic">Bowler rotation underway</span>`;
-    }
-
-    // Recent Deliveries (Over balls)
-    const ballsContainer = document.getElementById('cpop-balls');
-    const balls = d.recentBalls || d.recent_balls || ['0', '1', '2'];
-    ballsContainer.innerHTML = balls.map(b => {
-        let pillClass = 'bg-white/10 text-slate-300 border-white/10';
-        if (b === 'W') pillClass = 'bg-rose-500 text-white font-black border-rose-400 shadow-sm shadow-rose-500/50 animate-bounce';
-        else if (b === '4') pillClass = 'bg-purple-600 text-white font-black border-purple-400 shadow-sm shadow-purple-500/50';
-        else if (b === '6') pillClass = 'bg-emerald-500 text-white font-black border-emerald-300 shadow-sm shadow-emerald-500/50';
-        else if (b === '•' || b === '0') pillClass = 'bg-white/5 text-slate-500 border-white/5';
-        else pillClass = 'bg-blue-600/30 text-cyan-200 border-cyan-400/30 font-bold';
-
-        return `<span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono border ${pillClass}">${b}</span>`;
-    }).join('');
-
-    // Partnership, Last Wicket & Rates
-    document.getElementById('cpop-partnership').textContent = d.partnership || '-';
-    document.getElementById('cpop-last-wicket').textContent = d.lastWicket || d.last_wicket || '-';
-    document.getElementById('cpop-crr').textContent = `CRR: ${d.crr || '7.5'}`;
-    document.getElementById('cpop-rrr').textContent = d.rrr ? `RRR: ${d.rrr}` : '';
-
-    pop.classList.remove('hidden');
-    positionCricketPopover(e);
-    requestAnimationFrame(() => {
-        pop.style.opacity = '1';
-        pop.style.transform = 'translateY(0) scale(1)';
-    });
-}
-
-function positionCricketPopover(e) {
-    const pop = document.getElementById('cricket-popover');
-    if (!pop) return;
-
-    const target = e.currentTarget || e.target.closest('.cricket-card-item');
-    if (!target) return;
-
-    const rect = target.getBoundingClientRect();
-    const popWidth = 380;
-    let left = rect.left;
-    let top = rect.bottom + 8;
-
-    if (left + popWidth > window.innerWidth - 12) {
-        left = window.innerWidth - popWidth - 12;
-    }
-    if (left < 12) left = 12;
-
-    pop.style.left = `${left}px`;
-    pop.style.top = `${top}px`;
-}
-
-function hideCricketPopover() {
-    const pop = document.getElementById('cricket-popover');
-    if (!pop) return;
-    pop.style.opacity = '0';
-    pop.style.transform = 'translateY(6px) scale(0.97)';
-    setTimeout(() => {
-        if (pop.style.opacity === '0') pop.classList.add('hidden');
-    }, 150);
-}
-
 function renderCricketCards(d) {
     const hub = document.getElementById('cricket-hub');
     const container = document.getElementById('cricket-container');
     if (!hub || !container) return;
     const matches = d?.typeMatches || [];
-    window._cricketMatches = [];
     let cards = '';
-    let matchIdx = 0;
-
     for (const tm of matches) {
         for (const sm of tm.seriesMatches || []) {
-            for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 8)) {
+            for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 6)) {
                 const mi = m.matchInfo;
                 if (!mi) continue;
                 const rawT1 = mi.team1?.teamName || '';
                 const rawT2 = mi.team2?.teamName || '';
+                // Filter out dummy teams or placeholder matches
                 if (!rawT1 || !rawT2 || rawT1 === 'Team A' || rawT2 === 'Team B') continue;
-
-                window._cricketMatches.push(m);
-                const currentIdx = matchIdx++;
 
                 const t1 = mi.team1?.teamSName || (rawT1.length <= 4 ? rawT1 : rawT1.slice(0, 3).toUpperCase());
                 const t2 = mi.team2?.teamSName || (rawT2.length <= 4 ? rawT2 : rawT2.slice(0, 3).toUpperCase());
@@ -2213,105 +1461,44 @@ function renderCricketCards(d) {
                 const s2 = formatTeamScore(m.matchScore, 'team2Score');
 
                 const stateStr = mi.state || '';
-                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete' && stateStr !== 'Finished');
+                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
                 const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
-                const badgeText = isLive ? 'LIVE' : (isComplete ? 'TODAY' : stateStr || 'UPCOMING');
+                const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
                 const statusNote = mi.status || stateStr;
 
-                // Detect Popular Cricket Format: IPL T20, WPL T20, ODI, T20I, TEST
-                let formatLabel = (mi.matchFormat || '').toUpperCase();
-                const descUpper = ((mi.matchDesc || '') + ' ' + (mi.seriesName || '') + ' ' + (m.series || '')).toUpperCase();
-                if (descUpper.includes('IPL') || descUpper.includes('INDIAN PREMIER LEAGUE')) {
-                    formatLabel = 'IPL T20';
-                } else if (descUpper.includes('WPL') || descUpper.includes('WOMEN\'S PREMIER LEAGUE')) {
-                    formatLabel = 'WPL T20';
-                } else if (descUpper.includes('ODI')) {
-                    formatLabel = 'ODI';
-                } else if (descUpper.includes('TEST')) {
-                    formatLabel = 'TEST';
-                } else if (descUpper.includes('T20I') || descUpper.includes('T20')) {
-                    formatLabel = 'T20I';
-                }
-                if (!formatLabel) formatLabel = 'CRICKET';
-
-                // Micro player-bowler indicators directly on the card
-                const ld = m.liveDetails || {};
-                const cardBatters = ld.currentBatters || ld.batters || [];
-                const cardBowler = ld.currentBowler || ld.bowler || {};
-                let batBrief = '';
-                if (cardBatters.length > 0) {
-                    const onStrike = cardBatters.find(b => (b.onStrike !== undefined ? b.onStrike : b.on_strike)) || cardBatters[0];
-                    batBrief = `${onStrike.name.split(' ').pop()} ${onStrike.runs}* (${onStrike.balls})`;
-                }
-                let bowlBrief = '';
-                if (cardBowler && cardBowler.name) {
-                    bowlBrief = `${cardBowler.name.split(' ').pop()} ${cardBowler.wickets}/${cardBowler.runs}`;
-                }
-
                 cards += `
-                    <div class="cricket-card-item flex flex-col justify-between shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-xl hover:border-tl-purple/60 transition-all cursor-pointer min-w-[280px] relative group"
-                         onclick="openCricketScorecardModal(${currentIdx})"
-                         onmouseenter="showCricketPopover(event, ${currentIdx})"
-                         onmouseleave="hideCricketPopover()"
-                         onmousemove="positionCricketPopover(event)">
-                        
-                        <!-- Top format and match type bar -->
-                        <div class="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-100 dark:border-white/5">
-                            <span class="text-[9px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${formatLabel}</span>
-                            <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400 truncate max-w-[110px]" title="${mi.matchDesc || mi.seriesName || ''}">${mi.matchDesc || mi.seriesName || ''}</span>
-                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red flex items-center justify-end gap-1' : 'text-slate-500'}">
-                                ${isLive ? '<span class="w-1.5 h-1.5 rounded-full bg-tl-red animate-pulse"></span>' : ''}
-                                ${badgeText}
+                    <div class="flex items-center gap-4 shrink-0 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 px-4 py-2.5 rounded-2xl hover:shadow-md transition-all cursor-pointer min-w-[240px]">
+                        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
+                                    <span class="truncate">${t1}</span>
+                                </div>
+                                <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
+                                    <span class="truncate">${t2}</span>
+                                </div>
+                                <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
                             </div>
                         </div>
-
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="flex flex-col gap-1.5 flex-1 min-w-0">
-                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                    <div class="flex items-center gap-1.5 truncate">
-                                        <div class="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[9px] font-black text-tl-blue shrink-0">${t1[0]}</div>
-                                        <span class="truncate">${t1}</span>
-                                    </div>
-                                    <span class="font-mono font-black text-xs shrink-0">${s1 || '-'}</span>
-                                </div>
-                                <div class="flex items-center justify-between text-xs font-black dark:text-white gap-2">
-                                    <div class="flex items-center gap-1.5 truncate">
-                                        <div class="w-5 h-5 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[9px] font-black text-tl-red shrink-0">${t2[0]}</div>
-                                        <span class="truncate">${t2}</span>
-                                    </div>
-                                    <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
-                                </div>
-                            </div>
-                            <div class="ml-2 text-right shrink-0 max-w-[105px]">
-                                <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
-                            </div>
-                        </div>
-
-                        <!-- Micro player stats on card: who made runs & who took wicket -->
-                        <div class="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] font-mono">
-                            <span class="truncate max-w-[135px] font-bold text-slate-700 dark:text-cyan-300" title="Active Batter: ${batBrief}">🏏 ${batBrief || 'Batting Lineup'}</span>
-                            <span class="truncate max-w-[110px] text-right font-black text-rose-600 dark:text-rose-400" title="Current Bowler: ${bowlBrief}">🎯 ${bowlBrief || 'Bowling Figures'}</span>
+                        <div class="ml-2 text-right shrink-0 max-w-[100px]">
+                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red animate-pulse' : 'text-ink-500'}">${badgeText}</div>
+                            <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
                         </div>
                     </div>`;
             }
         }
     }
 
-    // Synchronize both global references for popover and modal
-    window.liveCricketMatches = window._cricketMatches;
-
     if (cards) {
-        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0 flex items-center gap-1"><span>🏏</span> <span class="tracking-wider">MATCH CENTER</span></span>` + cards;
+        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>` + cards;
         container.classList.remove('hidden');
     } else {
-        // No matches today — show friendly empty state
-        hub.innerHTML = `
-            <span class="text-xs text-ink-500 font-bold shrink-0 flex items-center gap-1">🏏 MATCH CENTER</span>
-            <div class="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 text-xs text-ink-500 dark:text-slate-400">
-                <i class="ph-bold ph-calendar-x text-base text-slate-400"></i>
-                No matches scheduled for today — check back later!
-            </div>`;
-        container.classList.remove('hidden');
+        hub.innerHTML = '';
+        container.classList.add('hidden');
     }
 }
 
@@ -2565,74 +1752,43 @@ function renderScanAnimation(container, title, subtitle) {
 async function runTextScan() {
     const text = document.getElementById('scan-text-input').value.trim();
     if (!text || text.length < 10) { showToast('Please enter at least 10 characters', 'error'); return; }
-
-    // Quota pre-check: if remaining is 0, prompt auth modal
-    if (state.quota && state.quota.remaining <= 0) {
-        showToast('Free scan limit reached. Sign in to unlock 50 scans!', 'error');
-        openAuthModal(state.currentUser ? 'login' : 'signup');
-        return;
-    }
-
     const result = document.getElementById('text-scan-result');
     renderScanAnimation(result, 'Deep Learning & NLP Verification Active', 'Analyzing text sequence & cross-checking live news databases...');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-
-    const headers = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem('tl_auth_token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    let guestId = localStorage.getItem('tl_guest_id');
-    if (!guestId) {
-        guestId = 'gid_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now().toString(36);
-        localStorage.setItem('tl_guest_id', guestId);
-    }
-    headers['X-Guest-ID'] = guestId;
+    const timeout = setTimeout(() => controller.abort(), 45000); // Generous 45s buffer for Render cold instances
 
     try {
         const r = await fetch('/api/ai-scan', {
             method: 'POST',
-            headers: headers,
+            headers: getAuthHeaders(),
             body: JSON.stringify({text}),
             signal: controller.signal
         });
         clearTimeout(timeout);
-
         if (!r.ok) {
             let errMsg = 'Analysis failed.';
-            try { 
-                const ed = await r.json(); 
-                errMsg = ed.message || ed.error || errMsg;
-                if (r.status === 403) {
-                    showToast(errMsg, 'error');
-                    openAuthModal('signup');
-                }
-            } catch(e) {}
+            try { const ed = await r.json(); errMsg = ed.error || errMsg; } catch(e) {}
+            if (r.status === 429) {
+                openAuthModal('login');
+                showToast(errMsg || 'Daily scan quota reached. Please sign in to get 100 deep scans.', 'warning');
+            }
             result.innerHTML = `<div class="p-5 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-tl-red/30">
                 <p class="text-tl-red font-bold text-sm">${errMsg}</p>
                 <button onclick="runTextScan()" class="mt-2 text-xs text-tl-purple font-black hover:underline">↺ Try Again</button>
             </div>`;
             return;
         }
-
         const d = await r.json();
-
-        // Dynamically update the floating quota pill
         if (d.quota) {
-            updateQuotaUI(d.quota);
+            currentQuota = {
+                limit: d.quota.limit || 25,
+                used: d.quota.used || 0,
+                remaining: d.quota.remaining !== undefined ? d.quota.remaining : Math.max(0, (d.quota.limit || 25) - (d.quota.used || 0)),
+                is_authenticated: d.quota.is_authenticated
+            };
+            renderAuthArea();
         }
-
-        // If guest, record locally for instant history & cloud migration
-        if (!state.currentUser) {
-            saveGuestScanToLocal({
-                text_input: text,
-                verdict: d.verdict,
-                confidence: d.confidence,
-                created_at: new Date().toISOString()
-            });
-        }
-
         renderScanResult(result, d);
     } catch(e) {
         clearTimeout(timeout);
@@ -2953,58 +2109,29 @@ function setSample(type) {
 }
 
 async function loadScanHistory() {
-    const historyContainer = document.getElementById('scan-history-content');
-    if (!historyContainer) return;
 
-    const headers = {};
-    const token = localStorage.getItem('tl_auth_token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
-        const r = await fetch('/api/scan-history', { headers });
+        const r = await fetch('/api/scan-history', { headers: getAuthHeaders() });
         const d = await r.json();
 
-        let history = d.history || [];
-
-        // If guest or empty cloud history, merge with local guest scans
-        const guestScansRaw = localStorage.getItem('tl_guest_scans');
-        if (guestScansRaw) {
-            try {
-                const guestScans = JSON.parse(guestScansRaw);
-                if (Array.isArray(guestScans) && guestScans.length > 0) {
-                    // Combine and deduplicate by text_input
-                    const seen = new Set(history.map(h => h.text_input));
-                    guestScans.forEach(gs => {
-                        if (!seen.has(gs.text_input)) {
-                            history.push(gs);
-                            seen.add(gs.text_input);
-                        }
-                    });
-                }
-            } catch(e) {}
-        }
-
-        // Sort descending by created_at
-        history.sort((a,b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-
-        historyContainer.innerHTML = history.length ? history.map(h => `
-            <div class="flex items-center gap-3 p-3.5 bg-paper-50 dark:bg-ink-900 rounded-2xl border border-paper-200 dark:border-white/10 hover:border-tl-purple/30 transition-all">
-                <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${h.verdict==='REAL' ? 'bg-tl-green/15 text-tl-green' : 'bg-tl-red/15 text-tl-red'}">
-                    <i class="ph-fill ${h.verdict==='REAL' ? 'ph-check-circle' : 'ph-warning-circle'} text-xl"></i>
+        const history = d.history || [];
+        document.getElementById('scan-history-content').innerHTML = history.length ? history.map(h => `
+            <div class="flex items-center gap-3 p-3 bg-paper-50 dark:bg-ink-900 rounded-xl border border-paper-200 dark:border-white/10">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${h.verdict==='REAL' ? 'bg-tl-green/15' : 'bg-tl-red/15'}">
+                    <i class="ph-fill ${h.verdict==='REAL' ? 'ph-check-circle text-tl-green' : 'ph-warning-circle text-tl-red'} text-lg"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${escapeHtml(h.text_input || 'Verified Claim')}</p>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${h.verdict==='REAL' ? 'bg-tl-green/10 text-tl-green' : 'bg-tl-red/10 text-tl-red'}">${h.verdict}</span>
-                        <span class="text-[10px] font-mono text-ink-500 font-bold">${h.confidence}% confidence</span>
-                        <span class="text-[10px] text-ink-500 ml-auto font-mono">${h.created_at ? new Date(h.created_at).toLocaleDateString('en-IN') : 'Recent'}</span>
+                    <p class="text-xs font-bold text-ink-900 dark:text-white truncate">${escapeHtml(h.text_input || 'Scan item')}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[9px] font-black ${h.verdict==='REAL' ? 'text-tl-green' : 'text-tl-red'}">${h.verdict}</span>
+                        <span class="text-[9px] text-ink-500">${h.confidence}% confidence</span>
+                        <span class="text-[9px] text-ink-500 ml-auto">${new Date(h.created_at).toLocaleDateString('en-IN')}</span>
                     </div>
                 </div>
             </div>`).join('') :
-            '<div class="text-center py-10 text-ink-500 text-xs italic">No scan history recorded yet. Verify a news claim to inspect neural activations!</div>';
-    } catch(e) {
-        historyContainer.innerHTML = '<div class="text-center py-8 text-tl-red text-xs">Failed to load scan history.</div>';
-    }
+            '<div class="text-center py-8 text-ink-500 text-sm italic">No scan history yet. Start by scanning a news claim above!</div>';
+    } catch(e) {}
 }
 
 // =====================================================================
@@ -3026,21 +2153,18 @@ async function sendChat() {
     addChatMessage('thinking', '');
     state.chatHistory.push({role:'user', content:message});
     try {
-        const headers = {'Content-Type':'application/json'};
-        const token = localStorage.getItem('tl_auth_token');
-        if (token) headers['Authorization'] = `Bearer ${token}`;
         const r = await fetch('/api/chat', {
-            method:'POST', headers,
+            method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({message, history: state.chatHistory})
         });
         const d = await r.json();
         document.getElementById('chat-thinking')?.remove();
-        const reply = d.reply || d.error || 'I can help you fact-check claims, verify news credibility, or explain AI detection results. Try asking about a news story!';
+        const reply = d.reply || 'Sorry, I could not process that request.';
         state.chatHistory.push({role:'assistant', content:reply});
         addChatMessage('assistant', reply);
     } catch(e) {
         document.getElementById('chat-thinking')?.remove();
-        addChatMessage('assistant', 'TruthLens AI is initializing. Please try again in a moment.');
+        addChatMessage('assistant', 'Network error. Please try again.');
     }
 }
 
@@ -3102,11 +2226,7 @@ async function fetchWeather(lat, lon) {
 // =====================================================================
 function toggleTheme() {
     document.documentElement.classList.toggle('dark');
-    const isDark = document.documentElement.classList.contains('dark');
-    localStorage.setItem('tl_theme', isDark ? 'dark' : 'light');
-    if (_threeParticles && _threeParticles.material) {
-        _threeParticles.material.color.setHex(isDark ? 0x9333ea : 0x7c3aed);
-    }
+    localStorage.setItem('tl_theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 }
 
 // =====================================================================
@@ -3189,445 +2309,70 @@ function renderPrice(m) {
     } catch (e) { return m.price_str || (m.sym || '&#8377;') + (m.price || 'N/A'); }
 }
 
-// ==========================================
-// CRICKET FULL SCORECARD & LIVE INTEL MODAL
-// ==========================================
-function openCricketScorecardModal(idx) {
-    const m = (window.liveCricketMatches && window.liveCricketMatches[idx]) || (window._cricketMatches && window._cricketMatches[idx]) || null;
-    const body = document.getElementById('cricket-modal-body');
-    const modal = document.getElementById('cricket-scorecard-modal');
-    if (!modal || !body) return;
-
-    if (!m) {
-        body.innerHTML = `<div class="text-center py-8 text-slate-400">Match data unavailable</div>`;
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        return;
-    }
-
-    const mi = m.matchInfo || {};
-    const ms = m.matchScore || {};
-    const t1 = mi.team1 ? (mi.team1.teamName || mi.team1.name) : 'Team 1';
-    const t2 = mi.team2 ? (mi.team2.teamName || mi.team2.name) : 'Team 2';
-    const s1 = ms.team1Score ? `${ms.team1Score.inngs1?.runs || ms.team1Score.runs || 0}/${ms.team1Score.inngs1?.wickets || ms.team1Score.wickets || 0} (${ms.team1Score.inngs1?.overs || ms.team1Score.overs || 0})` : '';
-    const s2 = ms.team2Score ? `${ms.team2Score.inngs1?.runs || ms.team2Score.runs || 0}/${ms.team2Score.inngs1?.wickets || ms.team2Score.wickets || 0} (${ms.team2Score.inngs1?.overs || ms.team2Score.overs || 0})` : '';
-    const isLive = mi.state === 'In Progress' || mi.state === 'live' || (mi.status && mi.status.toLowerCase().includes('opt to'));
-    const ld = m.liveDetails || {};
-    const batters = ld.currentBatters || ld.batters || [];
-    const bowler = ld.currentBowler || ld.bowler || {};
-    const recentBalls = ld.recentBalls || ld.recent_balls || ['0', '1', '2'];
-    const lastWicket = ld.lastWicket || ld.last_wicket || '-';
-    const partnership = ld.partnership || '-';
-    const crr = ld.crr || '7.45';
-    const rrr = ld.rrr ? `• RRR: ${ld.rrr}` : '';
-
-    let battersHtml = batters.length > 0 ? batters.map(b => {
-        const onStrike = (b.onStrike !== undefined ? b.onStrike : b.on_strike);
-        return `
-            <tr class="border-b border-slate-100 dark:border-white/5 ${onStrike ? 'bg-purple-500/10 dark:bg-purple-900/20 font-bold' : ''}">
-                <td class="py-2.5 px-3 flex items-center gap-1.5 text-slate-800 dark:text-white">
-                    ${onStrike ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>' : ''}
-                    <span>${b.name}</span>
-                    ${onStrike ? '<span class="text-[10px] text-emerald-500 font-mono font-black">*</span>' : ''}
-                </td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">${b.runs}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.balls}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.fours || 0}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">${b.sixes || 0}</td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-tl-blue">${b.strikeRate || b.sr || '100.0'}</td>
-            </tr>`;
-    }).join('') : `<tr><td colspan="6" class="text-center py-4 text-xs text-slate-400">Batting details updating from live feed...</td></tr>`;
-
-    let bowlerHtml = bowler && bowler.name ? `
-        <tr class="border-b border-slate-100 dark:border-white/5">
-            <td class="py-2.5 px-3 font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                ${bowler.name}
-            </td>
-            <td class="py-2.5 px-3 text-right font-mono">${bowler.overs || '0.0'}</td>
-            <td class="py-2.5 px-3 text-right font-mono">${bowler.maidens || 0}</td>
-            <td class="py-2.5 px-3 text-right font-mono">${bowler.runs || 0}</td>
-            <td class="py-2.5 px-3 text-right font-mono font-black text-rose-500">${bowler.wickets || 0}</td>
-            <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-500">${bowler.economy || bowler.econ || '0.0'}</td>
-        </tr>` : `<tr><td colspan="6" class="text-center py-4 text-xs text-slate-400">Bowling figures updating...</td></tr>`;
-
-    let ballsHtml = recentBalls.map(b => {
-        let pillClass = 'bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10';
-        if (b === 'W' || b === 'w') pillClass = 'bg-rose-500 text-white font-black border-rose-300';
-        else if (b === '4') pillClass = 'bg-blue-500 text-white font-black border-blue-300';
-        else if (b === '6') pillClass = 'bg-emerald-500 text-white font-black border-emerald-300';
-        return `<span class="w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-mono font-bold ${pillClass}">${b}</span>`;
-    }).join('');
-
-    body.innerHTML = `
-        <div class="space-y-6">
-            <!-- Modal Header -->
-            <div class="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-white/10">
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isLive ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/10 text-slate-500'}">
-                            ${isLive ? '🔴 LIVE BALL-BY-BALL' : (mi.state || 'MATCH SCORECARD')}
-                        </span>
-                        <span class="text-xs text-slate-500 font-bold">${mi.seriesName || 'ICC Championship'}</span>
-                    </div>
-                    <h3 class="text-xl font-bold dark:text-white text-slate-900">${t1} vs ${t2}</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">${mi.status || 'Match in progress'}</p>
-                </div>
-            </div>
-
-            <!-- Score Summary Cards -->
-            <div class="grid grid-cols-2 gap-4">
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-[11px] font-bold text-slate-500 mb-1">${t1}</div>
-                    <div class="text-lg font-mono font-black text-slate-900 dark:text-white">${s1 || 'Yet to bat'}</div>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-[11px] font-bold text-slate-500 mb-1">${t2}</div>
-                    <div class="text-lg font-mono font-black text-slate-900 dark:text-white">${s2 || 'Yet to bat'}</div>
-                </div>
-            </div>
-
-            <!-- Live Batters Section -->
-            <div>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-baseball"></i> Active Batters (Runs & Strike Rate)
-                </h4>
-                <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-50 dark:bg-white/5 text-[10px] uppercase font-mono text-slate-500 border-b border-slate-200 dark:border-white/10">
-                            <tr>
-                                <th class="py-2 px-3">Batter</th>
-                                <th class="py-2 px-3 text-right">R</th>
-                                <th class="py-2 px-3 text-right">B</th>
-                                <th class="py-2 px-3 text-right">4s</th>
-                                <th class="py-2 px-3 text-right">6s</th>
-                                <th class="py-2 px-3 text-right">SR</th>
-                            </tr>
-                        </thead>
-                        <tbody>${battersHtml}</tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Live Bowler Section -->
-            <div>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-crosshair"></i> Current Bowler (Wickets & Economy)
-                </h4>
-                <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-50 dark:bg-white/5 text-[10px] uppercase font-mono text-slate-500 border-b border-slate-200 dark:border-white/10">
-                            <tr>
-                                <th class="py-2 px-3">Bowler</th>
-                                <th class="py-2 px-3 text-right">O</th>
-                                <th class="py-2 px-3 text-right">M</th>
-                                <th class="py-2 px-3 text-right">R</th>
-                                <th class="py-2 px-3 text-right text-rose-500">W</th>
-                                <th class="py-2 px-3 text-right">ECON</th>
-                            </tr>
-                        </thead>
-                        <tbody>${bowlerHtml}</tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Recent Deliveries & Fall of Wickets -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-[10px] uppercase font-bold text-slate-500 mb-2">This Over Deliveries</div>
-                    <div class="flex items-center gap-2 flex-wrap">${ballsHtml}</div>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Fall of Wicket / Last Out</div>
-                    <div class="text-xs font-semibold text-rose-500">${lastWicket}</div>
-                    <div class="text-[11px] text-slate-500 mt-2">Partnership: <span class="font-bold text-slate-700 dark:text-white">${partnership}</span></div>
-                    <div class="text-[11px] font-mono text-cyan-500 mt-1">CRR: ${crr} ${rrr}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function closeCricketModal() {
-    const modal = document.getElementById('cricket-scorecard-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
-}
-
-// ==========================================
-// ADMIN CONTROL CENTER
-// ==========================================
-function openAdminModal() {
-    const modal = document.getElementById('admin-control-modal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    fetchAdminOverview();
-}
-
-function closeAdminModal() {
-    const modal = document.getElementById('admin-control-modal');
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
-
-async function fetchAdminOverview() {
-    const container = document.getElementById('admin-modal-content');
-    if (!container) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/admin/overview`, { credentials: 'include' });
-        if (!res.ok) {
-            container.innerHTML = `<div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs">Failed to load admin metrics: Unauthorized or server error.</div>`;
-            return;
+// ==================== TRUTHLENS SECURITY & ANTI-INSPECT ====================
+(function initAntiInspect() {
+    // 1. Disable Right Click Context Menu (except in input / textarea for pasting)
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+            return; // Allow users to paste text into input fields
         }
-        const data = await res.json();
-        const totalUsers = data.total_users || 0;
-        const totalScans = data.total_scans || 0;
-        const adminEmail = (currentUser && currentUser.email) || 'Administrator';
+        e.preventDefault();
+        showToast("🔒 Inspect Element is disabled on TruthLens Sandbox.", "error");
+    }, { capture: true });
 
-        container.innerHTML = `
-            <div class="space-y-6">
-                <!-- Admin Card -->
-                <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/15 border border-amber-500/30 flex items-center justify-between">
-                    <div>
-                        <div class="text-xs text-amber-300 font-bold uppercase tracking-wider">Super Administrator</div>
-                        <div class="text-base font-bold text-white">${adminEmail}</div>
-                        <div class="text-xs text-slate-400 mt-0.5">Quota Limit: <span class="text-amber-400 font-bold">UNLIMITED (∞)</span> • 24h Session Active</div>
-                    </div>
-                    <span class="text-3xl">👑</span>
-                </div>
+    // 2. Disable Keyboard Shortcuts (F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+S)
+    document.addEventListener('keydown', function(e) {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const ctrl = isMac ? e.metaKey : e.ctrlKey;
+        const key = e.key ? e.key.toUpperCase() : '';
+        const code = e.keyCode || e.which;
 
-                <!-- Metrics Grid -->
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
-                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Total Users</div>
-                        <div class="text-2xl font-black text-white font-mono">${totalUsers}</div>
-                    </div>
-                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
-                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Total AI Scans</div>
-                        <div class="text-2xl font-black text-tl-blue font-mono">${totalScans}</div>
-                    </div>
-                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
-                        <div class="text-[10px] font-mono uppercase text-slate-400 mb-1">Admin Scan Access</div>
-                        <div class="text-2xl font-black text-amber-400 font-mono">∞ Unlimited</div>
-                    </div>
-                </div>
-
-                <!-- Admin Action Controls -->
-                <div class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                        <i class="ph-bold ph-gear"></i> Platform Management Controls
-                    </h4>
-
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <input id="admin-target-user-email" type="email" placeholder="user@domain.com to reset quota"
-                               class="flex-1 px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-xs text-white outline-none focus:border-amber-400">
-                        <button onclick="adminResetUserQuota()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs uppercase tracking-wider transition-all">
-                            Reset Quota to 50
-                        </button>
-                    </div>
-
-                    <div class="flex items-center gap-3 pt-2">
-                        <button onclick="adminClearCache()" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all flex items-center gap-2">
-                            <i class="ph-bold ph-trash"></i> Purge System Cache
-                        </button>
-                        <button onclick="fetchCricketScores(); fetchMarketData(); fetchAdminOverview();" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all flex items-center gap-2">
-                            <i class="ph-bold ph-arrows-clockwise"></i> Force Refresh Feeds
-                        </button>
-                    </div>
-                    <div id="admin-action-msg" class="text-xs font-mono"></div>
-                </div>
-            </div>
-        `;
-    } catch (e) {
-        container.innerHTML = `<div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs">Failed to connect to admin API: ${e.message}</div>`;
-    }
-}
-
-async function adminResetUserQuota() {
-    const input = document.getElementById('admin-target-user-email');
-    const msg = document.getElementById('admin-action-msg');
-    if (!input || !input.value.trim()) return;
-    const email = input.value.trim();
-    msg.textContent = 'Processing quota reset...';
-    msg.className = 'text-xs font-mono text-amber-300';
-    try {
-        const res = await fetch(`${API_BASE}/api/admin/reset-user-quota`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ email })
-        });
-        const d = await res.json();
-        if (res.ok) {
-            msg.textContent = `✓ Quota for ${email} reset to 50 scans.`;
-            msg.className = 'text-xs font-mono text-emerald-400';
-            input.value = '';
-        } else {
-            msg.textContent = `✗ Failed: ${d.error || 'Server error'}`;
-            msg.className = 'text-xs font-mono text-rose-400';
-        }
-    } catch (e) {
-        msg.textContent = `✗ Error: ${e.message}`;
-        msg.className = 'text-xs font-mono text-rose-400';
-    }
-}
-
-async function adminClearCache() {
-    const msg = document.getElementById('admin-action-msg');
-    if (msg) {
-        msg.textContent = 'Purging cache...';
-        msg.className = 'text-xs font-mono text-amber-300';
-    }
-    try {
-        const res = await fetch(`${API_BASE}/api/admin/clear-cache`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        const d = await res.json();
-        if (res.ok && msg) {
-            msg.textContent = '✓ Platform cache purged successfully.';
-            msg.className = 'text-xs font-mono text-emerald-400';
-        }
-    } catch (e) {
-        if (msg) {
-            msg.textContent = `✗ Cache purge error: ${e.message}`;
-            msg.className = 'text-xs font-mono text-rose-400';
-        }
-    }
-}
-
-// ==========================================================
-// ANTI-INSPECT / DEVTOOLS PROTECTION & CANARY HONEYPOT
-// ==========================================================
-(function initAntiInspectGuard() {
-    let devToolsOpen = false;
-    let canaryFloodTimer = null;
-
-    function triggerCanaryFlood() {
-        if (canaryFloodTimer) return;
-        canaryFloodTimer = setInterval(() => {
-            if (!devToolsOpen) {
-                clearInterval(canaryFloodTimer);
-                canaryFloodTimer = null;
-                return;
-            }
-            // Trigger 404 honey-pot requests so network inspectors see /fuck.html 404
-            fetch(`/fuck.html?trace=${Math.random().toString(36).substring(2)}`, { cache: 'no-store' }).catch(() => {});
-        }, 1200);
-        // Immediate first blast
-        for (let i = 0; i < 3; i++) {
-            fetch(`/fuck.html?t=${Date.now()}_${i}`, { cache: 'no-store' }).catch(() => {});
-        }
-    }
-
-    function setDevToolsState(isOpen) {
-        if (devToolsOpen === isOpen) return;
-        devToolsOpen = isOpen;
-        const guard = document.getElementById('devtools-guard');
-
-        if (isOpen) {
-            document.body.classList.add('inspect-blocked');
-            if (guard) guard.classList.remove('hidden');
-            triggerCanaryFlood();
-        } else {
-            document.body.classList.remove('inspect-blocked');
-            if (guard) guard.classList.add('hidden');
-            if (canaryFloodTimer) {
-                clearInterval(canaryFloodTimer);
-                canaryFloodTimer = null;
-            }
-        }
-    }
-
-    window._closeDevToolsGuard = function() {
-        setDevToolsState(false);
-    };
-
-    // 1. Block Keyboard Shortcuts for DevTools & Source Inspection
-    window.addEventListener('keydown', (e) => {
-        // F12
-        if (e.key === 'F12' || e.keyCode === 123) {
+        // F12 key
+        if (key === 'F12' || code === 123) {
             e.preventDefault();
             e.stopPropagation();
-            setDevToolsState(true);
+            showToast("🔒 Developer Tools access is protected.", "error");
             return false;
         }
-        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (or Cmd+Alt on Mac)
-        const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-        if (isCmdOrCtrl && e.shiftKey) {
-            const k = (e.key || '').toLowerCase();
-            if (k === 'i' || k === 'j' || k === 'c') {
-                e.preventDefault();
-                e.stopPropagation();
-                setDevToolsState(true);
-                return false;
-            }
+
+        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+        if (ctrl && e.shiftKey && (key === 'I' || key === 'J' || key === 'C' || code === 73 || code === 74 || code === 67)) {
+            e.preventDefault();
+            e.stopPropagation();
+            showToast("🔒 Developer inspection shortcut disabled.", "error");
+            return false;
         }
+
         // Ctrl+U (View Source)
-        if (isCmdOrCtrl && (e.key === 'u' || e.key === 'U')) {
+        if (ctrl && (key === 'U' || code === 85)) {
             e.preventDefault();
             e.stopPropagation();
-            setDevToolsState(true);
+            showToast("🔒 Page Source viewing is disabled.", "error");
             return false;
         }
+
         // Ctrl+S (Save Page)
-        if (isCmdOrCtrl && (e.key === 's' || e.key === 'S')) {
+        if (ctrl && (key === 'S' || code === 83)) {
             e.preventDefault();
             e.stopPropagation();
             return false;
         }
-    }, true);
+    }, { capture: true });
 
-    // 2. Disable Context Menu
-    window.addEventListener('contextmenu', (e) => {
-        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-        if (tag !== 'input' && tag !== 'textarea') {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-    }, true);
-
-    // 3. Real-time Window Dimension Offset Checker (Docked DevTools Detection)
-    function checkWindowDelta() {
-        const threshold = 160;
-        const widthDiff = window.outerWidth - window.innerWidth;
-        const heightDiff = window.outerHeight - window.innerHeight;
-        if (widthDiff > threshold || heightDiff > threshold) {
-            setDevToolsState(true);
-        } else {
-            // When user closes devtools, automatically restore
-            if (devToolsOpen) {
-                setDevToolsState(false);
-            }
-        }
-    }
-
-    window.addEventListener('resize', checkWindowDelta);
-    setInterval(checkWindowDelta, 1000);
-
-    // 4. Console getter check
+    // 3. Clear console on devtools open detection
+    let devtoolsOpen = false;
+    const threshold = 160;
     setInterval(() => {
-        const start = performance.now();
-        const div = document.createElement('div');
-        Object.defineProperty(div, 'id', {
-            get: function() {
-                setDevToolsState(true);
-                return 'canary';
-            }
-        });
-        const elapsed = performance.now() - start;
-        if (elapsed > 100) {
-            setDevToolsState(true);
+        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        if ((widthThreshold || heightThreshold) && !devtoolsOpen) {
+            devtoolsOpen = true;
+            console.clear();
+            console.warn("%c[TRUTHLENS SECURITY] Source code protection active. External inspection disabled.", "color:#8b5cf6; font-size:14px; font-weight:bold;");
+        } else if (!widthThreshold && !heightThreshold) {
+            devtoolsOpen = false;
         }
-    }, 2000);
+    }, 1000);
 })();
 </script>
 </body>
