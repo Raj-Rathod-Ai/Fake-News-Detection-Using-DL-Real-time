@@ -153,7 +153,7 @@ class TestTruthLensEndpoints(unittest.TestCase):
         resp_sync = self.client.post(
             "/api/auth/sync-history",
             headers={"Authorization": f"Bearer {token}"},
-            json={"scans": [{"id": "guest_scan_1", "text": "Sample claim test", "title": "Test Claim", "verdict": "REAL", "confidence": 98.0}]}
+            json={"scans": [{"id": f"guest_scan_{uuid.uuid4().hex[:8]}", "text": "Sample claim test", "title": "Test Claim", "verdict": "REAL", "confidence": 98.0}]}
         )
         self.assertEqual(resp_sync.status_code, 200)
         self.assertEqual(resp_sync.get_json()["synced_count"], 1)
