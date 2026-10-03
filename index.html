@@ -408,6 +408,13 @@
         <div class="p-6">
             <!-- TEXT SCAN -->
             <div id="scan-tab-text" class="scan-content space-y-4">
+                <div id="scanner-quota-badge" class="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-paper-100 dark:bg-white/5 border border-paper-200 dark:border-white/10 text-xs font-mono">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-ink-700 dark:text-ink-300 font-bold" id="scanner-quota-text">Used: 0 · Remaining: 25 Scans</span>
+                    </div>
+                    <span class="text-[11px] text-tl-purple font-semibold">Restores every week</span>
+                </div>
                 <div class="relative">
                     <textarea id="scan-text-input" rows="5" placeholder="Paste article text, headline, or claim to verify against Deep Learning neural engine..." 
                         class="w-full border-2 border-paper-200 dark:border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-tl-purple bg-paper-50 dark:bg-ink-900 dark:text-white resize-none transition-all"></textarea>
@@ -740,7 +747,7 @@ async function wakeUpBackend() {
 // AUTHENTICATION & QUOTA STATE
 // =====================================================================
 let currentUser = null;
-let currentQuota = { limit: 25, used: 0, remaining: 25, is_authenticated: false };
+let currentQuota = { limit: 25, used: 0, remaining: 25, is_authenticated: false, quota_cycle: 'weekly' };
 
 function getGuestId() {
     let gid = localStorage.getItem('tl_guest_id');
@@ -756,7 +763,7 @@ function getAuthHeaders() {
         'Content-Type': 'application/json',
         'X-Guest-ID': getGuestId()
     };
-    const token = localStorage.getItem('tl_auth_token');
+    const token = localStorage.getItem('tl_token') || localStorage.getItem('tl_auth_token');
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
@@ -768,11 +775,17 @@ async function checkAuthStatus() {
         const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
         if (res.ok) {
             const data = await res.json();
+            if (data.new_token || data.token) {
+                const freshTok = data.new_token || data.token;
+                localStorage.setItem('tl_token', freshTok);
+                localStorage.setItem('tl_auth_token', freshTok);
+            }
             currentQuota = {
-                limit: data.limit || 25,
-                used: data.scans_used || 0,
-                remaining: data.remaining !== undefined ? data.remaining : Math.max(0, (data.limit || 25) - (data.scans_used || 0)),
-                is_authenticated: data.is_authenticated
+                limit: data.limit || 50,
+                used: data.scans_used !== undefined ? data.scans_used : (data.used !== undefined ? data.used : 0),
+                remaining: data.remaining !== undefined ? data.remaining : Math.max(0, (data.limit || 50) - (data.used || 0)),
+                is_authenticated: data.is_authenticated,
+                quota_cycle: data.quota_cycle || 'weekly'
             };
             currentUser = data.user || null;
             renderAuthArea();
@@ -786,15 +799,21 @@ function renderAuthArea() {
     const area = document.getElementById('auth-area');
     if (!area) return;
 
+    // Update scanner modal quota text if open
+    const scanQuotaText = document.getElementById('scanner-quota-text');
+    if (scanQuotaText) {
+        scanQuotaText.textContent = `Used: ${currentQuota.used} · Remaining: ${currentQuota.remaining} Scans`;
+    }
+
     if (currentUser && currentQuota.is_authenticated) {
         const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
         const displayName = currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
         area.innerHTML = `
             <div class="flex items-center gap-2">
-                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tl-purple/10 border border-tl-purple/20 text-tl-purple text-xs font-bold" title="Remaining Daily Scans">
+                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tl-purple/10 border border-tl-purple/20 text-tl-purple text-xs font-bold" title="Weekly Free Scans (Restores every week)">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="font-mono">${currentQuota.remaining}/${currentQuota.limit}</span>
-                    <span class="text-[10px] uppercase text-ink-500 hidden md:inline">Scans</span>
+                    <span class="font-mono">Used: ${currentQuota.used} · Remaining: ${currentQuota.remaining}</span>
+                    <span class="text-[10px] text-ink-500 font-sans hidden lg:inline">(Weekly)</span>
                 </div>
                 <div class="relative group">
                     <button class="flex items-center gap-2 p-1.5 pl-2.5 pr-3 rounded-xl bg-paper-100 dark:bg-white/10 hover:bg-paper-200 dark:hover:bg-white/15 transition-all text-xs font-bold">
@@ -804,10 +823,11 @@ function renderAuthArea() {
                         <span class="truncate max-w-[100px] text-xs font-mono hidden md:inline text-ink-900 dark:text-white">${displayName}</span>
                         <i class="ph-bold ph-caret-down text-ink-500 text-xs"></i>
                     </button>
-                    <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50">
+                    <div class="absolute right-0 mt-2 w-52 bg-white dark:bg-paper-900 border border-paper-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 hidden group-hover:block z-50">
                         <div class="px-3 py-2 border-b border-paper-200 dark:border-white/5 mb-1">
                             <p class="text-xs font-bold truncate text-ink-900 dark:text-white">${currentUser.email || displayName}</p>
-                            <p class="text-[10px] text-ink-500 uppercase tracking-wider">${currentUser.role || 'Verified Researcher'}</p>
+                            <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">Used: ${currentQuota.used} | Remaining: ${currentQuota.remaining}</p>
+                            <p class="text-[9px] text-ink-400">Free limit restores weekly</p>
                         </div>
                         <button onclick="openScanPanel('history')" class="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-paper-100 dark:hover:bg-white/5 flex items-center gap-2 text-ink-700 dark:text-ink-300">
                             <i class="ph-bold ph-clock-counter-clockwise"></i> Scan History
@@ -821,6 +841,11 @@ function renderAuthArea() {
     } else {
         area.innerHTML = `
             <div class="flex items-center gap-2">
+                <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-paper-100 dark:bg-white/5 border border-paper-200 dark:border-white/10 text-xs font-mono text-ink-600 dark:text-ink-400" title="Weekly Free Guest Scans">
+                    <span>Used: ${currentQuota.used}</span>
+                    <span class="text-ink-300 dark:text-ink-600">·</span>
+                    <span>Remaining: ${currentQuota.remaining}</span>
+                </div>
                 <button onclick="openScanPanel('text')" class="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-tl-purple to-tl-blue px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95">
                     <i class="ph-fill ph-shield-check text-sm"></i> AI Scanner
                 </button>
@@ -860,14 +885,14 @@ function switchAuthTab(tab) {
         tabLogin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-paper-800 text-tl-purple shadow-sm";
         tabSignup.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-ink-500 hover:text-ink-900 dark:hover:text-white";
         title.textContent = "Welcome Back";
-        sub.textContent = "Sign in to access 100 daily neural scans and persistent history.";
+        sub.textContent = "Sign in to access 50 weekly neural scans and 24-hour continuous access.";
     } else {
         formLogin.classList.add('hidden');
         formSignup.classList.remove('hidden');
         tabSignup.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-paper-800 text-tl-purple shadow-sm";
         tabLogin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-ink-500 hover:text-ink-900 dark:hover:text-white";
         title.textContent = "Create Account";
-        sub.textContent = "Create an account to unlock expanded neural intelligence and 100 daily scans.";
+        sub.textContent = "Create an account or connect your email to unlock 50 weekly scans with 24-hour access.";
     }
 }
 
@@ -894,28 +919,30 @@ async function submitLogin() {
         if (!res.ok) {
             showToast(data.error || "Login failed.", "error");
             btn.disabled = false;
-            btn.textContent = "Sign In & Unlock 100 Scans";
+            btn.textContent = "Sign In & Unlock 50 Scans";
             return;
         }
 
         if (data.token) {
+            localStorage.setItem('tl_token', data.token);
             localStorage.setItem('tl_auth_token', data.token);
         }
         currentUser = data.user;
         currentQuota = {
-            limit: data.user.limit || 100,
-            used: data.user.scans_used || 0,
-            remaining: data.user.remaining !== undefined ? data.user.remaining : (data.user.limit - data.user.scans_used),
-            is_authenticated: true
+            limit: data.user.limit || 50,
+            used: data.user.scans_used !== undefined ? data.user.scans_used : (data.user.used || 0),
+            remaining: data.user.remaining !== undefined ? data.user.remaining : Math.max(0, (data.user.limit || 50) - (data.user.scans_used || 0)),
+            is_authenticated: true,
+            quota_cycle: 'weekly'
         };
         closeAuthModal();
         renderAuthArea();
-        showToast("Welcome back! 100 deep scans unlocked.", "success");
+        showToast("Signed in! 24-hour session active. Free quota restores weekly.", "success");
     } catch(e) {
         showToast("Network error. Please try again.", "error");
     } finally {
         btn.disabled = false;
-        btn.textContent = "Sign In & Unlock 100 Scans";
+        btn.textContent = "Sign In & Unlock 50 Scans";
     }
 }
 
@@ -947,28 +974,30 @@ async function submitSignup() {
         if (!res.ok) {
             showToast(data.error || "Signup failed.", "error");
             btn.disabled = false;
-            btn.textContent = "Create Free Account (100 Scans)";
+            btn.textContent = "Create Free Account (50 Weekly Scans)";
             return;
         }
 
         if (data.token) {
+            localStorage.setItem('tl_token', data.token);
             localStorage.setItem('tl_auth_token', data.token);
         }
         currentUser = data.user;
         currentQuota = {
-            limit: data.user.limit || 100,
-            used: 0,
-            remaining: 100,
-            is_authenticated: true
+            limit: data.user.limit || 50,
+            used: data.user.scans_used !== undefined ? data.user.scans_used : (data.user.used || 0),
+            remaining: data.user.remaining !== undefined ? data.user.remaining : Math.max(0, (data.user.limit || 50) - (data.user.scans_used || 0)),
+            is_authenticated: true,
+            quota_cycle: 'weekly'
         };
         closeAuthModal();
         renderAuthArea();
-        showToast("Account created successfully! 100 scans unlocked.", "success");
+        showToast(data.message || "Account ready! 24-hour session active. 50 weekly scans unlocked.", "success");
     } catch(e) {
         showToast("Network error. Please try again.", "error");
     } finally {
         btn.disabled = false;
-        btn.textContent = "Create Free Account (100 Scans)";
+        btn.textContent = "Create Free Account (50 Weekly Scans)";
     }
 }
 
@@ -976,9 +1005,10 @@ async function handleLogout() {
     try {
         await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
     } catch(e) {}
+    localStorage.removeItem('tl_token');
     localStorage.removeItem('tl_auth_token');
     currentUser = null;
-    currentQuota = { limit: 25, used: 0, remaining: 25, is_authenticated: false };
+    currentQuota = { limit: 5, used: 0, remaining: 5, is_authenticated: false, quota_cycle: 'weekly' };
     renderAuthArea();
     showToast("Signed out successfully.", "info");
 }
@@ -1671,22 +1701,32 @@ function renderCricketCards(d) {
             for (const m of (sm.seriesAdWrapper?.matches || []).slice(0, 6)) {
                 const mi = m.matchInfo;
                 if (!mi) continue;
-                const rawT1 = mi.team1?.teamName || '';
-                const rawT2 = mi.team2?.teamName || '';
-                // Filter out dummy teams or placeholder matches
-                if (!rawT1 || !rawT2 || rawT1 === 'Team A' || rawT2 === 'Team B') continue;
+                const rawT1 = (mi.team1?.teamName || '').toLowerCase();
+                const rawT2 = (mi.team2?.teamName || '').toLowerCase();
+                const s1Code = (mi.team1?.teamSName || '').toLowerCase();
+                const s2Code = (mi.team2?.teamSName || '').toLowerCase();
 
-                const t1 = mi.team1?.teamSName || (rawT1.length <= 4 ? rawT1 : rawT1.slice(0, 3).toUpperCase());
-                const t2 = mi.team2?.teamSName || (rawT2.length <= 4 ? rawT2 : rawT2.slice(0, 3).toUpperCase());
+                // USER REQUIREMENT: Only India match show!
+                const isIndia = rawT1.includes('india') || rawT2.includes('india') ||
+                                rawT1.includes('ind') || rawT2.includes('ind') ||
+                                s1Code === 'ind' || s2Code === 'ind' ||
+                                s1Code === 'roi' || s2Code === 'roi' ||
+                                rawT1.includes('rest of india') || rawT2.includes('rest of india');
+                if (!isIndia) continue;
+
+                // USER REQUIREMENT: Only live and that day match, not yesterday!
+                const stateStr = mi.state || '';
+                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || stateStr === 'live' || (m.matchScore && stateStr !== 'Complete' && stateStr !== 'Finished');
+                if (!isLive) continue;
+
+                const t1 = mi.team1?.teamSName || (mi.team1?.teamName || '').slice(0, 3).toUpperCase();
+                const t2 = mi.team2?.teamSName || (mi.team2?.teamName || '').slice(0, 3).toUpperCase();
 
                 const s1 = formatTeamScore(m.matchScore, 'team1Score');
                 const s2 = formatTeamScore(m.matchScore, 'team2Score');
 
-                const stateStr = mi.state || '';
-                const isLive = stateStr === 'In Progress' || stateStr === 'Stumps' || (m.matchScore && stateStr !== 'Complete');
-                const isComplete = stateStr === 'Complete' || stateStr === 'Finished';
-                const badgeText = isLive ? 'LIVE' : (isComplete ? 'RECENT' : stateStr || 'UPCOMING');
-                const statusNote = mi.status || stateStr;
+                const badgeText = 'LIVE';
+                const statusNote = mi.status || 'Match in progress';
 
                 _cricket_matches_cache.push(m);
                 const currentIdx = cardIdx++;
@@ -1709,8 +1749,8 @@ function renderCricketCards(d) {
                                 <span class="font-mono font-black text-xs shrink-0">${s2 || '-'}</span>
                             </div>
                         </div>
-                        <div class="ml-2 text-right shrink-0 max-w-[100px]">
-                            <div class="text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-tl-red animate-pulse' : 'text-ink-500'}">${badgeText}</div>
+                        <div class="ml-2 text-right shrink-0 max-w-[110px]">
+                            <div class="text-[9px] font-black uppercase tracking-widest text-tl-red animate-pulse">${badgeText}</div>
                             <div class="text-[9px] font-bold text-ink-500 dark:text-white/60 truncate mt-0.5" title="${statusNote}">${statusNote}</div>
                         </div>
                     </div>`;
@@ -1719,7 +1759,7 @@ function renderCricketCards(d) {
     }
 
     if (cards) {
-        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET</span>` + cards;
+        hub.innerHTML = `<span class="text-xs text-ink-500 font-bold shrink-0">🏏 LIVE CRICKET (INDIA)</span>` + cards;
         container.classList.remove('hidden');
     } else {
         hub.innerHTML = '';
@@ -1728,24 +1768,12 @@ function renderCricketCards(d) {
 }
 
 async function fetchCricket() {
-    // Show cached or authentic instant fallback right away so cricket is never blank or waiting
     const cached = localStorage.getItem('tl_cache_cricket');
     if (cached) {
         try { 
             const parsed = JSON.parse(cached);
-            // Ensure no stale IND vs AUS is in localStorage cache
-            const jsonStr = JSON.stringify(parsed);
-            if (!jsonStr.includes('Australia') && !jsonStr.includes('AUS')) {
-                renderCricketCards(parsed); 
-            } else {
-                localStorage.removeItem('tl_cache_cricket');
-                renderCricketCards(MARQUEE_CRICKET_FALLBACK);
-            }
-        } catch(e) {
-            renderCricketCards(MARQUEE_CRICKET_FALLBACK);
-        }
-    } else {
-        renderCricketCards(MARQUEE_CRICKET_FALLBACK);
+            renderCricketCards(parsed); 
+        } catch(e) {}
     }
 
     try {
@@ -1755,10 +1783,10 @@ async function fetchCricket() {
             localStorage.setItem('tl_cache_cricket', JSON.stringify(d));
             renderCricketCards(d);
         } else {
-            renderCricketCards(MARQUEE_CRICKET_FALLBACK);
+            renderCricketCards({ typeMatches: [] });
         }
     } catch(e) {
-        renderCricketCards(MARQUEE_CRICKET_FALLBACK);
+        console.warn('Cricket fetch error:', e);
     }
 }
 

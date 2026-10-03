@@ -263,6 +263,56 @@ class TestTruthLensEndpoints(unittest.TestCase):
         resp_empty = self.client.post("/api/chat", json={"message": ""})
         self.assertEqual(resp_empty.status_code, 400)
 
+    def test_19_existing_account_signup_no_error_and_bcrypt(self):
+        email = f"bcrypt_tester_{uuid.uuid4().hex[:8]}@truthlens.ai"
+        # 1. First signup
+        r1 = self.client.post("/api/auth/signup", json={"email": email, "password": "password_v1_123"})
+        self.assertEqual(r1.status_code, 200)
+        self.assertTrue(r1.get_json()["success"])
+        t1 = r1.get_json()["token"]
+        self.assertIsNotNone(t1)
+
+        # 2. Second signup with SAME email (must NOT return 400 error!)
+        r2 = self.client.post("/api/auth/signup", json={"email": email, "password": "password_v2_456"})
+        self.assertEqual(r2.status_code, 200)
+        self.assertTrue(r2.get_json()["success"])
+        t2 = r2.get_json()["token"]
+        self.assertIsNotNone(t2)
+
+        # 3. Check that /api/auth/me returns 24-hr refreshed new_token, used, and remaining
+        r_me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {t2}"})
+        self.assertEqual(r_me.status_code, 200)
+        data_me = r_me.get_json()
+        self.assertTrue(data_me["is_authenticated"])
+        self.assertIn("new_token", data_me)
+        self.assertIn("used", data_me)
+        self.assertIn("remaining", data_me)
+        self.assertEqual(data_me["quota_cycle"], "weekly")
+
+        # 4. Login with updated password succeeds
+        r_login = self.client.post("/api/auth/login", json={"email": email, "password": "password_v2_456"})
+        self.assertEqual(r_login.status_code, 200)
+        self.assertTrue(r_login.get_json()["success"])
+
+    def test_20_cricket_only_india_live(self):
+        resp = self.client.get("/api/cricket")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        tm = data.get("typeMatches", [])
+        self.assertGreater(len(tm), 0)
+        for t in tm:
+            for sm in t.get("seriesMatches", []):
+                for m in sm.get("seriesAdWrapper", {}).get("matches", []):
+                    mi = m.get("matchInfo", {})
+                    t1 = mi.get("team1", {}).get("teamName", "")
+                    t2 = mi.get("team2", {}).get("teamName", "")
+                    s1 = mi.get("team1", {}).get("teamSName", "")
+                    s2 = mi.get("team2", {}).get("teamSName", "")
+                    is_ind = any(k in (t1 + " " + t2 + " " + s1 + " " + s2).lower() for k in ["india", "ind", "roi", "rest of india"])
+                    self.assertTrue(is_ind, f"Match {t1} vs {t2} is not an India match!")
+                    state = mi.get("state", "")
+                    self.assertIn(state, ["In Progress", "live", "Stumps"])
+
 if __name__ == "__main__":
     unittest.main()
 

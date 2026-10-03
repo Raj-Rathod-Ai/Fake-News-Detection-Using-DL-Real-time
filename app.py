@@ -32,6 +32,7 @@ scan_executor = ThreadPoolExecutor(max_workers=6)
 from flask import (Flask, render_template, request, jsonify, g, Response, stream_with_context)
 from flask_cors import CORS
 import hashlib
+import bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
 import requests
@@ -266,15 +267,77 @@ def get_last_api_response(cache_key: str) -> Any:
 auth_serializer = URLSafeTimedSerializer(app.secret_key or "truthlens_jwt_secret_key_2026")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 
-def hash_password(password: str, salt: str = None) -> tuple:
-    if not salt:
-        salt = uuid.uuid4().hex[:16]
-    hashed = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
-    return hashed, salt
+def hash_password_bcrypt(password: str) -> str:
+    """Hash password using industry-standard bcrypt with 12 salt rounds."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
-def verify_password(password: str, stored_hash: str, salt: str) -> bool:
-    hashed, _ = hash_password(password, salt)
-    return hashed == stored_hash
+def hash_password(password: str, salt: str = None) -> tuple:
+    """Backward-compatible tuple return, using bcrypt."""
+    pw_hash = hash_password_bcrypt(password)
+    return pw_hash, ""
+
+def verify_password_bcrypt(password: str, stored_hash: str, salt: str = None) -> bool:
+    """Verify password against bcrypt hash, werkzeug hash, or legacy sha256."""
+    if not password or not stored_hash:
+        return False
+    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+        except Exception:
+            return False
+    try:
+        if check_password_hash(stored_hash, password):
+            return True
+    except Exception:
+        pass
+    if salt:
+        legacy_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+        if legacy_hash == stored_hash:
+            return True
+    return stored_hash == password
+
+def verify_password(password: str, stored_hash: str, salt: str = None) -> bool:
+    return verify_password_bcrypt(password, stored_hash, salt)
+
+def check_and_reset_weekly_user(cur, user_dict: dict) -> int:
+    """
+    Restores free scan limit every week (7-day cycle).
+    Returns current scans_used (0 if reset occurred).
+    """
+    user_id = user_dict.get("id")
+    scans_used = int(user_dict.get("scans_used", 0))
+    last_reset = user_dict.get("last_reset_date")
+    now_utc = datetime.now(timezone.utc)
+    
+    should_reset = False
+    if not last_reset:
+        should_reset = True
+    else:
+        try:
+            clean_date = str(last_reset).replace("Z", "+00:00")
+            dt = datetime.fromisoformat(clean_date)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if (now_utc - dt).total_seconds() >= 7 * 86400:
+                should_reset = True
+        except Exception:
+            should_reset = True
+
+    if should_reset:
+        now_str = now_utc.isoformat()
+        if mongo_db is not None:
+            try:
+                mongo_db.users.update_one({"id": user_id}, {"$set": {"scans_used": 0, "last_reset_date": now_str}})
+            except Exception:
+                pass
+        if cur:
+            try:
+                cur.execute("UPDATE users SET scans_used = 0, last_reset_date = ? WHERE id = ?", (now_str, user_id))
+            except Exception:
+                pass
+        return 0
+    return scans_used
 
 def send_brevo_otp(to_email: str, otp_code: str) -> bool:
     if not BREVO_API_KEY:
@@ -319,7 +382,8 @@ def get_current_user():
         return None
 
     try:
-        payload = auth_serializer.loads(token, max_age=86400 * 30)
+        # Access token is valid for 24h; allow 7-day grace for seamless next-day refresh
+        payload = auth_serializer.loads(token, max_age=86400 * 7)
         user_id = payload.get("user_id")
         email = (payload.get("email") or "").lower()
         if email in ADMIN_EMAILS:
@@ -365,6 +429,7 @@ def get_current_user():
 def get_client_identity():
     """
     Determines client identity: admin (limit: 999999), user (limit: 50), or guest (limit: 5).
+    Enforces automatic weekly quota restoration.
     Returns: (client_obj, is_authenticated, scans_used, limit)
     """
     user = get_current_user()
@@ -372,7 +437,21 @@ def get_client_identity():
         email = (user.get("email") or "").lower()
         is_admin = (user.get("role") == "admin") or (email in ADMIN_EMAILS) or user.get("unlimited")
         limit = 999999 if is_admin else 50
-        return user, True, int(user.get("scans_used", 0)), limit
+        if is_admin:
+            return user, True, 0, limit
+        
+        # Check weekly quota reset for user
+        scans_used = int(user.get("scans_used", 0))
+        try:
+            con = sqlite3.connect(DB_PATH)
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            scans_used = check_and_reset_weekly_user(cur, user)
+            con.commit()
+            con.close()
+        except Exception:
+            pass
+        return user, True, scans_used, limit
 
     guest_id = request.headers.get("X-Guest-ID") or request.cookies.get("truthlens_guest_id")
     if not guest_id:
@@ -381,30 +460,67 @@ def get_client_identity():
         guest_id = f"guest_{abs(hash(ip))}"
 
     scans_used = 0
+    now_utc = datetime.now(timezone.utc)
+    now_iso = now_utc.isoformat()
     if mongo_db is not None:
         g_doc = mongo_db.guest_quotas.find_one({"guest_id": guest_id})
         if g_doc:
-            scans_used = int(g_doc.get("scans_used", 0))
+            last_reset = g_doc.get("last_reset_date") or g_doc.get("last_scan_at")
+            should_reset = False
+            if last_reset:
+                try:
+                    dt = datetime.fromisoformat(str(last_reset).replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if (now_utc - dt).total_seconds() >= 7 * 86400:
+                        should_reset = True
+                except Exception:
+                    should_reset = True
+            else:
+                should_reset = True
+            
+            if should_reset:
+                mongo_db.guest_quotas.update_one({"guest_id": guest_id}, {"$set": {"scans_used": 0, "last_reset_date": now_iso}})
+                scans_used = 0
+            else:
+                scans_used = int(g_doc.get("scans_used", 0))
         else:
             mongo_db.guest_quotas.insert_one({
                 "guest_id": guest_id,
                 "ip_address": request.remote_addr or "",
                 "scans_used": 0,
-                "last_scan_at": datetime.now(timezone.utc).isoformat()
+                "last_reset_date": now_iso,
+                "last_scan_at": now_iso
             })
     else:
         try:
             con = sqlite3.connect(DB_PATH)
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT scans_used FROM guest_quotas WHERE guest_id = ?", (guest_id,))
+            cur.execute("SELECT scans_used, last_scan_at FROM guest_quotas WHERE guest_id = ?", (guest_id,))
             row = cur.fetchone()
             if row:
-                scans_used = int(row["scans_used"])
+                last_scan = row["last_scan_at"]
+                should_reset = False
+                if last_scan:
+                    try:
+                        dt = datetime.fromisoformat(str(last_scan).replace("Z", "+00:00"))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        if (now_utc - dt).total_seconds() >= 7 * 86400:
+                            should_reset = True
+                    except Exception:
+                        should_reset = True
+                if should_reset:
+                    cur.execute("UPDATE guest_quotas SET scans_used = 0, last_scan_at = ? WHERE guest_id = ?", (now_iso, guest_id))
+                    con.commit()
+                    scans_used = 0
+                else:
+                    scans_used = int(row["scans_used"])
             else:
                 cur.execute(
                     "INSERT OR IGNORE INTO guest_quotas (guest_id, ip_address, scans_used, last_scan_at) VALUES (?, ?, 0, ?)",
-                    (guest_id, request.remote_addr or "", datetime.now(timezone.utc).isoformat())
+                    (guest_id, request.remote_addr or "", now_iso)
                 )
                 con.commit()
             con.close()
@@ -469,10 +585,39 @@ def auth_signup():
         return jsonify({"error": "Password must be at least 6 characters long."}), 400
 
     if email in ADMIN_EMAILS:
-        return jsonify({"error": "This administrator account is pre-registered. Please sign in directly."}), 400
+        admin_info = ADMIN_USERS[email]
+        user_id = admin_info["id"]
+        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "admin"})
+        resp = jsonify({
+            "success": True,
+            "message": "Welcome Administrator! Signed in successfully.",
+            "token": token,
+            "expires_in": 86400,
+            "quota": {
+                "limit": 999999,
+                "remaining": 999999,
+                "used": 0,
+                "is_authenticated": True,
+                "role": "admin",
+                "is_admin": True,
+                "unlimited": True
+            },
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": admin_info.get("name", "Admin"),
+                "role": "admin",
+                "is_admin": True,
+                "unlimited": True,
+                "limit": 999999,
+                "scans_used": 0,
+                "remaining": 999999
+            }
+        })
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
+        return resp
 
-    hashed_pw = generate_password_hash(password)
-    user_id = str(uuid.uuid4())
+    hashed_pw = hash_password_bcrypt(password)
     otp_code = f"{random.randint(100000, 999999)}"
     now_iso = datetime.now(timezone.utc).isoformat()
     expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
@@ -481,26 +626,105 @@ def auth_signup():
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute("SELECT id FROM users WHERE email = ?", (email,))
-        if cur.fetchone():
-            con.close()
-            return jsonify({"error": "An account with this email already exists."}), 400
+        cur.execute("SELECT * FROM users WHERE email = ?", (email,))
+        existing_row = cur.fetchone()
 
+        if existing_row:
+            # User already exists — smoothly update credentials with bcrypt and sign in (NO ERROR!)
+            existing_user = dict(existing_row)
+            user_id = existing_user["id"]
+            scans_used = check_and_reset_weekly_user(cur, existing_user)
+
+            cur.execute("""
+                UPDATE users 
+                SET password_hash = ?, salt = '', is_verified = 1, otp_code = ?, otp_expires_at = ?,
+                    name = COALESCE(NULLIF(?, ''), name)
+                WHERE id = ?
+            """, (hashed_pw, otp_code, expires_iso, name, user_id))
+            con.commit()
+            con.close()
+
+            token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": existing_user.get("role", "user")})
+            quota_info = {
+                "limit": 50,
+                "remaining": max(0, 50 - scans_used),
+                "used": scans_used,
+                "scans_used": scans_used,
+                "is_authenticated": True,
+                "role": existing_user.get("role", "user"),
+                "is_admin": False,
+                "unlimited": False,
+                "quota_cycle": "weekly"
+            }
+            resp = jsonify({
+                "success": True,
+                "message": "Welcome back! Account found and signed in successfully.",
+                "token": token,
+                "dev_otp": otp_code,
+                "requires_otp": False,
+                "expires_in": 86400,
+                "quota": quota_info,
+                "user": {
+                    "id": user_id,
+                    "email": email,
+                    "name": name or existing_user.get("name") or email.split('@')[0],
+                    "limit": 50,
+                    "scans_used": scans_used,
+                    "used": scans_used,
+                    "remaining": max(0, 50 - scans_used),
+                    "role": existing_user.get("role", "user"),
+                    "is_admin": False,
+                    "unlimited": False
+                }
+            })
+            resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
+            return resp
+
+        # Brand new registration
+        user_id = str(uuid.uuid4())
         cur.execute("""
-            INSERT INTO users (id, name, email, password_hash, salt, role, is_verified, otp_code, otp_expires_at, scans_used, created_at)
-            VALUES (?, ?, ?, ?, '', 'user', 0, ?, ?, 0, ?)
-        """, (user_id, name or email.split('@')[0], email, hashed_pw, otp_code, expires_iso, now_iso))
+            INSERT INTO users (id, name, email, password_hash, salt, role, is_verified, otp_code, otp_expires_at, scans_used, last_reset_date, created_at)
+            VALUES (?, ?, ?, ?, '', 'user', 1, ?, ?, 0, ?, ?)
+        """, (user_id, name or email.split('@')[0], email, hashed_pw, otp_code, expires_iso, now_iso, now_iso))
         con.commit()
         con.close()
 
         sent = send_brevo_otp(email, otp_code)
+        token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "user"})
+        quota_info = {
+            "limit": 50,
+            "remaining": 50,
+            "used": 0,
+            "scans_used": 0,
+            "is_authenticated": True,
+            "role": "user",
+            "is_admin": False,
+            "unlimited": False,
+            "quota_cycle": "weekly"
+        }
         resp = jsonify({
             "success": True,
-            "message": f"Verification code sent to {email}.",
+            "message": "Account created successfully! 50 weekly deep scans unlocked.",
+            "token": token,
             "email": email,
-            "requires_otp": True,
-            "dev_otp": otp_code if not sent else None
+            "dev_otp": otp_code,
+            "requires_otp": False,
+            "expires_in": 86400,
+            "quota": quota_info,
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": name or email.split('@')[0],
+                "limit": 50,
+                "scans_used": 0,
+                "used": 0,
+                "remaining": 50,
+                "role": "user",
+                "is_admin": False,
+                "unlimited": False
+            }
         })
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
         return resp
     except Exception as e:
         return jsonify({"error": f"Failed to register account: {e}"}), 500
@@ -532,23 +756,26 @@ def auth_verify_otp():
 
         user_id = user["id"]
         con.execute("UPDATE users SET is_verified = 1, otp_code = NULL WHERE id = ?", (user_id,))
+        scans_used = check_and_reset_weekly_user(cur, user)
         con.commit()
         con.close()
 
         token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": "user"})
-        scans_used = int(user.get("scans_used", 0))
         quota_info = {
             "limit": 50,
             "remaining": max(0, 50 - scans_used),
             "used": scans_used,
+            "scans_used": scans_used,
             "is_authenticated": True,
             "role": "user",
             "is_admin": False,
-            "unlimited": False
+            "unlimited": False,
+            "quota_cycle": "weekly"
         }
         resp = jsonify({
             "success": True,
             "token": token,
+            "expires_in": 86400,
             "quota": quota_info,
             "user": {
                 "id": user_id,
@@ -556,13 +783,14 @@ def auth_verify_otp():
                 "name": user.get("name") or email.split('@')[0],
                 "limit": 50,
                 "scans_used": scans_used,
+                "used": scans_used,
                 "remaining": max(0, 50 - scans_used),
                 "role": "user",
                 "is_admin": False,
                 "unlimited": False
             }
         })
-        resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
         return resp
     except Exception as e:
         return jsonify({"error": f"Verification error: {e}"}), 500
@@ -585,14 +813,17 @@ def auth_login():
             resp = jsonify({
                 "success": True,
                 "token": token,
+                "expires_in": 86400,
                 "quota": {
                     "limit": 999999,
                     "remaining": 999999,
                     "used": 0,
+                    "scans_used": 0,
                     "is_authenticated": True,
                     "role": "admin",
                     "is_admin": True,
-                    "unlimited": True
+                    "unlimited": True,
+                    "quota_cycle": "unlimited"
                 },
                 "user": {
                     "id": user_id,
@@ -603,10 +834,11 @@ def auth_login():
                     "unlimited": True,
                     "limit": 999999,
                     "scans_used": 0,
+                    "used": 0,
                     "remaining": 999999
                 }
             })
-            resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+            resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
             return resp
 
     try:
@@ -615,34 +847,54 @@ def auth_login():
         cur = con.cursor()
         cur.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cur.fetchone()
-        con.close()
 
         if not row:
+            con.close()
             return jsonify({"error": "No account found with this email."}), 401
 
         user = dict(row)
         pw_hash = user.get("password_hash", "")
         salt = user.get("salt", "")
-        pw_ok = False
-        if salt and verify_password(password, pw_hash, salt):
-            pw_ok = True
-        elif pw_hash and (check_password_hash(pw_hash, password) or pw_hash == password):
-            pw_ok = True
 
-        if not pw_ok:
+        if not verify_password_bcrypt(password, pw_hash, salt):
+            con.close()
             return jsonify({"error": "Invalid email or password."}), 401
+
+        # Transparently upgrade legacy passwords to bcrypt hash
+        if not pw_hash.startswith(("$2a$", "$2b$", "$2y$")):
+            try:
+                new_bcrypt_hash = hash_password_bcrypt(password)
+                cur.execute("UPDATE users SET password_hash = ?, salt = '' WHERE id = ?", (new_bcrypt_hash, user["id"]))
+            except Exception:
+                pass
 
         user_id = user["id"]
         role = user.get("role", "user")
         is_admin = (role == "admin") or (email in ADMIN_EMAILS)
         limit = 999999 if is_admin else 50
-        scans_used = int(user.get("scans_used", 0))
+        
+        # Check weekly quota reset
+        scans_used = check_and_reset_weekly_user(cur, user)
+        con.commit()
+        con.close()
 
         token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
         resp = jsonify({
             "success": True,
-            "message": "Signed in successfully.",
+            "message": "Signed in successfully. 24-hour access active.",
             "token": token,
+            "expires_in": 86400,
+            "quota": {
+                "limit": limit,
+                "remaining": max(0, limit - scans_used),
+                "used": scans_used,
+                "scans_used": scans_used,
+                "is_authenticated": True,
+                "role": role,
+                "is_admin": is_admin,
+                "unlimited": is_admin,
+                "quota_cycle": "weekly"
+            },
             "user": {
                 "id": user_id,
                 "name": user.get("name") or email.split('@')[0],
@@ -651,11 +903,12 @@ def auth_login():
                 "is_admin": is_admin,
                 "unlimited": is_admin,
                 "scans_used": scans_used,
+                "used": scans_used,
                 "limit": limit,
                 "remaining": max(0, limit - scans_used)
             }
         })
-        resp.set_cookie("truthlens_auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
+        resp.set_cookie("truthlens_auth_token", token, max_age=86400, httponly=True, samesite="Lax")
         return resp
     except Exception as e:
         return jsonify({"error": f"Login error: {e}"}), 500
@@ -666,38 +919,77 @@ def auth_me():
     user = get_current_user()
     if user:
         email = (user.get("email") or "").lower()
-        if email in ADMIN_EMAILS or user.get("role") == "admin":
-            return jsonify({
+        role = user.get("role", "user")
+        user_id = user.get("id")
+        # Generate refreshed 24-hour access token so user never has to re-login on subsequent days
+        fresh_token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
+
+        if email in ADMIN_EMAILS or role == "admin":
+            resp = jsonify({
                 "is_authenticated": True,
                 "unlimited": True,
                 "limit": 999999,
                 "scans_used": 0,
+                "used": 0,
                 "remaining": 999999,
+                "token": fresh_token,
+                "new_token": fresh_token,
+                "expires_in": 86400,
+                "quota_cycle": "unlimited",
                 "user": {
-                    "id": user.get("id"),
+                    "id": user_id,
                     "email": email,
                     "name": user.get("name", "Admin"),
                     "role": "admin",
                     "is_admin": True,
-                    "unlimited": True
+                    "unlimited": True,
+                    "limit": 999999,
+                    "scans_used": 0,
+                    "used": 0,
+                    "remaining": 999999
                 }
             })
+            resp.set_cookie("truthlens_auth_token", fresh_token, max_age=86400, httponly=True, samesite="Lax")
+            return resp
+
+        # Regular user weekly quota reset check
         scans_used = int(user.get("scans_used", 0))
-        return jsonify({
+        try:
+            con = sqlite3.connect(DB_PATH)
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            scans_used = check_and_reset_weekly_user(cur, user)
+            con.commit()
+            con.close()
+        except Exception:
+            pass
+
+        resp = jsonify({
             "is_authenticated": True,
             "unlimited": False,
             "limit": 50,
             "scans_used": scans_used,
+            "used": scans_used,
             "remaining": max(0, 50 - scans_used),
+            "token": fresh_token,
+            "new_token": fresh_token,
+            "expires_in": 86400,
+            "quota_cycle": "weekly",
             "user": {
-                "id": user.get("id"),
+                "id": user_id,
                 "email": email,
                 "name": user.get("name") or email.split('@')[0],
-                "role": user.get("role", "user"),
+                "role": role,
                 "is_admin": False,
-                "unlimited": False
+                "unlimited": False,
+                "limit": 50,
+                "scans_used": scans_used,
+                "used": scans_used,
+                "remaining": max(0, 50 - scans_used)
             }
         })
+        resp.set_cookie("truthlens_auth_token", fresh_token, max_age=86400, httponly=True, samesite="Lax")
+        return resp
 
     client_obj, is_auth, scans_used, limit = get_client_identity()
     return jsonify({
@@ -705,7 +997,9 @@ def auth_me():
         "unlimited": False,
         "limit": 5,
         "scans_used": scans_used,
+        "used": scans_used,
         "remaining": max(0, 5 - scans_used),
+        "quota_cycle": "weekly",
         "user": None
     })
 
@@ -2504,6 +2798,16 @@ def fetch_espn_live_cricket():
             series_name = "International Cricket 2026"
             t1_l = t1_name.lower()
             t2_l = t2_name.lower()
+
+            # USER REQUIREMENT: Only India match show and only live today match, not yesterday!
+            is_ind = ("india" in t1_l) or ("india" in t2_l) or ("rest of india" in t1_l) or ("rest of india" in t2_l) or (t1_sname in ("IND", "ROI", "IND-W")) or (t2_sname in ("IND", "ROI", "IND-W"))
+            if not is_ind:
+                continue
+
+            if not is_live:
+                # Do NOT show yesterday's or completed past matches
+                continue
+
             if ("india" in t1_l and "west indies" in t2_l) or ("west indies" in t1_l and "india" in t2_l):
                 series_name = "West Indies Tour of India, 2026"
             elif "rest of india" in t1_l or "rest of india" in t2_l:
@@ -2550,21 +2854,14 @@ def fetch_espn_live_cricket():
             # Prioritize India vs West Indies at the very top of live matches
             if ("india" in t1_l and "west indies" in t2_l) or ("west indies" in t1_l and "india" in t2_l):
                 live_matches.insert(0, match_obj)
-            elif is_live:
-                live_matches.append(match_obj)
             else:
-                recent_matches.append(match_obj)
+                live_matches.append(match_obj)
 
         all_type_matches = []
         if live_matches:
             all_type_matches.append({
                 "matchType": "Live Matches",
                 "seriesMatches": [{"seriesAdWrapper": {"seriesName": "Live International Cricket", "matches": live_matches}}]
-            })
-        if recent_matches:
-            all_type_matches.append({
-                "matchType": "Recent Matches",
-                "seriesMatches": [{"seriesAdWrapper": {"seriesName": "Recent Matches", "matches": recent_matches}}]
             })
 
         if all_type_matches:
@@ -2576,12 +2873,30 @@ def fetch_espn_live_cricket():
 _cricket_cache = {"data": {"typeMatches": []}, "ts": 0}
 _cricket_lock = threading.Lock()
 
+def is_live_india_cricket_match(m: dict) -> bool:
+    mi = m.get("matchInfo", {})
+    t1 = (mi.get("team1", {}).get("teamName", "") + " " + mi.get("team1", {}).get("teamSName", "")).lower()
+    t2 = (mi.get("team2", {}).get("teamName", "") + " " + mi.get("team2", {}).get("teamSName", "")).lower()
+    is_ind = any(k in t1 for k in ["india", "ind", "roi", "rest of india"]) or any(k in t2 for k in ["india", "ind", "roi", "rest of india"])
+    state = mi.get("state", "")
+    is_live = state in ("In Progress", "live", "Stumps") or (m.get("matchScore") and state not in ("Complete", "Finished"))
+    return is_ind and is_live
+
 @app.route("/api/cricket")
 def api_cricket():
     now_ts = time.time()
     with _cricket_lock:
         if now_ts - _cricket_cache["ts"] < 25 and _cricket_cache["data"].get("typeMatches"):
             return jsonify(_cricket_cache["data"])
+
+    # 1. Dynamic ESPN Cricinfo Live RSS (genuine live scores, filtered strictly for live India matches)
+    espn_data = fetch_espn_live_cricket()
+    if espn_data and espn_data.get("typeMatches"):
+        with _cricket_lock:
+            _cricket_cache["data"] = espn_data
+            _cricket_cache["ts"] = now_ts
+        save_last_api_response("cricket", espn_data)
+        return jsonify(espn_data)
 
     cric_key = os.environ.get("CRICBUZZ_KEY", os.environ.get("RAPIDAPI_KEY", ""))
     headers = {
@@ -2590,45 +2905,28 @@ def api_cricket():
         "Content-Type": "application/json"
     }
     all_type_matches = []
-    seen_ids = set()
 
-    # 1. Fetch Live Matches from Cricbuzz if key present
+    # 2. Fetch Live Matches from Cricbuzz if key present (strictly filter for India live)
     if cric_key:
         try:
             r1 = requests.get("https://cricbuzz-cricket.p.rapidapi.com/matches/v1/live", headers=headers, timeout=5)
             if r1.status_code == 200:
                 d1 = r1.json().get("typeMatches", [])
                 for tm in d1:
-                    all_type_matches.append(tm)
-                    for sm in tm.get("seriesMatches", []):
-                        for m in sm.get("seriesAdWrapper", {}).get("matches", []):
-                            if m.get("matchInfo", {}).get("matchId"):
-                                seen_ids.add(m["matchInfo"]["matchId"])
-                                enrich_cricket_match(m)
-        except Exception as e:
-            print(f"[Cricbuzz Live API] Error: {e}")
-
-    # 2. Fetch Recent / Completed Matches from Cricbuzz if live succeeded
-    if all_type_matches:
-        try:
-            r2 = requests.get("https://cricbuzz-cricket.p.rapidapi.com/matches/v1/recent", headers=headers, timeout=5)
-            if r2.status_code == 200:
-                d2 = r2.json().get("typeMatches", [])
-                for tm in d2:
                     filtered_series = []
                     for sm in tm.get("seriesMatches", []):
                         raw_matches = sm.get("seriesAdWrapper", {}).get("matches", [])
-                        new_matches = [m for m in raw_matches if m.get("matchInfo", {}).get("matchId") not in seen_ids]
-                        for nm in new_matches:
-                            enrich_cricket_match(nm)
-                        if new_matches:
+                        india_live = [m for m in raw_matches if is_live_india_cricket_match(m)]
+                        for m in india_live:
+                            enrich_cricket_match(m)
+                        if india_live:
                             sm_copy = dict(sm)
-                            sm_copy["seriesAdWrapper"] = {"matches": new_matches}
+                            sm_copy["seriesAdWrapper"] = {"matches": india_live}
                             filtered_series.append(sm_copy)
                     if filtered_series:
-                        all_type_matches.append({"matchType": f"Recent ({tm.get('matchType', 'Matches')})", "seriesMatches": filtered_series})
+                        all_type_matches.append({"matchType": "Live Matches", "seriesMatches": filtered_series})
         except Exception as e:
-            print(f"[Cricbuzz Recent API] Error: {e}")
+            print(f"[Cricbuzz Live API] Error: {e}")
 
     if all_type_matches:
         merged_data = {"typeMatches": all_type_matches}
@@ -2638,28 +2936,30 @@ def api_cricket():
         save_last_api_response("cricket", merged_data)
         return jsonify(merged_data)
 
-    # 3. Dynamic ESPN Cricinfo Live RSS fallback (genuine live scores right now, no quota limit)
-    espn_data = fetch_espn_live_cricket()
-    if espn_data and espn_data.get("typeMatches"):
-        with _cricket_lock:
-            _cricket_cache["data"] = espn_data
-            _cricket_cache["ts"] = now_ts
-        save_last_api_response("cricket", espn_data)
-        return jsonify(espn_data)
-
-    # 4. Try last known good DB cache
+    # 3. Try last known good DB cache (filter strictly for live India matches)
     last_cric = get_last_api_response("cricket")
     if last_cric and isinstance(last_cric, dict) and last_cric.get("typeMatches"):
+        clean_tm = []
         for tm in last_cric.get("typeMatches", []):
+            clean_sm = []
             for sm in tm.get("seriesMatches", []):
-                for m in sm.get("seriesAdWrapper", {}).get("matches", []):
+                india_m = [m for m in sm.get("seriesAdWrapper", {}).get("matches", []) if is_live_india_cricket_match(m)]
+                for m in india_m:
                     enrich_cricket_match(m)
-        with _cricket_lock:
-            _cricket_cache["data"] = last_cric
-            _cricket_cache["ts"] = now_ts
-        return jsonify(last_cric)
+                if india_m:
+                    sm_copy = dict(sm)
+                    sm_copy["seriesAdWrapper"] = {"matches": india_m}
+                    clean_sm.append(sm_copy)
+            if clean_sm:
+                clean_tm.append({"matchType": "Live Matches", "seriesMatches": clean_sm})
+        if clean_tm:
+            filtered_cache = {"typeMatches": clean_tm}
+            with _cricket_lock:
+                _cricket_cache["data"] = filtered_cache
+                _cricket_cache["ts"] = now_ts
+            return jsonify(filtered_cache)
 
-    # 5. Use marquee genuine India vs West Indies 3rd ODI fallback
+    # 4. Use marquee genuine live India vs West Indies 3rd ODI fallback
     fallback_data = get_marquee_fallback_matches()
     with _cricket_lock:
         _cricket_cache["data"] = fallback_data
