@@ -797,8 +797,8 @@ threading.Thread(target=_self_keep_alive, daemon=True).start()
 
 #### 1. Repository Setup
 ```bash
-git clone https://github.com/Raj-Rathod-Ai/Fake-News-Detection-Using-ML-Real-time.git
-cd Fake-News-Detection-Using-ML-Real-time
+git clone https://github.com/Raj-Rathod-Ai/Fake-News-Detection-Using-DL-Real-time.git
+cd Fake-News-Detection-Using-DL-Real-time
 ```
 
 #### 2. Virtual Environment Configuration
