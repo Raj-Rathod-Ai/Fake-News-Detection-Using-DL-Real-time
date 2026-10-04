@@ -384,9 +384,9 @@ BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "pdead3320@gmail.com")
 BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "truthlens")
 
 def send_brevo_email(to_email: str, to_name: str, subject: str, html_content: str) -> bool:
-    api_key = os.environ.get("BREVO_API_KEY", "")
-    sender_email = os.environ.get("BREVO_SENDER_EMAIL", "pdead3320@gmail.com")
-    sender_name = os.environ.get("BREVO_SENDER_NAME", "truthlens")
+    api_key = os.environ.get("BREVO_API_KEY", "") or BREVO_API_KEY
+    sender_email = os.environ.get("BREVO_SENDER_EMAIL", "") or BREVO_SENDER_EMAIL
+    sender_name = os.environ.get("BREVO_SENDER_NAME", "") or BREVO_SENDER_NAME
     if not api_key:
         print("[Brevo] No BREVO_API_KEY configured.")
         return False

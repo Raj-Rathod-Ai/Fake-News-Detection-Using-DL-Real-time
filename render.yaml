@@ -20,3 +20,4 @@ services:
         value: "0"
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"
+

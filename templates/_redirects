@@ -1,0 +1,2 @@
+/api/*  https://fake-news-detection-using-ml-real-time.onrender.com/api/:splat  200!
+/*      /index.html                                                            200

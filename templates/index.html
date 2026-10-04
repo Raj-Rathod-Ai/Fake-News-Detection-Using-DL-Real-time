@@ -1262,6 +1262,65 @@
         }
 
         // =====================================================================
+        // BACKEND API CLIENT & URL ROUTER (Handles Local Dev + Netlify + Render Cloud)
+        // =====================================================================
+        const RENDER_BACKEND_ORIGIN = 'https://fake-news-detection-using-ml-real-time.onrender.com';
+
+        function getApiUrl(endpoint) {
+            if (!endpoint) return '';
+            if (!endpoint.startsWith('/')) endpoint = '/' + endpoint;
+            // Local dev server -> keep relative path
+            const isLocal = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.port === '3000' || 
+                            window.location.port === '5000';
+            if (isLocal) {
+                return endpoint;
+            }
+            // Netlify or external production frontend -> connect directly to Render backend
+            return `${RENDER_BACKEND_ORIGIN}${endpoint}`;
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            const url = getApiUrl(endpoint);
+            let res;
+            try {
+                res = await fetch(url, options);
+            } catch (err) {
+                // If direct Render request failed on Netlify, attempt fallback to relative path
+                if (url.startsWith('http') && !url.includes(window.location.host)) {
+                    try {
+                        res = await fetch(endpoint, options);
+                    } catch (fallbackErr) {
+                        throw new Error("Unable to reach TruthLens AI servers. If the server is starting up, please wait ~20 seconds and try again.");
+                    }
+                } else {
+                    throw err;
+                }
+            }
+
+            const cType = (res.headers && res.headers.get('content-type')) || '';
+            let data = null;
+            if (cType.includes('application/json')) {
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    data = null;
+                }
+            } else {
+                const text = await res.text();
+                if (res.status === 504 || res.status === 502) {
+                    throw new Error("TruthLens server is currently spinning up (cold-start takes ~25s). Please wait 20 seconds and click again.");
+                }
+                if (!res.ok) {
+                    throw new Error(`Server returned error (${res.status}). Please try again.`);
+                }
+            }
+
+            return { res, data, ok: res.ok, status: res.status };
+        }
+
+        // =====================================================================
         // AUTHENTICATION & QUOTA STATE
         // =====================================================================
         let currentUser = null;
@@ -1291,11 +1350,9 @@
         async function checkAuthStatus() {
             try {
                 const token = localStorage.getItem('tl_auth_token') || localStorage.getItem('tl_token');
-                const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
-                if (res.ok) {
-                    const data = await res.json();
+                const { ok, status, data } = await apiFetch('/api/auth/me', { headers: getAuthHeaders() });
+                if (ok && data) {
                     if (data.is_authenticated && data.user) {
-                        // User has active access token (<= 1 day) -> direct seamless sign in!
                         currentUser = data.user;
                         currentQuota = {
                             limit: data.limit || 50,
@@ -1314,7 +1371,6 @@
                         renderAuthArea();
                         return;
                     } else {
-                        // Token expired (> 1 day limit) or invalid
                         if (token) {
                             localStorage.removeItem('tl_auth_token');
                             localStorage.removeItem('tl_token');
@@ -1328,8 +1384,7 @@
                         };
                         renderAuthArea();
                     }
-                } else if (res.status === 401 || res.status === 403) {
-                    // Token expired (> 1 day limit)
+                } else if (status === 401 || status === 403) {
                     localStorage.removeItem('tl_auth_token');
                     localStorage.removeItem('tl_token');
                     currentUser = null;
@@ -1609,20 +1664,19 @@
             }
 
             try {
-                const res = await fetch('/api/auth/forgot-password', {
+                const { ok, data } = await apiFetch('/api/auth/forgot-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Failed to send reset code.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Failed to send reset code.", "error");
                     return;
                 }
-                showToast("A 7-digit password reset code has been sent to your email.", "success");
+                showToast(data.message || "A 7-digit password reset code has been sent to your email.", "success");
                 showResetPasswordForm(email);
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -1654,14 +1708,13 @@
             btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Updating Password...`;
 
             try {
-                const res = await fetch('/api/auth/reset-password', {
+                const { ok, data } = await apiFetch('/api/auth/reset-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: pendingResetEmail, otp, new_password })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Failed to reset password. Please check the code.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Failed to reset password. Please check the code.", "error");
                     return;
                 }
 
@@ -1681,7 +1734,7 @@
                 renderAuthArea();
                 showToast("Password updated successfully! You are now signed in.", "success");
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 btn.disabled = false;
                 btn.textContent = "Update Password & Sign In";
@@ -1736,19 +1789,18 @@
             btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Authenticating...`;
 
             try {
-                const res = await fetch('/api/auth/login', {
+                const { ok, data } = await apiFetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Guest-ID': getGuestId() },
                     body: JSON.stringify({ email, password })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    if (data.requires_otp) {
+                if (!ok || !data) {
+                    if (data && data.requires_otp) {
                         showToast(data.error || "Please verify your account with the 7-digit code sent to your email.", "warning");
                         showOtpForm(data.email || email);
                         return;
                     }
-                    showToast(data.error || "Login failed.", "error");
+                    showToast((data && data.error) || "Login failed.", "error");
                     return;
                 }
 
@@ -1769,7 +1821,7 @@
                 const welcomeMsg = data.recovered ? "Welcome back! Account deletion was cancelled and your profile was recovered." : "Welcome back! 50 weekly scans unlocked.";
                 showToast(welcomeMsg, "success");
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 btn.disabled = false;
                 btn.textContent = "Sign In & Unlock 50 Scans";
@@ -1795,14 +1847,13 @@
             btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Registering...`;
 
             try {
-                const res = await fetch('/api/auth/signup', {
+                const { ok, data } = await apiFetch('/api/auth/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Guest-ID': getGuestId() },
                     body: JSON.stringify({ name, email, password })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Signup failed.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Signup failed.", "error");
                     return;
                 }
 
@@ -1828,7 +1879,7 @@
                 renderAuthArea();
                 showToast(data.message || "Account created successfully! 50 weekly scans unlocked.", "success");
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 btn.disabled = false;
                 btn.textContent = "Create Free Account (50 Scans)";
@@ -1853,14 +1904,13 @@
             btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Activating Account...`;
 
             try {
-                const res = await fetch('/api/auth/verify-otp', {
+                const { ok, data } = await apiFetch('/api/auth/verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Guest-ID': getGuestId() },
                     body: JSON.stringify({ email: pendingVerificationEmail, otp })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Verification failed. Please check the 7-digit code.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Verification failed. Please check the 7-digit code.", "error");
                     return;
                 }
 
@@ -1880,7 +1930,7 @@
                 renderAuthArea();
                 showToast("Account created successfully! Check your email for login confirmation. Enjoy TruthLens!", "success");
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 btn.disabled = false;
                 btn.textContent = "Verify & Activate Account (50 Scans)";
@@ -1897,19 +1947,18 @@
             btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Resending...`;
 
             try {
-                const res = await fetch('/api/auth/resend-otp', {
+                const { ok, data } = await apiFetch('/api/auth/resend-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: pendingVerificationEmail })
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Failed to resend code.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Failed to resend code.", "error");
                 } else {
                     showToast("A new 7-digit verification code has been sent to your email.", "success");
                 }
             } catch (e) {
-                showToast("Network error while resending code.", "error");
+                showToast(e.message || "Network error while resending code.", "error");
             } finally {
                 btn.disabled = false;
                 btn.textContent = "Resend Code";
@@ -1940,13 +1989,12 @@
             }
 
             try {
-                const res = await fetch('/api/auth/delete-profile', {
+                const { ok, data } = await apiFetch('/api/auth/delete-profile', {
                     method: 'POST',
                     headers: getAuthHeaders()
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    showToast(data.error || "Failed to schedule account deletion.", "error");
+                if (!ok || !data) {
+                    showToast((data && data.error) || "Failed to schedule account deletion.", "error");
                     return;
                 }
 
@@ -1959,7 +2007,7 @@
 
                 showToast("Your account will be deleted in 24 hours. You can recover it within 24 hours by signing in.", "warning");
             } catch (e) {
-                showToast("Network error. Please try again.", "error");
+                showToast(e.message || "Network error. Please try again.", "error");
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -1970,7 +2018,7 @@
 
         async function handleLogout() {
             try {
-                await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
+                await apiFetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
             } catch (e) { }
             localStorage.removeItem('tl_auth_token');
             localStorage.removeItem('tl_token');
