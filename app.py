@@ -53,10 +53,33 @@ load_dotenv()
 
 # App Initialization
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 app.secret_key = os.environ.get("SECRET_KEY", "truthlens-v8-production-secret-key-change-me")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+
+@app.before_request
+def handle_options_preflight():
+    if request.method == "OPTIONS":
+        resp = Response(status=200)
+        resp.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        resp.headers["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "Content-Type, Authorization, X-Guest-ID, Accept, Origin")
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
+        resp.headers["Access-Control-Max-Age"] = "86400"
+        return resp
+
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "Content-Type, Authorization, X-Guest-ID, Accept, Origin")
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    return response
 
 # API Keys & URLs
 NEWS_API_KEY      = os.environ.get("NEWS_API_KEY", "")
@@ -445,6 +468,7 @@ def send_brevo_otp(to_email: str, otp_code: str, user_name: str = "") -> bool:
     name_display = user_name or to_email.split('@')[0]
     subject = f"TruthLens: {otp_code} is your 7-Digit Verification Code"
     brand_logo = get_email_brand_header("Account Security & Verification")
+    verify_url = f"https://truthlens5.netlify.app/?action=verify-otp&email={urllib.parse.quote(to_email)}&code={otp_code}"
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -455,12 +479,21 @@ def send_brevo_otp(to_email: str, otp_code: str, user_name: str = "") -> bool:
             <div style="padding: 35px 30px; text-align: center;">
                 {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Verify Your Account</h1>
-                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
+                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 20px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>, welcome to TruthLens. Please use the 7-digit verification code below to verify your account and unlock <strong>50 free weekly deep scans</strong>:
                 </p>
-                <div style="background-color: #0f172a; border: 2px dashed #a855f7; border-radius: 16px; padding: 20px; margin: 25px 0;">
+                <div style="background-color: #0f172a; border: 2px dashed #a855f7; border-radius: 16px; padding: 20px; margin: 20px 0;">
                     <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #38bdf8;">{otp_code}</span>
                 </div>
+                <div style="margin: 25px 0 15px 0;">
+                    <a href="{verify_url}" target="_blank" style="display: inline-block; padding: 15px 32px; background: linear-gradient(135deg, #a855f7, #3b82f6); color: #ffffff; text-decoration: none; font-weight: 800; font-size: 15px; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 8px 25px rgba(168, 85, 247, 0.45);">
+                        👉 Verify & Activate Account &rarr;
+                    </a>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin: 15px 0 0 0; word-break: break-all;">
+                    Or open this link directly in your browser:<br>
+                    <a href="{verify_url}" target="_blank" style="color: #38bdf8; text-decoration: underline;">{verify_url}</a>
+                </p>
                 <p style="font-size: 12px; color: #64748b; margin: 20px 0 0 0;">
                     ⏱️ This code expires in <strong>15 minutes</strong>.<br>Without verifying, your account cannot be created or accessed. If you did not request this, please ignore this email.
                 </p>
@@ -530,6 +563,7 @@ def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str
     name_display = user_name or to_email.split('@')[0]
     subject = f"TruthLens: {otp_code} is your 7-Digit Password Reset Code"
     brand_logo = get_email_brand_header("Account Security")
+    reset_url = f"https://truthlens5.netlify.app/?action=reset-password&email={urllib.parse.quote(to_email)}&code={otp_code}"
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -540,13 +574,22 @@ def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str
             <div style="padding: 35px 30px; text-align: center;">
                 {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Reset Your Password</h1>
-                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
+                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 20px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
                     We received a request to reset your TruthLens account password. Use the 7-digit verification code below to set a new password:
                 </p>
-                <div style="background-color: #0f172a; border: 2px dashed #ec4899; border-radius: 16px; padding: 20px; margin: 25px 0;">
+                <div style="background-color: #0f172a; border: 2px dashed #ec4899; border-radius: 16px; padding: 20px; margin: 20px 0;">
                     <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #f472b6;">{otp_code}</span>
                 </div>
+                <div style="margin: 25px 0 15px 0;">
+                    <a href="{reset_url}" target="_blank" style="display: inline-block; padding: 15px 32px; background: linear-gradient(135deg, #ec4899, #8b5cf6); color: #ffffff; text-decoration: none; font-weight: 800; font-size: 15px; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 8px 25px rgba(236, 72, 153, 0.45);">
+                        👉 Reset Your Password Now &rarr;
+                    </a>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin: 15px 0 0 0; word-break: break-all;">
+                    Or open this link directly in your browser:<br>
+                    <a href="{reset_url}" target="_blank" style="color: #38bdf8; text-decoration: underline;">{reset_url}</a>
+                </p>
                 <p style="font-size: 12px; color: #64748b; margin: 20px 0 0 0;">
                     ⏱️ This reset code expires in <strong>15 minutes</strong>.<br>
                     If you did not request a password reset, you can safely ignore this email. Your current password remains secure.
@@ -852,8 +895,10 @@ def require_auth(f):
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTH API ENDPOINTS
 # ─────────────────────────────────────────────────────────────────────────────
-@app.route("/api/auth/signup", methods=["POST"])
+@app.route("/api/auth/signup", methods=["POST", "OPTIONS"])
 def auth_signup():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
@@ -869,37 +914,39 @@ def auth_signup():
     expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         existing_user = sync_and_get_user(email, con)
 
         if existing_user:
-            user_id = existing_user["id"]
+            user_id = str(existing_user.get("id") or existing_user.get("_id") or uuid.uuid4())
             user_name = name or existing_user.get("name") or email.split('@')[0]
             # Require 7-digit verification before account can be accessed
             cur.execute("""
                 UPDATE users 
                 SET password_hash = ?, salt = '', is_verified = 0, otp_code = ?, otp_expires_at = ?,
                     name = COALESCE(NULLIF(?, ''), name), deletion_scheduled_at = NULL
-                WHERE id = ?
-            """, (hashed_pw, otp_code, expires_iso, name, user_id))
+                WHERE LOWER(email) = ? OR id = ?
+            """, (hashed_pw, otp_code, expires_iso, name, email, user_id))
             con.commit()
             con.close()
 
-            mdb = get_mongo_db()
-            if mdb is not None:
-                try:
-                    mdb.users.update_one(
-                        {"email": email},
-                        {"$set": {
-                            "password_hash": hashed_pw, "is_verified": 0, "otp_code": otp_code,
-                            "otp_expires_at": expires_iso, "deletion_scheduled_at": None,
-                            "name": user_name
-                        }}
-                    )
-                except Exception:
-                    pass
+            def _bg_update_mongo():
+                mdb = get_mongo_db()
+                if mdb is not None:
+                    try:
+                        mdb.users.update_one(
+                            {"email": email},
+                            {"$set": {
+                                "password_hash": hashed_pw, "is_verified": 0, "otp_code": otp_code,
+                                "otp_expires_at": expires_iso, "deletion_scheduled_at": None,
+                                "name": user_name
+                            }}
+                        )
+                    except Exception:
+                        pass
+            threading.Thread(target=_bg_update_mongo, daemon=True).start()
 
             send_brevo_otp(email, otp_code, user_name)
             return jsonify({
@@ -920,21 +967,23 @@ def auth_signup():
         con.commit()
         con.close()
 
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one(
-                    {"email": email},
-                    {"$set": {
-                        "id": user_id, "name": user_name, "email": email,
-                        "password_hash": hashed_pw, "role": "user", "is_verified": 0,
-                        "otp_code": otp_code, "otp_expires_at": expires_iso, "scans_used": 0,
-                        "last_reset_date": now_iso, "created_at": now_iso
-                    }},
-                    upsert=True
-                )
-            except Exception:
-                pass
+        def _bg_insert_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one(
+                        {"email": email},
+                        {"$set": {
+                            "id": user_id, "name": user_name, "email": email,
+                            "password_hash": hashed_pw, "role": "user", "is_verified": 0,
+                            "otp_code": otp_code, "otp_expires_at": expires_iso, "scans_used": 0,
+                            "last_reset_date": now_iso, "created_at": now_iso
+                        }},
+                        upsert=True
+                    )
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_insert_mongo, daemon=True).start()
 
         # Send 7-digit OTP via Brevo
         send_brevo_otp(email, otp_code, user_name)
@@ -950,8 +999,10 @@ def auth_signup():
         return jsonify({"error": f"Failed to register account: {e}"}), 500
 
 
-@app.route("/api/auth/verify-otp", methods=["POST"])
+@app.route("/api/auth/verify-otp", methods=["POST", "OPTIONS"])
 def auth_verify_otp():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     otp = str(data.get("otp") or "").strip()
@@ -959,7 +1010,7 @@ def auth_verify_otp():
         return jsonify({"error": "Email and 7-digit code are required."}), 400
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         user = sync_and_get_user(email, con)
@@ -972,19 +1023,21 @@ def auth_verify_otp():
             con.close()
             return jsonify({"error": "Invalid verification code. Please check your email or resend."}), 400
 
-        user_id = user["id"]
+        user_id = str(user.get("id") or user.get("_id") or uuid.uuid4())
         user_name = user.get("name") or email.split('@')[0]
-        cur.execute("UPDATE users SET is_verified = 1, otp_code = NULL, deletion_scheduled_at = NULL WHERE id = ?", (user_id,))
+        cur.execute("UPDATE users SET is_verified = 1, otp_code = NULL, deletion_scheduled_at = NULL WHERE LOWER(email) = ? OR id = ?", (email, user_id))
         scans_used = check_and_reset_weekly_user(cur, user)
         con.commit()
         con.close()
 
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one({"id": user_id}, {"$set": {"is_verified": 1, "otp_code": None, "deletion_scheduled_at": None}})
-            except Exception:
-                pass
+        def _bg_verify_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"is_verified": 1, "otp_code": None, "deletion_scheduled_at": None}})
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_verify_mongo, daemon=True).start()
 
         # Send Brevo welcome / account created successfully email with login link!
         send_brevo_welcome_email(email, user_name)
@@ -1031,8 +1084,10 @@ def auth_verify_otp():
         return jsonify({"error": f"Verification error: {e}"}), 500
 
 
-@app.route("/api/auth/resend-otp", methods=["POST"])
+@app.route("/api/auth/resend-otp", methods=["POST", "OPTIONS"])
 def auth_resend_otp():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     if not email:
@@ -1042,7 +1097,7 @@ def auth_resend_otp():
     expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         user = sync_and_get_user(email, con)
@@ -1050,18 +1105,20 @@ def auth_resend_otp():
             con.close()
             return jsonify({"error": "No account found with this email."}), 404
 
-        user_id = user["id"]
+        user_id = str(user.get("id") or user.get("_id") or uuid.uuid4())
         user_name = user.get("name") or email.split('@')[0]
-        cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user_id))
+        cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE LOWER(email) = ? OR id = ?", (otp_code, expires_iso, email, user_id))
         con.commit()
         con.close()
 
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one({"id": user_id}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
-            except Exception:
-                pass
+        def _bg_resend_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_resend_mongo, daemon=True).start()
 
         send_brevo_otp(email, otp_code, user_name)
         return jsonify({
@@ -1073,8 +1130,10 @@ def auth_resend_otp():
         return jsonify({"error": f"Failed to resend code: {e}"}), 500
 
 
-@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/auth/login", methods=["POST", "OPTIONS"])
 def auth_login():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -1082,7 +1141,7 @@ def auth_login():
         return jsonify({"error": "Email and password are required."}), 400
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         user = sync_and_get_user(email, con)
@@ -1098,21 +1157,26 @@ def auth_login():
             con.close()
             return jsonify({"error": "Invalid email or password."}), 401
 
+        user_id = str(user.get("id") or user.get("_id") or uuid.uuid4())
+        user_name = user.get("name") or email.split('@')[0]
+
         # Check if account is verified
         if not user.get("is_verified"):
             # Without verify not create/access account -> generate 7-digit OTP and send via Brevo
             otp_code = f"{random.randint(1000000, 9999999)}"
             expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-            cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user["id"]))
+            cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE LOWER(email) = ? OR id = ?", (otp_code, expires_iso, email, user_id))
             con.commit()
             con.close()
-            mdb = get_mongo_db()
-            if mdb is not None:
-                try:
-                    mdb.users.update_one({"id": user["id"]}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
-                except Exception:
-                    pass
-            send_brevo_otp(email, otp_code, user.get("name"))
+            def _bg_unverified_mongo():
+                mdb = get_mongo_db()
+                if mdb is not None:
+                    try:
+                        mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+                    except Exception:
+                        pass
+            threading.Thread(target=_bg_unverified_mongo, daemon=True).start()
+            send_brevo_otp(email, otp_code, user_name)
             return jsonify({
                 "error": "Your account is not verified yet. We have sent a 7-digit verification code to your email. Please verify before sign in.",
                 "requires_otp": True,
@@ -1131,28 +1195,32 @@ def auth_login():
                     dt_del = dt_del.replace(tzinfo=timezone.utc)
                 if now_utc >= dt_del:
                     # 24 hours have passed -> permanently delete user data!
-                    cur.execute("DELETE FROM users WHERE id = ?", (user["id"],))
-                    cur.execute("DELETE FROM scan_history WHERE user_id = ?", (user["id"],))
+                    cur.execute("DELETE FROM users WHERE LOWER(email) = ? OR id = ?", (email, user_id))
+                    cur.execute("DELETE FROM scan_history WHERE user_id = ?", (user_id,))
                     con.commit()
                     con.close()
-                    mdb = get_mongo_db()
-                    if mdb is not None:
-                        try:
-                            mdb.users.delete_one({"id": user["id"]})
-                            mdb.scan_history.delete_many({"user_id": user["id"]})
-                        except Exception:
-                            pass
+                    def _bg_del_mongo():
+                        mdb = get_mongo_db()
+                        if mdb is not None:
+                            try:
+                                mdb.users.delete_one({"$or": [{"email": email}, {"id": user_id}]})
+                                mdb.scan_history.delete_many({"user_id": user_id})
+                            except Exception:
+                                pass
+                    threading.Thread(target=_bg_del_mongo, daemon=True).start()
                     return jsonify({"error": "This account was scheduled for deletion and has been permanently deleted after 24 hours."}), 410
                 else:
                     # Within 24 hours -> Recover account!
-                    cur.execute("UPDATE users SET deletion_scheduled_at = NULL WHERE id = ?", (user["id"],))
+                    cur.execute("UPDATE users SET deletion_scheduled_at = NULL WHERE LOWER(email) = ? OR id = ?", (email, user_id))
                     account_recovered = True
-                    mdb = get_mongo_db()
-                    if mdb is not None:
-                        try:
-                            mdb.users.update_one({"id": user["id"]}, {"$set": {"deletion_scheduled_at": None}})
-                        except Exception:
-                            pass
+                    def _bg_recover_mongo():
+                        mdb = get_mongo_db()
+                        if mdb is not None:
+                            try:
+                                mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"deletion_scheduled_at": None}})
+                            except Exception:
+                                pass
+                    threading.Thread(target=_bg_recover_mongo, daemon=True).start()
             except Exception:
                 pass
 
@@ -1160,17 +1228,18 @@ def auth_login():
         if not pw_hash.startswith(("$2a$", "$2b$", "$2y$")):
             try:
                 new_bcrypt_hash = hash_password_bcrypt(password)
-                cur.execute("UPDATE users SET password_hash = ?, salt = '' WHERE id = ?", (new_bcrypt_hash, user["id"]))
-                mdb = get_mongo_db()
-                if mdb is not None:
-                    try:
-                        mdb.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_bcrypt_hash, "salt": ""}})
-                    except Exception:
-                        pass
+                cur.execute("UPDATE users SET password_hash = ?, salt = '' WHERE LOWER(email) = ? OR id = ?", (new_bcrypt_hash, email, user_id))
+                def _bg_upgrade_mongo():
+                    mdb = get_mongo_db()
+                    if mdb is not None:
+                        try:
+                            mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"password_hash": new_bcrypt_hash, "salt": ""}})
+                        except Exception:
+                            pass
+                threading.Thread(target=_bg_upgrade_mongo, daemon=True).start()
             except Exception:
                 pass
 
-        user_id = user["id"]
         is_admin = is_admin_user(user) or (user.get("role") == "admin") or (email in ADMIN_EMAILS)
         role = "admin" if is_admin else user.get("role", "user")
         limit = 999999 if is_admin else 50
@@ -1180,22 +1249,24 @@ def auth_login():
         con.commit()
         con.close()
 
-        # Update last_login in MongoDB Atlas
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one(
-                    {"id": user_id},
-                    {"$set": {
-                        "last_login": datetime.now(timezone.utc).isoformat(),
-                        "scans_used": scans_used
-                    }}
-                )
-            except Exception:
-                pass
+        # Update last_login in MongoDB Atlas asynchronously
+        def _bg_login_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one(
+                        {"$or": [{"email": email}, {"id": user_id}]},
+                        {"$set": {
+                            "last_login": datetime.now(timezone.utc).isoformat(),
+                            "scans_used": scans_used
+                        }}
+                    )
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_login_mongo, daemon=True).start()
 
         # Send login notification / welcome email via Brevo
-        send_brevo_welcome_email(email, user.get("name"))
+        send_brevo_welcome_email(email, user_name)
 
         token = auth_serializer.dumps({"user_id": user_id, "email": email, "role": role})
         welcome_msg = "Welcome back! Account deletion was cancelled and your profile was recovered." if account_recovered else "Signed in successfully. 24-hour access active."
@@ -1219,7 +1290,7 @@ def auth_login():
             "user": {
                 "id": user_id,
                 "email": email,
-                "name": user.get("name") or email.split('@')[0],
+                "name": user_name,
                 "limit": limit,
                 "scans_used": scans_used,
                 "used": scans_used,
@@ -1235,8 +1306,10 @@ def auth_login():
         return jsonify({"error": f"Login failed: {e}"}), 500
 
 
-@app.route("/api/auth/forgot-password", methods=["POST"])
+@app.route("/api/auth/forgot-password", methods=["POST", "OPTIONS"])
 def auth_forgot_password():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     if not email:
@@ -1246,7 +1319,7 @@ def auth_forgot_password():
     expires_iso = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         user = sync_and_get_user(email, con)
@@ -1254,18 +1327,20 @@ def auth_forgot_password():
             con.close()
             return jsonify({"error": "No account found with this email address. Please check your spelling or sign up."}), 404
 
-        user_id = user["id"]
+        user_id = str(user.get("id") or user.get("_id") or uuid.uuid4())
         user_name = user.get("name") or email.split('@')[0]
-        cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?", (otp_code, expires_iso, user_id))
+        cur.execute("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE LOWER(email) = ? OR id = ?", (otp_code, expires_iso, email, user_id))
         con.commit()
         con.close()
 
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one({"id": user_id}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
-            except Exception:
-                pass
+        def _bg_forgot_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one({"$or": [{"email": email}, {"id": user_id}]}, {"$set": {"otp_code": otp_code, "otp_expires_at": expires_iso}})
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_forgot_mongo, daemon=True).start()
 
         send_brevo_password_reset_email(email, otp_code, user_name)
         return jsonify({
@@ -1278,8 +1353,10 @@ def auth_forgot_password():
         return jsonify({"error": f"Failed to send password reset code: {e}"}), 500
 
 
-@app.route("/api/auth/reset-password", methods=["POST"])
+@app.route("/api/auth/reset-password", methods=["POST", "OPTIONS"])
 def auth_reset_password():
+    if request.method == "OPTIONS":
+        return Response(status=200)
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     otp_input = str(data.get("otp") or "").strip()
@@ -1295,7 +1372,7 @@ def auth_reset_password():
         return jsonify({"error": "New password must be at least 6 characters long."}), 400
 
     try:
-        con = sqlite3.connect(DB_PATH)
+        con = sqlite3.connect(DB_PATH, timeout=10)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         user = sync_and_get_user(email, con)
@@ -1323,33 +1400,35 @@ def auth_reset_password():
             except Exception:
                 pass
 
-        user_id = user["id"]
+        user_id = str(user.get("id") or user.get("_id") or uuid.uuid4())
         user_name = user.get("name") or email.split('@')[0]
         # Hash new password securely with bcrypt
         new_pw_hash = hash_password_bcrypt(new_password)
 
         cur.execute(
-            "UPDATE users SET password_hash = ?, salt = '', otp_code = NULL, otp_expires_at = NULL, is_verified = 1 WHERE id = ?",
-            (new_pw_hash, user_id)
+            "UPDATE users SET password_hash = ?, salt = '', otp_code = NULL, otp_expires_at = NULL, is_verified = 1 WHERE LOWER(email) = ? OR id = ?",
+            (new_pw_hash, email, user_id)
         )
         con.commit()
         con.close()
 
-        mdb = get_mongo_db()
-        if mdb is not None:
-            try:
-                mdb.users.update_one(
-                    {"id": user_id},
-                    {"$set": {
-                        "password_hash": new_pw_hash,
-                        "salt": "",
-                        "otp_code": None,
-                        "otp_expires_at": None,
-                        "is_verified": 1
-                    }}
-                )
-            except Exception:
-                pass
+        def _bg_reset_mongo():
+            mdb = get_mongo_db()
+            if mdb is not None:
+                try:
+                    mdb.users.update_one(
+                        {"$or": [{"email": email}, {"id": user_id}]},
+                        {"$set": {
+                            "password_hash": new_pw_hash,
+                            "salt": "",
+                            "otp_code": None,
+                            "otp_expires_at": None,
+                            "is_verified": 1
+                        }}
+                    )
+                except Exception:
+                    pass
+        threading.Thread(target=_bg_reset_mongo, daemon=True).start()
 
         # Send security confirmation email
         send_brevo_password_changed_email(email, user_name)
@@ -2041,189 +2120,201 @@ def format_price(val, decimals=2, currency_sym=''):
     except Exception:
         return str(val)
 
+_market_last_refresh_time = 0
+_market_is_refreshing = False
+
 def refresh_markets():
-    all_symbols = list(YAHOO_SYMBOLS.keys())
-    items = []
-    live_count = 0
-
-    usd_inr = FALLBACK_PRICES["INR=X"]
-    # 1. Fetch live USD/INR exchange rate from open exchange API
+    global _market_last_refresh_time, _market_is_refreshing
+    now_ts = time.time()
+    if _market_is_refreshing or (now_ts - _market_last_refresh_time < 120):
+        return
+    _market_is_refreshing = True
     try:
-        r_fx = requests.get("https://open.er-api.com/v6/latest/USD", timeout=3)
-        if r_fx.status_code == 200:
-            fx_rate = r_fx.json().get("rates", {}).get("INR")
-            if fx_rate:
-                usd_inr = float(fx_rate)
-    except Exception:
-        pass
+        all_symbols = list(YAHOO_SYMBOLS.keys())
+        items = []
+        live_count = 0
 
-    gold_usd = FALLBACK_PRICES["GC=F"]
-    silver_usd = FALLBACK_PRICES["SI=F"]
+        usd_inr = FALLBACK_PRICES["INR=X"]
+        # 1. Fetch live USD/INR exchange rate from open exchange API
+        try:
+            r_fx = requests.get("https://open.er-api.com/v6/latest/USD", timeout=3)
+            if r_fx.status_code == 200:
+                fx_rate = r_fx.json().get("rates", {}).get("INR")
+                if fx_rate:
+                    usd_inr = float(fx_rate)
+        except Exception:
+            pass
 
-    browser_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json"
-    }
+        gold_usd = FALLBACK_PRICES["GC=F"]
+        silver_usd = FALLBACK_PRICES["SI=F"]
 
-    import urllib.request
-    import urllib.parse
-
-    for ticker, meta in YAHOO_SYMBOLS.items():
-        price = None
-        change_pct = 0.0
-
-        # Try Yahoo query1 then query2
-        for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]:
-            try:
-                url = f"https://{host}/v8/finance/chart/{urllib.parse.quote(ticker)}?interval=1d"
-                req = urllib.request.Request(url, headers=browser_headers)
-                raw_data = urllib.request.urlopen(req, timeout=3).read()
-                c_data = json.loads(raw_data)
-                c_meta = c_data['chart']['result'][0]['meta']
-
-                p_live = c_meta.get('regularMarketPrice')
-                p_prev = c_meta.get('chartPreviousClose') or c_meta.get('previousClose')
-                if p_live is not None:
-                    price = float(p_live)
-                    if p_prev and p_prev > 0:
-                        change_pct = round(((price - p_prev) / p_prev) * 100, 2)
-                    live_count += 1
-                    break
-            except Exception:
-                continue
-
-        # Fallback for Crypto if Yahoo rate-limits
-        if price is None and ticker in ["BTC-USD", "ETH-USD"]:
-            try:
-                sym_pair = "BTCUSDT" if ticker == "BTC-USD" else "ETHUSDT"
-                r_crypto = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={sym_pair}", timeout=3)
-                if r_crypto.status_code == 200:
-                    price = float(r_crypto.json().get("price", 0))
-                    live_count += 1
-            except Exception:
-                pass
-
-        if price is None:
-            if ticker == "INR=X":
-                price = usd_inr
-            else:
-                price = FALLBACK_PRICES.get(ticker, 100.0)
-
-        if ticker == "INR=X": usd_inr = price
-        elif ticker == "GC=F": gold_usd = price
-        elif ticker == "SI=F": silver_usd = price
-
-        up = change_pct >= 0
-        price_str = format_price(price, decimals=meta.get("decimals", 2), currency_sym=meta.get("sym", ""))
-        entry = {
-            "symbol": meta["symbol"],
-            "price": price,
-            "price_str": price_str,
-            "change": f"{'+' if up else ''}{change_pct:.2f}%",
-            "arrow": '▲' if up else '▼',
-            "up": up,
-            "cat": meta["cat"],
-            "sym": meta.get("sym", ""),
-            "live": True
+        browser_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
         }
-        if "unit" in meta: entry["unit"] = meta["unit"]
-        items.append(entry)
 
-    # Dynamic Precious Metals (India 24K Gold, 22K Gold, 999 Silver)
-    # Derived from live Spot Gold/Silver USD and USD/INR exchange rate
-    tax_multiplier = 1.15
-    gold_24k_10g = round((gold_usd * usd_inr / 31.1034768) * 10 * tax_multiplier, 0)
-    gold_22k_10g = round(gold_24k_10g * 0.916, 0)
-    silver_999_1kg = round((silver_usd * usd_inr / 31.1034768) * 1000 * tax_multiplier, 0)
+        import urllib.request
+        import urllib.parse
 
-    gold_change_pct = round(((gold_usd - 4202.3) / 4202.3) * 100, 2) if gold_usd else 0.0
-    silver_change_pct = round(((silver_usd - 61.175) / 61.175) * 100, 2) if silver_usd else 0.0
+        for ticker, meta in YAHOO_SYMBOLS.items():
+            price = None
+            change_pct = 0.0
 
-    gold_up = gold_change_pct >= 0
-    silver_up = silver_change_pct >= 0
+            # Try Yahoo query1 then query2
+            for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]:
+                try:
+                    url = f"https://{host}/v8/finance/chart/{urllib.parse.quote(ticker)}?interval=1d"
+                    req = urllib.request.Request(url, headers=browser_headers)
+                    raw_data = urllib.request.urlopen(req, timeout=3).read()
+                    c_data = json.loads(raw_data)
+                    c_meta = c_data['chart']['result'][0]['meta']
 
-    precious_metals = [
-        {
-            "symbol": "GOLD 24K",
-            "price": gold_24k_10g,
-            "price_str": f"₹{int(gold_24k_10g):,}",
-            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
-            "arrow": '▲' if gold_up else '▼',
-            "up": gold_up,
-            "cat": "metal",
-            "sym": "₹",
-            "unit": "/10g",
-            "live": True
-        },
-        {
-            "symbol": "GOLD 22K",
-            "price": gold_22k_10g,
-            "price_str": f"₹{int(gold_22k_10g):,}",
-            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
-            "arrow": '▲' if gold_up else '▼',
-            "up": gold_up,
-            "cat": "metal",
-            "sym": "₹",
-            "unit": "/10g",
-            "live": True
-        },
-        {
-            "symbol": "SILVER 999",
-            "price": silver_999_1kg,
-            "price_str": f"₹{int(silver_999_1kg):,}",
-            "change": f"{'+' if silver_up else ''}{silver_change_pct:.2f}%",
-            "arrow": '▲' if silver_up else '▼',
-            "up": silver_up,
-            "cat": "metal",
-            "sym": "₹",
-            "unit": "/1kg",
-            "live": True
-        },
-        {
-            "symbol": "GOLD SPOT",
-            "price": gold_usd,
-            "price_str": f"${gold_usd:,.2f}",
-            "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
-            "arrow": '▲' if gold_up else '▼',
-            "up": gold_up,
-            "cat": "metal",
-            "sym": "$",
-            "unit": "/oz",
-            "live": True
+                    p_live = c_meta.get('regularMarketPrice')
+                    p_prev = c_meta.get('chartPreviousClose') or c_meta.get('previousClose')
+                    if p_live is not None:
+                        price = float(p_live)
+                        if p_prev and p_prev > 0:
+                            change_pct = round(((price - p_prev) / p_prev) * 100, 2)
+                        live_count += 1
+                        break
+                except Exception:
+                    continue
+
+            # Fallback for Crypto if Yahoo rate-limits
+            if price is None and ticker in ["BTC-USD", "ETH-USD"]:
+                try:
+                    sym_pair = "BTCUSDT" if ticker == "BTC-USD" else "ETHUSDT"
+                    r_crypto = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={sym_pair}", timeout=3)
+                    if r_crypto.status_code == 200:
+                        price = float(r_crypto.json().get("price", 0))
+                        live_count += 1
+                except Exception:
+                    pass
+
+            if price is None:
+                if ticker == "INR=X":
+                    price = usd_inr
+                else:
+                    price = FALLBACK_PRICES.get(ticker, 100.0)
+
+            if ticker == "INR=X": usd_inr = price
+            elif ticker == "GC=F": gold_usd = price
+            elif ticker == "SI=F": silver_usd = price
+
+            up = change_pct >= 0
+            price_str = format_price(price, decimals=meta.get("decimals", 2), currency_sym=meta.get("sym", ""))
+            entry = {
+                "symbol": meta["symbol"],
+                "price": price,
+                "price_str": price_str,
+                "change": f"{'+' if up else ''}{change_pct:.2f}%",
+                "arrow": '▲' if up else '▼',
+                "up": up,
+                "cat": meta["cat"],
+                "sym": meta.get("sym", ""),
+                "live": True
+            }
+            if "unit" in meta: entry["unit"] = meta["unit"]
+            items.append(entry)
+
+        # Dynamic Precious Metals (India 24K Gold, 22K Gold, 999 Silver)
+        # Derived from live Spot Gold/Silver USD and USD/INR exchange rate
+        tax_multiplier = 1.15
+        gold_24k_10g = round((gold_usd * usd_inr / 31.1034768) * 10 * tax_multiplier, 0)
+        gold_22k_10g = round(gold_24k_10g * 0.916, 0)
+        silver_999_1kg = round((silver_usd * usd_inr / 31.1034768) * 1000 * tax_multiplier, 0)
+
+        gold_change_pct = round(((gold_usd - 4202.3) / 4202.3) * 100, 2) if gold_usd else 0.0
+        silver_change_pct = round(((silver_usd - 61.175) / 61.175) * 100, 2) if silver_usd else 0.0
+
+        gold_up = gold_change_pct >= 0
+        silver_up = silver_change_pct >= 0
+
+        precious_metals = [
+            {
+                "symbol": "GOLD 24K",
+                "price": gold_24k_10g,
+                "price_str": f"₹{int(gold_24k_10g):,}",
+                "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+                "arrow": '▲' if gold_up else '▼',
+                "up": gold_up,
+                "cat": "metal",
+                "sym": "₹",
+                "unit": "/10g",
+                "live": True
+            },
+            {
+                "symbol": "GOLD 22K",
+                "price": gold_22k_10g,
+                "price_str": f"₹{int(gold_22k_10g):,}",
+                "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+                "arrow": '▲' if gold_up else '▼',
+                "up": gold_up,
+                "cat": "metal",
+                "sym": "₹",
+                "unit": "/10g",
+                "live": True
+            },
+            {
+                "symbol": "SILVER 999",
+                "price": silver_999_1kg,
+                "price_str": f"₹{int(silver_999_1kg):,}",
+                "change": f"{'+' if silver_up else ''}{silver_change_pct:.2f}%",
+                "arrow": '▲' if silver_up else '▼',
+                "up": silver_up,
+                "cat": "metal",
+                "sym": "₹",
+                "unit": "/1kg",
+                "live": True
+            },
+            {
+                "symbol": "GOLD SPOT",
+                "price": gold_usd,
+                "price_str": f"${gold_usd:,.2f}",
+                "change": f"{'+' if gold_up else ''}{gold_change_pct:.2f}%",
+                "arrow": '▲' if gold_up else '▼',
+                "up": gold_up,
+                "cat": "metal",
+                "sym": "$",
+                "unit": "/oz",
+                "live": True
+            }
+        ]
+        items.extend(precious_metals)
+
+        dynamic_fuel = [
+            {"symbol": "PETROL", "price": round(94.72 + (usd_inr - 83.0) * 0.05, 2), "price_str": f"₹{round(94.72 + (usd_inr - 83.0) * 0.05, 2):.2f}", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
+            {"symbol": "DIESEL", "price": round(87.62 + (usd_inr - 83.0) * 0.04, 2), "price_str": f"₹{round(87.62 + (usd_inr - 83.0) * 0.04, 2):.2f}", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
+            {"symbol": "LPG", "price": round(903.00, 2), "price_str": "₹903.00", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Cylinder", "live": True},
+            {"symbol": "CNG", "price": round(74.09, 2), "price_str": "₹74.09", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Kg", "live": True},
+        ]
+        items.extend(dynamic_fuel)
+
+        status = get_market_status()
+        updated_data = {
+            "items": items,
+            "markets": items,
+            "indices": items[:3],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "live_count": live_count,
+            "total_count": len(items),
+            "market_status": status
         }
-    ]
-    items.extend(precious_metals)
 
-    dynamic_fuel = [
-        {"symbol": "PETROL", "price": round(94.72 + (usd_inr - 83.0) * 0.05, 2), "price_str": f"₹{round(94.72 + (usd_inr - 83.0) * 0.05, 2):.2f}", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
-        {"symbol": "DIESEL", "price": round(87.62 + (usd_inr - 83.0) * 0.04, 2), "price_str": f"₹{round(87.62 + (usd_inr - 83.0) * 0.04, 2):.2f}", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Litre", "live": True},
-        {"symbol": "LPG", "price": round(903.00, 2), "price_str": "₹903.00", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Cylinder", "live": True},
-        {"symbol": "CNG", "price": round(74.09, 2), "price_str": "₹74.09", "change": "+0.00%", "up": True, "cat": "fuel", "sym": "₹", "unit": "/Kg", "live": True},
-    ]
-    items.extend(dynamic_fuel)
+        with _market_lock:
+            _market_cache.update(updated_data)
 
+        save_last_api_response("markets", updated_data)
 
-
-    status = get_market_status()
-    updated_data = {
-        "items": items,
-        "markets": items,
-        "indices": items[:3],
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "live_count": live_count,
-        "total_count": len(items),
-        "market_status": status
-    }
-
-    with _market_lock:
-        _market_cache.update(updated_data)
-
-    save_last_api_response("markets", updated_data)
-
-    try:
-        broadcast_market_update({"markets": items, "market_status": status})
-    except Exception:
-        pass
+        try:
+            broadcast_market_update({"markets": items, "market_status": status})
+        except Exception:
+            pass
+        _market_last_refresh_time = time.time()
+    except Exception as e:
+        print(f"[Markets] Refresh error: {e}")
+    finally:
+        _market_is_refreshing = False
 
 def get_market_status() -> dict:
     now = datetime.now(IST)

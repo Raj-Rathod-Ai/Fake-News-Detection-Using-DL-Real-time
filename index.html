@@ -1208,6 +1208,8 @@
             if (localStorage.getItem('tl_theme') === 'dark') document.documentElement.classList.add('dark');
             renderNavTabs();
             renderAuthArea();
+            checkAuthStatus();
+            handleUrlAuthActions();
             // Clear stale empty cache that may block fresh results
             clearStaleNewsCache();
             // Wake backend first, then load news (handles Render cold-start)
@@ -1256,7 +1258,7 @@
             try {
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 60000);
-                await fetch('/api/news?category=home', { signal: controller.signal });
+                await apiFetch('/api/health', { signal: controller.signal });
                 clearTimeout(timeout);
             } catch (e) { }
         }
@@ -1292,10 +1294,10 @@
                     try {
                         res = await fetch(endpoint, options);
                     } catch (fallbackErr) {
-                        throw new Error("Unable to reach TruthLens AI servers. If the server is starting up, please wait ~20 seconds and try again.");
+                        throw new Error("Unable to reach TruthLens AI servers. If server is waking up, please wait ~15 seconds and try again.");
                     }
                 } else {
-                    throw err;
+                    throw new Error("Unable to reach TruthLens AI servers. Please wait ~15 seconds and try again.");
                 }
             }
 
@@ -1310,7 +1312,7 @@
             } else {
                 const text = await res.text();
                 if (res.status === 504 || res.status === 502) {
-                    throw new Error("TruthLens server is currently spinning up (cold-start takes ~25s). Please wait 20 seconds and click again.");
+                    throw new Error("TruthLens server is currently spinning up (cold-start takes ~20s). Please wait a moment and try again.");
                 }
                 if (!res.ok) {
                     throw new Error(`Server returned error (${res.status}). Please try again.`);
@@ -1551,11 +1553,13 @@
             modal.classList.remove('flex');
         }
 
-        function showOtpForm(email) {
+        function showOtpForm(email, initialCode = '') {
             pendingVerificationEmail = email;
             const formLogin = document.getElementById('form-login');
             const formSignup = document.getElementById('form-signup');
             const formOtp = document.getElementById('form-otp');
+            const formForgot = document.getElementById('form-forgot');
+            const formReset = document.getElementById('form-reset-password');
             const tabsBar = document.getElementById('auth-tabs-bar');
             const title = document.getElementById('auth-modal-title');
             const sub = document.getElementById('auth-modal-sub');
@@ -1564,6 +1568,8 @@
 
             if (formLogin) formLogin.classList.add('hidden');
             if (formSignup) formSignup.classList.add('hidden');
+            if (formForgot) formForgot.classList.add('hidden');
+            if (formReset) formReset.classList.add('hidden');
             if (tabsBar) tabsBar.classList.add('hidden');
             if (formOtp) formOtp.classList.remove('hidden');
 
@@ -1571,7 +1577,7 @@
             if (sub) sub.textContent = "Enter the 7-digit code sent to your email to verify and activate your account.";
             if (emailDisp) emailDisp.textContent = email;
             if (otpInput) {
-                otpInput.value = '';
+                otpInput.value = initialCode || '';
                 setTimeout(() => otpInput.focus(), 150);
             }
         }
@@ -1619,7 +1625,7 @@
             if (forgotEmail) setTimeout(() => forgotEmail.focus(), 150);
         }
 
-        function showResetPasswordForm(email) {
+        function showResetPasswordForm(email, initialCode = '') {
             pendingResetEmail = email;
             const formLogin = document.getElementById('form-login');
             const formSignup = document.getElementById('form-signup');
@@ -1631,20 +1637,48 @@
             const sub = document.getElementById('auth-modal-sub');
             const targetEmail = document.getElementById('reset-target-email');
             const resetOtpInput = document.getElementById('reset-otp-input');
+            const resetNewPassword = document.getElementById('reset-new-password');
 
             if (formLogin) formLogin.classList.add('hidden');
             if (formSignup) formSignup.classList.add('hidden');
             if (formOtp) formOtp.classList.add('hidden');
             if (formForgot) formForgot.classList.add('hidden');
-            if (formReset) formReset.classList.remove('hidden');
             if (tabsBar) tabsBar.classList.add('hidden');
+            if (formReset) formReset.classList.remove('hidden');
 
             if (targetEmail) targetEmail.textContent = email;
             if (title) title.textContent = "Set New Password";
             if (sub) sub.textContent = "Enter the 7-digit code sent to your email and your new password.";
             if (resetOtpInput) {
-                resetOtpInput.value = '';
+                resetOtpInput.value = initialCode || '';
+            }
+            if (initialCode && resetNewPassword) {
+                setTimeout(() => resetNewPassword.focus(), 150);
+            } else if (resetOtpInput) {
                 setTimeout(() => resetOtpInput.focus(), 150);
+            }
+        }
+
+        function handleUrlAuthActions() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const action = params.get('action');
+                const email = (params.get('email') || '').trim();
+                const code = (params.get('code') || '').trim();
+
+                if (action === 'verify-otp' && email) {
+                    openAuthModal('signup');
+                    showOtpForm(email, code);
+                    showToast("Account verification link loaded! Enter your 7-digit code to activate.", "info");
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else if (action === 'reset-password' && email) {
+                    openAuthModal('login');
+                    showResetPasswordForm(email, code);
+                    showToast("Password reset link loaded! Please enter your new password.", "info");
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } catch (e) {
+                console.error("handleUrlAuthActions error:", e);
             }
         }
 
