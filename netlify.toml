@@ -1,6 +1,10 @@
 # Netlify Deployment Configuration for TruthLens Frontend
 [build]
+  base = "templates"
   publish = "."
+
+[build.environment]
+  PYTHON_VERSION = "3.11"
 
 # Proxy all /api/* requests seamlessly to the live Render Backend
 [[redirects]]
