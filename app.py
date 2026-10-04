@@ -381,12 +381,39 @@ def get_last_api_response(cache_key: str) -> Any:
 auth_serializer = URLSafeTimedSerializer(app.secret_key or "truthlens_jwt_secret_key_2026")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "pdead3320@gmail.com")
-BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "truthlens")
+BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "TruthLens")
+
+def get_email_brand_header(subtitle: str = "AI Verified Intelligence") -> str:
+    return f"""
+    <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 24px auto;">
+        <tr>
+            <td style="padding-right: 14px; vertical-align: middle;">
+                <table border="0" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td align="center" style="width: 48px; height: 48px; background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); border-radius: 14px; box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45); text-align: center; vertical-align: middle;">
+                            <span style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 22px; font-weight: 900; color: #ffffff; letter-spacing: 1px; display: inline-block; line-height: 48px;">TL</span>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+            <td style="vertical-align: middle; text-align: left;">
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px;">
+                    <span style="color: #ffffff;">Truth</span><span style="color: #a855f7;">Lens</span>
+                </div>
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 2.2px; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">
+                    {subtitle}
+                </div>
+            </td>
+        </tr>
+    </table>
+    """
 
 def send_brevo_email(to_email: str, to_name: str, subject: str, html_content: str) -> bool:
     api_key = os.environ.get("BREVO_API_KEY", "") or BREVO_API_KEY
     sender_email = os.environ.get("BREVO_SENDER_EMAIL", "") or BREVO_SENDER_EMAIL
-    sender_name = os.environ.get("BREVO_SENDER_NAME", "") or BREVO_SENDER_NAME
+    sender_name = os.environ.get("BREVO_SENDER_NAME", "") or BREVO_SENDER_NAME or "TruthLens"
+    if str(sender_name).strip().lower() == "truthlens":
+        sender_name = "TruthLens"
     if not api_key:
         print("[Brevo] No BREVO_API_KEY configured.")
         return False
@@ -403,7 +430,7 @@ def send_brevo_email(to_email: str, to_name: str, subject: str, html_content: st
             "subject": subject,
             "htmlContent": html_content
         }
-        resp = requests.post(url, headers=headers, json=payload, timeout=6)
+        resp = requests.post(url, headers=headers, json=payload, timeout=8)
         if resp.status_code in (200, 201, 202):
             print(f"[Brevo] Email sent successfully to {to_email}")
             return True
@@ -417,6 +444,7 @@ def send_brevo_email(to_email: str, to_name: str, subject: str, html_content: st
 def send_brevo_otp(to_email: str, otp_code: str, user_name: str = "") -> bool:
     name_display = user_name or to_email.split('@')[0]
     subject = f"TruthLens: {otp_code} is your 7-Digit Verification Code"
+    brand_logo = get_email_brand_header("Account Security & Verification")
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -425,9 +453,7 @@ def send_brevo_otp(to_email: str, otp_code: str, user_name: str = "") -> bool:
         <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
             <div style="height: 6px; background: linear-gradient(90deg, #a855f7, #3b82f6, #06b6d4);"></div>
             <div style="padding: 35px 30px; text-align: center;">
-                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 20px;">
-                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #c084fc;">TRUTHLENS AI</span>
-                </div>
+                {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Verify Your Account</h1>
                 <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>, welcome to TruthLens. Please use the 7-digit verification code below to verify your account and unlock <strong>50 free weekly deep scans</strong>:
@@ -452,6 +478,7 @@ def send_brevo_otp(to_email: str, otp_code: str, user_name: str = "") -> bool:
 def send_brevo_welcome_email(to_email: str, user_name: str = "") -> bool:
     name_display = user_name or to_email.split('@')[0]
     subject = "Account Created Successfully — Welcome to TruthLens! 🎉"
+    brand_logo = get_email_brand_header("AI Verified Intelligence")
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -460,9 +487,7 @@ def send_brevo_welcome_email(to_email: str, user_name: str = "") -> bool:
         <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
             <div style="height: 6px; background: linear-gradient(90deg, #10b981, #3b82f6, #a855f7);"></div>
             <div style="padding: 35px 30px; text-align: center;">
-                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 20px;">
-                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #34d399;">TRUTHLENS AI</span>
-                </div>
+                {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Account Created Successfully! 🎉</h1>
                 <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
@@ -504,6 +529,7 @@ def send_brevo_welcome_email(to_email: str, user_name: str = "") -> bool:
 def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str = "") -> bool:
     name_display = user_name or to_email.split('@')[0]
     subject = f"TruthLens: {otp_code} is your 7-Digit Password Reset Code"
+    brand_logo = get_email_brand_header("Account Security")
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -512,9 +538,7 @@ def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str
         <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
             <div style="height: 6px; background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6);"></div>
             <div style="padding: 35px 30px; text-align: center;">
-                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.3); margin-bottom: 20px;">
-                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #f472b6;">TRUTHLENS AI</span>
-                </div>
+                {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Reset Your Password</h1>
                 <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
@@ -541,6 +565,7 @@ def send_brevo_password_reset_email(to_email: str, otp_code: str, user_name: str
 def send_brevo_password_changed_email(to_email: str, user_name: str = "") -> bool:
     name_display = user_name or to_email.split('@')[0]
     subject = "Security Notice: Your TruthLens Password Was Changed"
+    brand_logo = get_email_brand_header("Security Notice")
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -549,16 +574,14 @@ def send_brevo_password_changed_email(to_email: str, user_name: str = "") -> boo
         <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 20px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
             <div style="height: 6px; background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);"></div>
             <div style="padding: 35px 30px; text-align: center;">
-                <div style="display: inline-block; padding: 10px 18px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 20px;">
-                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #34d399;">TRUTHLENS AI</span>
-                </div>
+                {brand_logo}
                 <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 10px 0;">Password Changed Successfully</h1>
                 <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 25px 0;">
                     Hello <strong style="color: #f1f5f9;">{name_display}</strong>,<br>
                     Your TruthLens password has been updated successfully. You can now use your new password to sign in across all your devices.
                 </p>
                 <div style="margin: 20px 0 25px 0;">
-                    <a href="https://truthlens5.netlify.app" target="_blank" style="display: inline-block; padding: 15px 36px; background: linear-gradient(135deg, #10b981, #3b82f6); color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; letter-spacing: 1px; border-radius: 12px; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);">
+                    <a href="https://truthlens5.netlify.app" target="_blank" style="display: inline-block; padding: 15px 36px; background: linear-gradient(135deg, #10b981, #3b82f6); color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; letter-spacing: 1px; border-radius: 12px; box-shadow: 0 8px 25px rgba(168, 85, 129, 0.4);">
                         SIGN IN NOW &rarr;
                     </a>
                 </div>
